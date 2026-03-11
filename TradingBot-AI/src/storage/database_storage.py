@@ -43,7 +43,7 @@ class DatabaseStorage:
             # Positions table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS positions (
-                    id INTEGER PRIMARY KEY DEFAULT 1,
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
                     data JSONB NOT NULL,
                     updated_at TIMESTAMP DEFAULT NOW()
                 )
