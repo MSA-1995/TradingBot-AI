@@ -249,38 +249,12 @@ class DatabaseStorage:
         except:
             return []
     
-    # ========== Positions (متوافق مع النظام الحالي) ==========
-    def save_positions(self, positions):
-        try:
-            data = {}
-            for symbol, config in positions.items():
-                if config['position']:
-                    data[symbol] = config['position']
-            
-            # نحفظ في جدول positions
-            self.supabase.table('positions').upsert({
-                'id': 1,
-                'data': data,
-                'updated_at': datetime.now().isoformat()
-            }).execute()
-            return True
-        except Exception as e:
-            print(f"❌ DB save positions error: {e}")
-            return False
-    
-    def load_positions(self):
-        try:
-            result = self.supabase.table('positions').select('data').eq('id', 1).execute()
-            if result.data:
-                return result.data[0]['data']
-            return {}
-        except:
-            return {}
-
     
     # ========== Positions ==========
     def save_positions(self, positions):
         try:
+            self.conn.rollback()  # تنظيف أي transaction فاشل
+            
             data = {}
             for symbol, config in positions.items():
                 if config.get('position'):
@@ -302,6 +276,8 @@ class DatabaseStorage:
     
     def load_positions(self):
         try:
+            self.conn.rollback()  # تنظيف أي transaction فاشل
+            
             cursor = self.conn.cursor(cursor_factory=self.RealDictCursor)
             cursor.execute("SELECT data FROM positions WHERE id = 1")
             result = cursor.fetchone()
@@ -309,7 +285,9 @@ class DatabaseStorage:
             if result:
                 return result['data']
             return {}
-        except:
+        except Exception as e:
+            print(f"❌ DB load positions error: {e}")
+            self.conn.rollback()
             return {}
     
     # ========== Performance ==========
