@@ -178,7 +178,9 @@ try:
                         sell_reason = sell_decision['reason']
                         profit_percent = sell_decision['profit']
                     elif sell_decision['action'] == 'HOLD':
-                        print(f"💎 {symbol:12} ${current_price:>8.2f} | Profit:{profit_percent:>+6.2f}% | {sell_decision['reason']}")
+                        # عرض المركز بتفاصيل كاملة
+                        profit_emoji = "📈" if profit_percent > 0 else "📉"
+                        print(f"{profit_emoji} {symbol:12} ${current_price:>8.4f} | Profit:{profit_percent:>+7.2f}% | Buy:${buy_price:>8.4f} | High:${highest_price:>8.4f} | {sell_decision['reason']}")
                         continue
                 else:
                     # Manual sell logic
@@ -203,7 +205,9 @@ try:
                             sell_reason = reason
                     
                     if not sell_reason:
-                        print(f"💎 {symbol:12} ${current_price:>8.2f} | Profit:{profit_percent:>+6.2f}% | Hold")
+                        # عرض المركز بتفاصيل كاملة
+                        profit_emoji = "📈" if profit_percent > 0 else "📉"
+                        print(f"{profit_emoji} {symbol:12} ${current_price:>8.4f} | Profit:{profit_percent:>+7.2f}% | Buy:${buy_price:>8.4f} | High:${highest_price:>8.4f} | Hold")
                         continue
                 
                 # Execute sell
@@ -236,8 +240,9 @@ try:
                             symbol_data['position'] = None
                             storage.save_positions(SYMBOLS_DATA)
                 else:
-                    # Hold
-                    print(f"💎 {symbol:12} ${current_price:>8.2f} | Profit:{profit_percent:>+6.2f}% | Hold")
+                    # Hold - عرض المركز بتفاصيل كاملة
+                    profit_emoji = "📈" if profit_percent > 0 else "📉"
+                    print(f"{profit_emoji} {symbol:12} ${current_price:>8.4f} | Profit:{profit_percent:>+7.2f}% | Buy:${buy_price:>8.4f} | High:${highest_price:>8.4f} | Hold")
             
             # ========== BUY LOGIC ==========
             else:
@@ -320,7 +325,13 @@ try:
                             available -= amount_usd
                             storage.save_positions(SYMBOLS_DATA)
                     else:
-                        print(f"📊 {symbol:12} ${current_price:>8.2f} | Confidence:{confidence}/120 - SKIP")
+                        # عرض التحليل للعملات بدون مراكز
+                        rsi = analysis.get('rsi', 0)
+                        volume = analysis.get('volume_ratio', 0)
+                        macd = analysis.get('macd_diff', 0)
+                        momentum = analysis.get('price_momentum', 0)
+                        
+                        print(f"📊 {symbol:12} ${current_price:>8.4f} | RSI:{rsi:>5.1f} | Vol:{volume:>4.1f}x | MACD:{macd:>+6.1f} | Mom:{momentum:>+5.1f}% | Conf:{confidence}/120")
         
         # Report
         if should_send_report(last_report_time, REPORT_INTERVAL):
