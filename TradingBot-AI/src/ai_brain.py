@@ -4,7 +4,13 @@ AI Brain - العقل المفكر
 """
 from datetime import datetime
 import sys
-sys.path.append('..')
+import os
+
+# إضافة المسار الصحيح
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from storage.storage_manager import StorageManager
 
 class AIBrain:
