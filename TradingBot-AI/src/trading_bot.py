@@ -304,7 +304,13 @@ try:
                             available -= amount_usd
                             storage.save_positions(SYMBOLS_DATA)
                     else:
-                        print(f"📊 {symbol:12} ${current_price:>8.2f} | AI: {decision['reason']}")
+                        # عرض التفاصيل حتى لو فشل AI
+                        rsi = analysis.get('rsi', 0)
+                        volume = analysis.get('volume_ratio', 0)
+                        macd = analysis.get('macd_diff', 0)
+                        
+                        vol_status = "🟢" if volume > 0.8 else "🔴"
+                        print(f"📊 {symbol:12} ${current_price:>8.2f} | RSI:{rsi:>5.1f} | Vol:{vol_status} {volume:.1f}x | MACD:{macd:>+6.1f} | Conf:{decision['confidence']}/120 | {decision['reason']}")
                 else:
                     # Manual mode
                     if confidence >= MIN_CONFIDENCE:
@@ -329,9 +335,9 @@ try:
                         rsi = analysis.get('rsi', 0)
                         volume = analysis.get('volume_ratio', 0)
                         macd = analysis.get('macd_diff', 0)
-                        momentum = analysis.get('price_momentum', 0)
                         
-                        print(f"📊 {symbol:12} ${current_price:>8.4f} | RSI:{rsi:>5.1f} | Vol:{volume:>4.1f}x | MACD:{macd:>+6.1f} | Mom:{momentum:>+5.1f}% | Conf:{confidence}/120")
+                        vol_status = "🟢" if volume > 0.8 else "🔴"
+                        print(f"📊 {symbol:12} ${current_price:>8.2f} | RSI:{rsi:>5.1f} | Vol:{vol_status} {volume:.1f}x | MACD:{macd:>+6.1f} | Conf:{confidence}/120")
         
         # Report
         if should_send_report(last_report_time, REPORT_INTERVAL):
