@@ -18,15 +18,18 @@ class DatabaseStorage:
         import psycopg2
         from psycopg2.extras import RealDictCursor
         import json as json_module
+        from urllib.parse import urlparse, unquote
         
-        # فك تشفير URL بطريقة أقوى
-        database_url = database_url.replace('%23', '#')
-        database_url = database_url.replace('%25', '%')
-        database_url = database_url.replace('%21', '!')
-        database_url = database_url.replace('%2C', ',')
-        database_url = database_url.replace('%2F', '/')
+        # استخراج المعلومات من URL
+        parsed = urlparse(database_url)
         
-        self.conn = psycopg2.connect(database_url)
+        self.conn = psycopg2.connect(
+            host=parsed.hostname,
+            port=parsed.port,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=unquote(parsed.password)
+        )
         self.json = json_module
         self.RealDictCursor = RealDictCursor
         self._create_tables()
