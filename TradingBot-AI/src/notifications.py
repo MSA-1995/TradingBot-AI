@@ -6,8 +6,9 @@ Handles Discord messages and file logging
 import requests
 from datetime import datetime
 import os
+from config_encrypted import get_discord_webhook
 
-DISCORD_WEBHOOK = os.getenv('DISCORD_WEBHOOK')
+DISCORD_WEBHOOK = get_discord_webhook()
 
 def send_discord(message, color='blue'):
     """Send message to Discord"""
