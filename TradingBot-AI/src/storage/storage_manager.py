@@ -8,35 +8,24 @@ from datetime import datetime
 class StorageManager:
     def __init__(self):
         self.mode = self.detect_environment()
-        self.local_path = '../data/'
         
         if self.mode == 'cloud':
             from .database_storage import DatabaseStorage
             self.storage = DatabaseStorage()
-        elif self.mode == 'local':
+        else:  # local
             from .local_storage import LocalStorage
-            self.storage = LocalStorage(self.local_path)
-        else:  # hybrid
-            from .hybrid_storage import HybridStorage
-            self.storage = HybridStorage(self.local_path)
+            self.storage = LocalStorage('data/')
         
         print(f"💾 Storage Mode: {self.mode.upper()}")
     
     def detect_environment(self):
         """يكتشف البيئة تلقائياً"""
-        supabase_url = os.getenv('SUPABASE_URL')
-        storage_mode = os.getenv('STORAGE_MODE', 'auto')
+        database_url = os.getenv('DATABASE_URL')
         
-        if storage_mode == 'local':
-            return 'local'
-        elif storage_mode == 'cloud' and supabase_url:
-            return 'cloud'
-        elif storage_mode == 'hybrid' and supabase_url:
-            return 'hybrid'
-        elif supabase_url:
-            return 'hybrid'  # الافتراضي: الاثنين معاً
+        if database_url:
+            return 'cloud'  # PostgreSQL فقط (Koyeb)
         else:
-            return 'local'
+            return 'local'  # JSON فقط (جهازك)
     
     # ========== Trade Operations ==========
     def save_trade(self, trade_data):
