@@ -32,7 +32,7 @@ from config import *
 # Modules
 from analysis import get_market_analysis, get_multi_timeframe_analysis, calculate_momentum
 from trading import execute_buy, execute_sell, calculate_sell_value, should_sell_fast_tp, should_sell_bearish, should_sell_stop_loss, update_highest_price
-from notifications import send_buy_notification, send_sell_notification, send_positions_report
+from notifications import send_buy_notification, send_sell_notification, send_positions_report, send_startup_notification
 from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent
 from storage import StorageManager
 
@@ -114,6 +114,9 @@ print(f"💰 Boost: ${BASE_AMOUNT}-${BOOST_AMOUNT}")
 print(f"🎯 TP: {TAKE_PROFIT_PERCENT}% | SL: {STOP_LOSS_PERCENT}%")
 print(f"🎯 Min Confidence: 60/120")
 print(f"🔺 Max Confidence: 75/120\n")
+
+# Send startup notification to Discord
+send_startup_notification()
 
 last_report_time = datetime.now()
 
