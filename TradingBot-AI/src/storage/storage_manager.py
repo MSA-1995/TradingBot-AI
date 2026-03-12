@@ -88,3 +88,10 @@ class StorageManager:
             return self.storage.load_trades(limit=1000)
         except:
             return []
+    
+    # ========== Auto Cleanup ==========
+    def cleanup_old_data(self):
+        """حذف البيانات القديمة تلقائياً"""
+        if hasattr(self.storage, 'cleanup_old_data'):
+            return self.storage.cleanup_old_data()
+        return False
