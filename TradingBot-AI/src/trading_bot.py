@@ -171,8 +171,8 @@ if NEWS_ENABLED:
 
 print(f"💰 Boost: ${BASE_AMOUNT}-${BOOST_AMOUNT}")
 print(f"🎯 TP: {TAKE_PROFIT_PERCENT}% | SL: {STOP_LOSS_PERCENT}%")
-print(f"🎯 Min Confidence: 60/120")
-print(f"🔺 Max Confidence: 75/120\n")
+print(f"🎯 Min Confidence: {MIN_CONFIDENCE}/120")
+print(f"🔺 Max Confidence: {AI_BOUNDARIES['max_confidence']}/120\n")
 
 # Send startup notification to Discord
 send_startup_notification()
