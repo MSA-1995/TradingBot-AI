@@ -23,6 +23,17 @@ class AIBrain:
         # تحميل المعرفة السابقة
         self.load_knowledge()
         
+        # MTF Analyzer (optional)
+        try:
+            import sys
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
+            from models.multi_timeframe_analyzer import MultiTimeframeAnalyzer
+            self.mtf_analyzer = None  # Will be set externally
+        except:
+            self.mtf_analyzer = None
+        
         print("🧠 AI Brain initialized")
         print(f"📊 Loaded {len(self.learned_patterns)} patterns")
         print(f"🚫 Loaded {len(self.trap_memory)} traps")
