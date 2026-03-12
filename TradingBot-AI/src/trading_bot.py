@@ -54,6 +54,23 @@ try:
 except:
     AI_ENABLED = False
 
+# Advanced Models
+try:
+    import sys
+    import os
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    
+    from models.multi_timeframe_analyzer import MultiTimeframeAnalyzer
+    from models.risk_manager import RiskManager
+    MTF_ENABLED = True
+    RISK_ENABLED = True
+except Exception as e:
+    print(f"⚠️ Advanced models not loaded: {e}")
+    MTF_ENABLED = False
+    RISK_ENABLED = False
+
 init(autoreset=True)
 
 # ========== SETUP ==========
@@ -77,6 +94,10 @@ storage = StorageManager()
 
 # AI Brain
 ai_brain = AIBrain(AI_BOUNDARIES) if AI_ENABLED else None
+
+# Advanced Models
+mtf_analyzer = MultiTimeframeAnalyzer(exchange) if MTF_ENABLED else None
+risk_manager = RiskManager(storage) if RISK_ENABLED else None
 
 # ========== BANNER ==========
 print("=" * 60)
@@ -110,6 +131,12 @@ if ai_brain:
     print(f"🧠 AI Brain: ACTIVE")
 else:
     print(f"⚙️ AI Brain: DISABLED")
+
+if mtf_analyzer:
+    print(f"📊 Multi-Timeframe: ACTIVE")
+if risk_manager:
+    print(f"🛡️ Risk Manager: ACTIVE")
+
 print(f"💰 Boost: ${BASE_AMOUNT}-${BOOST_AMOUNT}")
 print(f"🎯 TP: {TAKE_PROFIT_PERCENT}% | SL: {STOP_LOSS_PERCENT}%")
 print(f"🎯 Min Confidence: 60/120")
@@ -260,6 +287,19 @@ try:
                 # Get MTF and calculate confidence
                 mtf = get_multi_timeframe_analysis(exchange, symbol)
                 
+                # Advanced MTF Analysis
+                mtf_boost = 0
+                if mtf_analyzer:
+                    try:
+                        mtf_analysis = mtf_analyzer.analyze(symbol)
+                        if mtf_analysis:
+                            mtf_boost = mtf_analysis['confidence_boost']
+                            entry_point = mtf_analyzer.get_best_entry_point(symbol)
+                            if entry_point and entry_point['entry'] == 'EXCELLENT':
+                                mtf_boost += 5
+                    except Exception as e:
+                        print(f"⚠️ MTF error {symbol}: {e}")
+                
                 # Calculate price drop
                 price_drop = {'drop_percent': 0, 'confirmed': False}
                 try:
@@ -282,8 +322,27 @@ try:
                 # AI Decision
                 if ai_brain:
                     decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop)
+                    
+                    # Apply MTF boost
+                    if mtf_boost != 0:
+                        decision['confidence'] = min(75, max(60, decision['confidence'] + mtf_boost))
+                    
                     if decision['action'] == 'BUY':
-                        amount_usd = decision['amount']
+                        # Risk Manager - Calculate optimal amount
+                        if risk_manager:
+                            try:
+                                optimal_amount = risk_manager.get_position_size(
+                                    symbol, 
+                                    decision['confidence'], 
+                                    available + invested,
+                                    MAX_POSITIONS
+                                )
+                                amount_usd = optimal_amount
+                            except:
+                                amount_usd = decision['amount']
+                        else:
+                            amount_usd = decision['amount']
+                        
                         print(f"{Fore.GREEN}🟢 BUY {symbol} 🧠 | AI Confidence:{decision['confidence']}/120 | ${amount_usd}{Style.RESET_ALL}")
                         
                         result = execute_buy(exchange, symbol, amount_usd, current_price, decision['confidence'])
@@ -347,6 +406,28 @@ try:
         # Report
         if should_send_report(last_report_time, REPORT_INTERVAL):
             send_positions_report(available, invested, active_count, MAX_POSITIONS)
+            
+            # Risk Report
+            if risk_manager:
+                try:
+                    risk_report = risk_manager.get_risk_report()
+                    if risk_report:
+                        print(f"\n🛡️ Risk Report:")
+                        print(f"  Sharpe Ratio (7d): {risk_report['sharpe_ratio_7d']}")
+                        print(f"  Max Drawdown (7d): {risk_report['max_drawdown_7d']}%")
+                        print(f"  Risk Level: {risk_report['risk_level']}")
+                        
+                        # Check if should stop trading
+                        stop_check = risk_manager.should_stop_trading()
+                        if stop_check['stop']:
+                            print(f"\n⚠️ {Fore.RED}RISK ALERT: {stop_check['reason']}{Style.RESET_ALL}")
+                            print(f"Severity: {stop_check['severity']}")
+                            if stop_check['severity'] == 'CRITICAL':
+                                print(f"🛑 Stopping bot for safety...")
+                                break
+                except Exception as e:
+                    print(f"⚠️ Risk report error: {e}")
+            
             last_report_time = datetime.now()
         
         # Cleanup
