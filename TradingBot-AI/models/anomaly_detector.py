@@ -54,7 +54,7 @@ class AnomalyDetector:
                 'symbol': symbol,
                 'anomalies': anomalies,
                 'severity': severity,
-                'safe_to_trade': severity in ['NORMAL', 'LOW'],
+                'safe_to_trade': severity in ['NORMAL', 'LOW', 'MEDIUM'],  # Changed: accept MEDIUM
                 'timestamp': datetime.now().isoformat()
             }
             
