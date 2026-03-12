@@ -198,9 +198,9 @@ class CoinRankingModel:
             }
         elif coin['recommendation'] == 'WATCH':
             return {
-                'trade': True,
+                'trade': True,  # Changed: accept WATCH coins
                 'reason': 'Acceptable performer',
-                'confidence_adjustment': 0
+                'confidence_adjustment': -2  # Small penalty
             }
         else:  # AVOID
             return {
