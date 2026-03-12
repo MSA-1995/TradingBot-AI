@@ -224,17 +224,22 @@ try:
                             send_sell_notification(symbol, amount, current_price, sell_value, profit_percent, sell_reason)
                             
                             # AI Learning - يتعلم من كل شيء
-                            if ai_brain and 'ai_data' in position:
+                            if ai_brain:
                                 trade_result = {
                                     'symbol': symbol,
+                                    'action': 'SELL',
                                     'profit_percent': profit_percent,
                                     'sell_reason': sell_reason,
                                     'tp_target': position.get('tp_target', 1.0),
                                     'sl_target': position.get('sl_target', 2.0),
                                     'max_wait_hours': position.get('max_wait_hours', 48),
-                                    'hours_held': (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600,
-                                    **position['ai_data']
+                                    'hours_held': (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600
                                 }
+                                
+                                # إضافة ai_data إذا موجود
+                                if 'ai_data' in position:
+                                    trade_result.update(position['ai_data'])
+                                
                                 ai_brain.learn_from_trade(trade_result)
                             
                             symbol_data['position'] = None
