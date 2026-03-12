@@ -546,6 +546,13 @@ try:
         if should_send_report(last_report_time, REPORT_INTERVAL):
             send_positions_report(available, invested, active_count, MAX_POSITIONS)
             
+            # Auto-cleanup old data (every report)
+            try:
+                if hasattr(storage, 'cleanup_old_data'):
+                    storage.cleanup_old_data()
+            except Exception as e:
+                print(f"⚠️ Cleanup error: {e}")
+            
             # Risk Report
             if risk_manager:
                 try:
