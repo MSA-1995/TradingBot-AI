@@ -106,6 +106,7 @@ class DatabaseStorage:
             
             self.conn.commit()
             cursor.close()
+            print("✅ Database tables ready")
         except Exception as e:
             print(f"⚠️ Table creation error: {e}")
             self.conn.rollback()
@@ -234,6 +235,53 @@ class DatabaseStorage:
             return result.data
         except:
             return []
+    
+    # ========== Auto Cleanup ==========
+    def cleanup_old_data(self):
+        """حذف البيانات القديمة تلقائياً"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # حذف trades_history الأقدم من 30 يوم
+            cursor.execute("""
+                DELETE FROM trades_history 
+                WHERE timestamp < NOW() - INTERVAL '30 days'
+            """)
+            trades_deleted = cursor.rowcount
+            
+            # حذف learned_patterns الأقدم من 30 يوم
+            cursor.execute("""
+                DELETE FROM learned_patterns 
+                WHERE last_updated < NOW() - INTERVAL '30 days'
+            """)
+            patterns_deleted = cursor.rowcount
+            
+            # حذف ai_decisions الأقدم من 90 يوم (للتعلم)
+            cursor.execute("""
+                DELETE FROM ai_decisions 
+                WHERE timestamp < NOW() - INTERVAL '90 days'
+            """)
+            decisions_deleted = cursor.rowcount
+            
+            # حذف trap_memory الأقدم من 90 يوم
+            cursor.execute("""
+                DELETE FROM trap_memory 
+                WHERE timestamp < NOW() - INTERVAL '90 days'
+            """)
+            traps_deleted = cursor.rowcount
+            
+            self.conn.commit()
+            cursor.close()
+            
+            total_deleted = trades_deleted + patterns_deleted + decisions_deleted + traps_deleted
+            if total_deleted > 0:
+                print(f"🗑️ Cleaned: {trades_deleted} trades, {patterns_deleted} patterns, {decisions_deleted} AI decisions, {traps_deleted} traps")
+            
+            return True
+        except Exception as e:
+            print(f"⚠️ Cleanup error: {e}")
+            self.conn.rollback()
+            return False
     
     # ========== Traps ==========
     def save_trap(self, trap_data):
