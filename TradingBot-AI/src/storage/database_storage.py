@@ -113,6 +113,15 @@ class DatabaseStorage:
     # ========== Trades ==========
     def save_trade(self, trade_data):
         try:
+            # تحويل numpy types إلى Python types
+            def convert_value(val):
+                if val is None:
+                    return None
+                # تحويل numpy types
+                if hasattr(val, 'item'):
+                    return val.item()
+                return val
+            
             cursor = self.conn.cursor()
             cursor.execute("""
                 INSERT INTO trades_history (symbol, action, profit_percent, sell_reason, tp_target, sl_target, hours_held, data)
@@ -120,12 +129,12 @@ class DatabaseStorage:
             """, (
                 trade_data.get('symbol'),
                 trade_data.get('action'),
-                trade_data.get('profit_percent'),
+                convert_value(trade_data.get('profit_percent')),
                 trade_data.get('sell_reason'),
-                trade_data.get('tp_target'),
-                trade_data.get('sl_target'),
-                trade_data.get('hours_held'),
-                self.json.dumps(trade_data)
+                convert_value(trade_data.get('tp_target')),
+                convert_value(trade_data.get('sl_target')),
+                convert_value(trade_data.get('hours_held')),
+                self.json.dumps(trade_data, default=str)
             ))
             self.conn.commit()
             cursor.close()
