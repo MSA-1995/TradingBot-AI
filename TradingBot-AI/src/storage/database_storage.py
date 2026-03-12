@@ -40,12 +40,18 @@ class DatabaseStorage:
         try:
             cursor = self.conn.cursor()
             
-            # Positions table
+            # Positions table (نفس البوت القديم)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS positions (
-                    id INTEGER PRIMARY KEY CHECK (id = 1),
-                    data JSONB NOT NULL,
-                    updated_at TIMESTAMP DEFAULT NOW()
+                    symbol VARCHAR(20) PRIMARY KEY,
+                    buy_price FLOAT NOT NULL,
+                    amount FLOAT NOT NULL,
+                    highest_price FLOAT NOT NULL,
+                    tp_level_1 BOOLEAN DEFAULT FALSE,
+                    tp_level_2 BOOLEAN DEFAULT FALSE,
+                    buy_time TIMESTAMP NOT NULL,
+                    invested FLOAT NOT NULL,
+                    data JSONB
                 )
             """)
             
@@ -253,19 +259,32 @@ class DatabaseStorage:
     # ========== Positions ==========
     def save_positions(self, positions):
         try:
-            self.conn.rollback()  # تنظيف أي transaction فاشل
+            self.conn.rollback()
+            cursor = self.conn.cursor()
             
-            data = {}
+            # حذف المراكز القديمة
+            cursor.execute("DELETE FROM positions")
+            
+            # إضافة المراكز الجديدة
             for symbol, config in positions.items():
                 if config.get('position'):
-                    data[symbol] = config['position']
+                    pos = config['position']
+                    cursor.execute("""
+                        INSERT INTO positions 
+                        (symbol, buy_price, amount, highest_price, tp_level_1, tp_level_2, buy_time, invested, data)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        symbol,
+                        float(pos['buy_price']),
+                        float(pos['amount']),
+                        float(pos['highest_price']),
+                        pos.get('tp_level_1', False),
+                        pos.get('tp_level_2', False),
+                        pos['buy_time'],
+                        float(pos['invested']),
+                        self.json.dumps(pos)
+                    ))
             
-            cursor = self.conn.cursor()
-            cursor.execute("""
-                INSERT INTO positions (id, data, updated_at)
-                VALUES (1, %s, NOW())
-                ON CONFLICT (id) DO UPDATE SET data = %s, updated_at = NOW()
-            """, (self.json.dumps(data), self.json.dumps(data)))
             self.conn.commit()
             cursor.close()
             return True
@@ -276,15 +295,25 @@ class DatabaseStorage:
     
     def load_positions(self):
         try:
-            self.conn.rollback()  # تنظيف أي transaction فاشل
-            
+            self.conn.rollback()
             cursor = self.conn.cursor(cursor_factory=self.RealDictCursor)
-            cursor.execute("SELECT data FROM positions WHERE id = 1")
-            result = cursor.fetchone()
+            cursor.execute("SELECT * FROM positions")
+            rows = cursor.fetchall()
             cursor.close()
-            if result:
-                return result['data']
-            return {}
+            
+            data = {}
+            for row in rows:
+                data[row['symbol']] = {
+                    'buy_price': row['buy_price'],
+                    'amount': row['amount'],
+                    'highest_price': row['highest_price'],
+                    'tp_level_1': row['tp_level_1'],
+                    'tp_level_2': row['tp_level_2'],
+                    'buy_time': row['buy_time'].isoformat(),
+                    'invested': row['invested']
+                }
+            
+            return data
         except Exception as e:
             print(f"❌ DB load positions error: {e}")
             self.conn.rollback()
