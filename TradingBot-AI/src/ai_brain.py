@@ -98,7 +98,7 @@ class AIBrain:
         # 6. القرار النهائي
         if optimized_confidence >= 60:  # استخدام 60 (الحد الجديد)
             # حساب المبلغ الذكي
-            amount = self._calculate_smart_amount(optimized_confidence)
+            amount = self._calculate_smart_amount(optimized_confidence, analysis)
             
             # حساب TP و SL الذكي
             smart_targets = self._calculate_smart_targets(optimized_confidence, analysis, similar_success)
@@ -289,20 +289,77 @@ class AIBrain:
         
         return optimized
     
-    def _calculate_smart_amount(self, confidence):
-        """حساب المبلغ الذكي بناءً على Confidence"""
+    def _calculate_smart_amount(self, confidence, analysis, win_rate=None):
+        """حساب المبلغ الذكي بنطاق Min-Max"""
+        import pandas as pd
+        
+        # تحديد النطاق حسب Confidence
         if confidence >= 110:
-            return 20
+            min_amount, max_amount = 20, 25
         elif confidence >= 100:
-            return 18
+            min_amount, max_amount = 18, 23
         elif confidence >= 90:
-            return 16
+            min_amount, max_amount = 16, 20
         elif confidence >= 80:
-            return 14
+            min_amount, max_amount = 14, 18
         elif confidence >= 70:
-            return 12
+            min_amount, max_amount = 12, 15
+        else:  # 60-69
+            min_amount, max_amount = 10, 12
+        
+        # حساب المبلغ بين Min و Max
+        amount = min_amount
+        boost_points = 0
+        
+        # 1. RSI boost
+        rsi = analysis.get('rsi', 50)
+        if not pd.isna(rsi):
+            if rsi < 25:
+                boost_points += 3
+            elif rsi < 30:
+                boost_points += 2
+            elif rsi < 35:
+                boost_points += 1
+        
+        # 2. Volume boost
+        volume_ratio = analysis.get('volume_ratio', 1.0)
+        if not pd.isna(volume_ratio):
+            if volume_ratio > 2.5:
+                boost_points += 3
+            elif volume_ratio > 2.0:
+                boost_points += 2
+            elif volume_ratio > 1.5:
+                boost_points += 1
+        
+        # 3. MACD boost
+        macd_diff = analysis.get('macd_diff', 0)
+        if not pd.isna(macd_diff):
+            if macd_diff > 10:
+                boost_points += 2
+            elif macd_diff > 5:
+                boost_points += 1
+        
+        # 4. Win Rate boost
+        if win_rate:
+            if win_rate > 75:
+                boost_points += 2
+            elif win_rate > 65:
+                boost_points += 1
+        
+        # حساب المبلغ النهائي
+        range_size = max_amount - min_amount
+        if boost_points >= 8:
+            amount = max_amount
+        elif boost_points >= 6:
+            amount = min_amount + (range_size * 0.8)
+        elif boost_points >= 4:
+            amount = min_amount + (range_size * 0.6)
+        elif boost_points >= 2:
+            amount = min_amount + (range_size * 0.4)
         else:
-            return 10
+            amount = min_amount
+        
+        return round(amount, 2)
     
     def _estimate_success_probability(self, similar_patterns):
         """تقدير احتمال النجاح"""
