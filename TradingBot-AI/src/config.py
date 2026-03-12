@@ -4,7 +4,7 @@ All bot settings and constants
 """
 
 # Trading Parameters
-MIN_CONFIDENCE = 60
+MIN_CONFIDENCE = 55  # Changed from 60 - more aggressive
 MAX_POSITIONS = 20
 BASE_AMOUNT = 10
 BOOST_AMOUNT = 20
