@@ -136,7 +136,7 @@ class NewsAnalyzer:
             return False
         
         # تجنب إذا:
-        # 1. أكثر من 70% أخبار سلبية
+        # 1. أكثر من 80% أخبار سلبية (Changed from 70%)
         # 2. فيه 3+ أخبار سلبية وما فيه إيجابية
         
         total = sentiment['total']
@@ -145,7 +145,7 @@ class NewsAnalyzer:
         
         if total >= 3:
             neg_ratio = negative / total
-            if neg_ratio > 0.7:
+            if neg_ratio > 0.8:  # Changed from 0.7
                 return True
             
             if negative >= 3 and positive == 0:
