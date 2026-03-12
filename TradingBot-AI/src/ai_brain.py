@@ -72,31 +72,31 @@ class AIBrain:
             similar_success
         )
         
-        # 5. التحقق من الحدود الآمنة (DISABLED FOR TEST)
-        # validator = SafetyValidator(self.boundaries)
-        # is_safe = validator.validate_decision({
-        #     'confidence': optimized_confidence,
-        #     'volume': analysis['volume_ratio'],
-        #     'rsi': analysis['rsi'],
-        #     'macd': analysis['macd_diff']
-        # })
-        # 
-        # if not is_safe:
-        #     decision = {
-        #         'action': 'SKIP',
-        #         'reason': 'Failed safety validation',
-        #         'confidence': optimized_confidence
-        #     }
-        #     self.storage.save_ai_decision({
-        #         'symbol': symbol,
-        #         'decision': 'SKIP',
-        #         'reason': 'Safety check failed',
-        #         'confidence': optimized_confidence
-        #     })
-        #     return decision
+        # 5. التحقق من الحدود الآمنة
+        validator = SafetyValidator(self.boundaries)
+        is_safe = validator.validate_decision({
+            'confidence': optimized_confidence,
+            'volume': analysis['volume_ratio'],
+            'rsi': analysis['rsi'],
+            'macd': analysis['macd_diff']
+        })
+        
+        if not is_safe:
+            decision = {
+                'action': 'SKIP',
+                'reason': 'Failed safety validation',
+                'confidence': optimized_confidence
+            }
+            self.storage.save_ai_decision({
+                'symbol': symbol,
+                'decision': 'SKIP',
+                'reason': 'Safety check failed',
+                'confidence': optimized_confidence
+            })
+            return decision
         
         # 6. القرار النهائي
-        if optimized_confidence >= 30:  # TEST: Lowered from 60 to 30
+        if optimized_confidence >= 60:  # استخدام 60 (الحد الجديد)
             # حساب المبلغ الذكي
             amount = self._calculate_smart_amount(optimized_confidence)
             
