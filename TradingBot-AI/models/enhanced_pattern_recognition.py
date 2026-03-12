@@ -271,11 +271,11 @@ class EnhancedPatternRecognition:
             return 'STRONG_BUY'
         elif success_probability >= 0.65 and pattern_strength in ['STRONG', 'MEDIUM']:
             return 'BUY'
-        elif success_probability >= 0.55:
+        elif success_probability >= 0.50:  # Changed from 0.55
             return 'CONSIDER'
-        elif success_probability >= 0.45:
+        elif success_probability >= 0.40:  # Changed from 0.45
             return 'NEUTRAL'
-        elif success_probability >= 0.35:
+        elif success_probability >= 0.30:  # Changed from 0.35 - more aggressive
             return 'CAUTION'
         else:
             return 'AVOID'
