@@ -84,11 +84,13 @@ def should_send_report(last_report_time, interval_minutes=30):
 def format_price(price):
     """Format price based on value"""
     if price >= 100:
-        return f"${price:.2f}"
+        return f"${price:>8.2f}"
     elif price >= 1:
-        return f"${price:.4f}"
+        return f"${price:>8.4f}"
+    elif price >= 0.01:
+        return f"${price:>8.6f}"
     else:
-        return f"${price:.6f}"
+        return f"${price:>8.8f}"  # للعملات الرخيصة مثل SHIB
 
 def calculate_profit_percent(current_price, buy_price):
     """Calculate profit percentage"""
