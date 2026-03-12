@@ -38,7 +38,7 @@ from storage import StorageManager
 
 # AI Brain
 AI_BOUNDARIES = {
-    'min_confidence': 30,  # TEST: Lowered for quick buy
+    'min_confidence': 60,
     'max_confidence': 75,
     'min_volume': 0.8,
     'max_volume': 3.0,
