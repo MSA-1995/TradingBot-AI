@@ -64,12 +64,15 @@ try:
     
     from models.multi_timeframe_analyzer import MultiTimeframeAnalyzer
     from models.risk_manager import RiskManager
-    MTF_ENABLED = True
-    RISK_ENABLED = True
+    from models.coin_ranking_model import CoinRankingModel
+    from models.anomaly_detector import AnomalyDetector
+    from models.exit_strategy_model import ExitStrategyModel
+    from models.enhanced_pattern_recognition import EnhancedPatternRecognition
+    
+    MODELS_ENABLED = True
 except Exception as e:
     print(f"⚠️ Advanced models not loaded: {e}")
-    MTF_ENABLED = False
-    RISK_ENABLED = False
+    MODELS_ENABLED = False
 
 init(autoreset=True)
 
@@ -96,8 +99,20 @@ storage = StorageManager()
 ai_brain = AIBrain(AI_BOUNDARIES) if AI_ENABLED else None
 
 # Advanced Models
-mtf_analyzer = MultiTimeframeAnalyzer(exchange) if MTF_ENABLED else None
-risk_manager = RiskManager(storage) if RISK_ENABLED else None
+if MODELS_ENABLED:
+    mtf_analyzer = MultiTimeframeAnalyzer(exchange)
+    risk_manager = RiskManager(storage)
+    coin_ranker = CoinRankingModel(storage)
+    anomaly_detector = AnomalyDetector(exchange)
+    exit_strategy = ExitStrategyModel(storage)
+    pattern_recognizer = EnhancedPatternRecognition(storage)
+else:
+    mtf_analyzer = None
+    risk_manager = None
+    coin_ranker = None
+    anomaly_detector = None
+    exit_strategy = None
+    pattern_recognizer = None
 
 # ========== BANNER ==========
 print("=" * 60)
@@ -109,12 +124,12 @@ print("  ██║ ╚═╝ ██║███████║██║  ██�
 print("  ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝\n")
 print("  ✦•······················•✦•······················•✦")
 print("        🚀 MSA Smart Trading Bot")
-print("        💰 Binance Testnet - Priority System")
-print("        📊 20 Coins | Smart Boost System")
-print("        🧠 Auto-Adjust + Multi-Timeframe")
-print("        🛡️ Loss Protection System")
-print("        ⚡ Score-Based Investment")
-print("        ✅ Version 6.0 - Smart & Bold 🧠⚡")
+print("        💰 Binance Testnet - AI Powered")
+print("        📊 6 Advanced Models Integrated")
+print("        🧠 Multi-Timeframe + Risk Manager")
+print("        🏆 Coin Ranking + Anomaly Detection")
+print("        🎯 Exit Strategy + Pattern Recognition")
+print("        ✅ Version 7.0 - Full AI System 🤖🔥")
 print("  ✦•······················•✦•······················•✦\n")
 print("=" * 60)
 
@@ -132,10 +147,13 @@ if ai_brain:
 else:
     print(f"⚙️ AI Brain: DISABLED")
 
-if mtf_analyzer:
-    print(f"📊 Multi-Timeframe: ACTIVE")
-if risk_manager:
+if MODELS_ENABLED:
+    print(f"📊 Multi-Timeframe Analyzer: ACTIVE")
     print(f"🛡️ Risk Manager: ACTIVE")
+    print(f"🏆 Coin Ranking: ACTIVE")
+    print(f"🚨 Anomaly Detector: ACTIVE")
+    print(f"🎯 Exit Strategy: ACTIVE")
+    print(f"🧠 Pattern Recognition: ACTIVE")
 
 print(f"💰 Boost: ${BASE_AMOUNT}-${BOOST_AMOUNT}")
 print(f"🎯 TP: {TAKE_PROFIT_PERCENT}% | SL: {STOP_LOSS_PERCENT}%")
@@ -149,9 +167,25 @@ last_report_time = datetime.now()
 
 # ========== MAIN LOOP ==========
 try:
+    loop_count = 0
+    
     while True:
+        loop_count += 1
         current_time = datetime.now().strftime("%H:%M:%S")
         print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
+        
+        # Update coin rankings every 10 loops (~100 seconds)
+        if coin_ranker and loop_count % 10 == 1:
+            try:
+                print("\n🏆 Updating coin rankings...")
+                rankings = coin_ranker.rank_all_coins(SYMBOLS)
+                if rankings:
+                    top_5 = coin_ranker.get_top_coins(5)
+                    print(f"🌟 Top 5 Coins:")
+                    for coin in top_5:
+                        print(f"  {coin['rank']}. {coin['symbol']:12} | Score:{coin['score']:>5.1f} | WR:{coin['win_rate']:>5.1f}% | {coin['recommendation']}")
+            except Exception as e:
+                print(f"⚠️ Ranking error: {e}")
         
         # Balance
         try:
@@ -196,8 +230,21 @@ try:
                 # Check sell conditions
                 sell_decision = None
                 
-                # AI Smart Sell
-                if ai_brain:
+                # Exit Strategy Model (أولوية)
+                if exit_strategy:
+                    try:
+                        exit_decision = exit_strategy.should_exit(
+                            symbol, position, current_price, analysis, mtf
+                        )
+                        if exit_decision['action'] == 'SELL':
+                            sell_decision = exit_decision
+                            sell_reason = exit_decision['reason']
+                            profit_percent = exit_decision['profit']
+                    except Exception as e:
+                        pass
+                
+                # AI Smart Sell (إذا Exit Strategy ما قرر)
+                if not sell_decision and ai_brain:
                     mtf = get_multi_timeframe_analysis(exchange, symbol)
                     sell_decision = ai_brain.should_sell(symbol, position, current_price, analysis, mtf)
                     
@@ -269,6 +316,28 @@ try:
                                 
                                 ai_brain.learn_from_trade(trade_result)
                             
+                            # Exit Strategy Learning
+                            if exit_strategy:
+                                try:
+                                    exit_strategy.learn_from_exit(symbol, {
+                                        'profit_percent': profit_percent,
+                                        'sell_reason': sell_reason,
+                                        'hours_held': (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600
+                                    })
+                                except:
+                                    pass
+                            
+                            # Pattern Recognition Learning
+                            if pattern_recognizer:
+                                try:
+                                    pattern_recognizer.learn_pattern({
+                                        'symbol': symbol,
+                                        'profit_percent': profit_percent,
+                                        'features': position.get('ai_data', {})
+                                    })
+                                except:
+                                    pass
+                            
                             symbol_data['position'] = None
                             storage.save_positions(SYMBOLS_DATA)
                 else:
@@ -319,13 +388,51 @@ try:
                 
                 confidence, reasons = calculate_dynamic_confidence(analysis, mtf)
                 
+                # Coin Ranking Check
+                coin_rank_adjustment = 0
+                if coin_ranker:
+                    try:
+                        should_trade = coin_ranker.should_trade_coin(symbol)
+                        if not should_trade['trade']:
+                            print(f"❌ {symbol:12} | SKIP: {should_trade['reason']}")
+                            continue
+                        coin_rank_adjustment = should_trade['confidence_adjustment']
+                    except Exception as e:
+                        pass
+                
+                # Anomaly Detection
+                if anomaly_detector:
+                    try:
+                        anomaly_result = anomaly_detector.detect_anomalies(symbol, analysis)
+                        if not anomaly_result['safe_to_trade']:
+                            print(f"🚨 {symbol:12} | ANOMALY: {anomaly_result['severity']} - SKIP")
+                            continue
+                    except Exception as e:
+                        pass
+                
+                # Pattern Recognition
+                pattern_adjustment = 0
+                if pattern_recognizer:
+                    try:
+                        pattern_analysis = pattern_recognizer.analyze_entry_pattern(
+                            symbol, analysis, mtf, price_drop
+                        )
+                        if pattern_analysis:
+                            if pattern_analysis['recommendation'] == 'AVOID':
+                                print(f"⚠️ {symbol:12} | PATTERN: {pattern_analysis['recommendation']} - SKIP")
+                                continue
+                            pattern_adjustment = pattern_analysis['confidence_adjustment']
+                    except Exception as e:
+                        pass
+                
                 # AI Decision
                 if ai_brain:
                     decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop)
                     
-                    # Apply MTF boost
-                    if mtf_boost != 0:
-                        decision['confidence'] = min(75, max(60, decision['confidence'] + mtf_boost))
+                    # Apply all adjustments
+                    total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment
+                    if total_adjustment != 0:
+                        decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
                     
                     if decision['action'] == 'BUY':
                         # Risk Manager - Calculate optimal amount
@@ -427,6 +534,44 @@ try:
                                 break
                 except Exception as e:
                     print(f"⚠️ Risk report error: {e}")
+            
+            # Coin Ranking Report
+            if coin_ranker:
+                try:
+                    ranking_report = coin_ranker.get_ranking_report()
+                    if ranking_report:
+                        print(f"\n🏆 Coin Ranking Report:")
+                        print(f"  Total Coins: {ranking_report['total_coins']}")
+                        print(f"  Strong Buy: {ranking_report['strong_buy_count']}")
+                        print(f"  Avoid: {ranking_report['avoid_count']}")
+                        print(f"  Avg Win Rate: {ranking_report['avg_win_rate']:.1f}%")
+                except Exception as e:
+                    print(f"⚠️ Ranking report error: {e}")
+            
+            # Anomaly Report
+            if anomaly_detector:
+                try:
+                    anomaly_report = anomaly_detector.get_anomaly_report()
+                    if anomaly_report and anomaly_report['total_anomalies'] > 0:
+                        print(f"\n🚨 Anomaly Report (24h):")
+                        print(f"  Total: {anomaly_report['total_anomalies']}")
+                        print(f"  Critical: {anomaly_report['critical']}")
+                        print(f"  High: {anomaly_report['high']}")
+                except Exception as e:
+                    print(f"⚠️ Anomaly report error: {e}")
+            
+            # Pattern Statistics
+            if pattern_recognizer:
+                try:
+                    pattern_stats = pattern_recognizer.get_pattern_statistics()
+                    if pattern_stats:
+                        print(f"\n🧠 Pattern Statistics:")
+                        print(f"  Total Patterns: {pattern_stats['total_patterns']}")
+                        print(f"  Success: {pattern_stats['success_patterns']}")
+                        print(f"  Traps: {pattern_stats['trap_patterns']}")
+                        print(f"  Success Rate: {pattern_stats['success_rate']:.1f}%")
+                except Exception as e:
+                    print(f"⚠️ Pattern stats error: {e}")
             
             last_report_time = datetime.now()
         
