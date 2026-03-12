@@ -301,25 +301,16 @@ class AIBrain:
         return optimized
     
     def _calculate_smart_amount(self, confidence, analysis, win_rate=None):
-        """حساب المبلغ الذكي بنطاق Min-Max"""
+        """حساب المبلغ الذكي بين MIN و MAX من config"""
         import pandas as pd
+        from config import MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT
         
-        # تحديد النطاق حسب Confidence
-        if confidence >= 110:
-            min_amount, max_amount = 20, 25
-        elif confidence >= 100:
-            min_amount, max_amount = 18, 23
-        elif confidence >= 90:
-            min_amount, max_amount = 16, 20
-        elif confidence >= 80:
-            min_amount, max_amount = 14, 18
-        elif confidence >= 70:
-            min_amount, max_amount = 12, 15
-        else:  # 60-69
-            min_amount, max_amount = 10, 12
+        # النطاق الكامل
+        min_amount = MIN_TRADE_AMOUNT
+        max_amount = MAX_TRADE_AMOUNT
+        range_size = max_amount - min_amount
         
-        # حساب المبلغ بين Min و Max
-        amount = min_amount
+        # حساب Boost Points من التحليل
         boost_points = 0
         
         # 1. RSI boost
@@ -357,18 +348,27 @@ class AIBrain:
             elif win_rate > 65:
                 boost_points += 1
         
-        # حساب المبلغ النهائي
-        range_size = max_amount - min_amount
+        # حساب المبلغ النهائي بين MIN و MAX
+        # Confidence يؤثر على المبلغ الأساسي
+        if confidence >= 70:
+            base_amount = min_amount + (range_size * 0.5)  # وسط النطاق
+        else:  # 60-69
+            base_amount = min_amount + (range_size * 0.2)  # قريب من الحد الأدنى
+        
+        # Boost Points يضيف للمبلغ
         if boost_points >= 8:
             amount = max_amount
         elif boost_points >= 6:
-            amount = min_amount + (range_size * 0.8)
+            amount = base_amount + (range_size * 0.3)
         elif boost_points >= 4:
-            amount = min_amount + (range_size * 0.6)
+            amount = base_amount + (range_size * 0.2)
         elif boost_points >= 2:
-            amount = min_amount + (range_size * 0.4)
+            amount = base_amount + (range_size * 0.1)
         else:
-            amount = min_amount
+            amount = base_amount
+        
+        # التأكد من البقاء ضمن الحدود
+        amount = max(min_amount, min(max_amount, amount))
         
         return round(amount, 2)
     
