@@ -80,3 +80,11 @@ class StorageManager:
     def load_positions(self):
         """تحميل المراكز (متوافق مع النظام الحالي)"""
         return self.storage.load_positions()
+    
+    # ========== Advanced Queries ==========
+    def get_all_trades(self):
+        """جلب جميع الصفقات (للتحليل)"""
+        try:
+            return self.storage.load_trades(limit=1000)
+        except:
+            return []
