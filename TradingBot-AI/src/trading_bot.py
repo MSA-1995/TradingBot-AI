@@ -33,7 +33,7 @@ from config import *
 from analysis import get_market_analysis, get_multi_timeframe_analysis, calculate_momentum
 from trading import execute_buy, execute_sell, calculate_sell_value, should_sell_fast_tp, should_sell_bearish, should_sell_stop_loss, update_highest_price
 from notifications import send_buy_notification, send_sell_notification, send_positions_report, send_startup_notification
-from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent
+from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent, format_price
 from storage import StorageManager
 
 # AI Brain
@@ -180,7 +180,7 @@ try:
                     elif sell_decision['action'] == 'HOLD':
                         # عرض المركز بتفاصيل كاملة
                         profit_emoji = "📈" if profit_percent > 0 else "📉"
-                        print(f"{profit_emoji} {symbol:12} ${current_price:>8.4f} | Profit:{profit_percent:>+7.2f}% | Buy:${buy_price:>8.4f} | High:${highest_price:>8.4f} | {sell_decision['reason']}")
+                        print(f"{profit_emoji} {symbol:12} {format_price(current_price)} | Profit:{profit_percent:>+7.2f}% | Buy:{format_price(buy_price)} | High:{format_price(highest_price)} | {sell_decision['reason']}")
                         continue
                 else:
                     # Manual sell logic
@@ -207,7 +207,7 @@ try:
                     if not sell_reason:
                         # عرض المركز بتفاصيل كاملة
                         profit_emoji = "📈" if profit_percent > 0 else "📉"
-                        print(f"{profit_emoji} {symbol:12} ${current_price:>8.4f} | Profit:{profit_percent:>+7.2f}% | Buy:${buy_price:>8.4f} | High:${highest_price:>8.4f} | Hold")
+                        print(f"{profit_emoji} {symbol:12} {format_price(current_price)} | Profit:{profit_percent:>+7.2f}% | Buy:{format_price(buy_price)} | High:{format_price(highest_price)} | Hold")
                         continue
                 
                 # Execute sell
@@ -242,7 +242,7 @@ try:
                 else:
                     # Hold - عرض المركز بتفاصيل كاملة
                     profit_emoji = "📈" if profit_percent > 0 else "📉"
-                    print(f"{profit_emoji} {symbol:12} ${current_price:>8.4f} | Profit:{profit_percent:>+7.2f}% | Buy:${buy_price:>8.4f} | High:${highest_price:>8.4f} | Hold")
+                    print(f"{profit_emoji} {symbol:12} {format_price(current_price)} | Profit:{profit_percent:>+7.2f}% | Buy:{format_price(buy_price)} | High:{format_price(highest_price)} | Hold")
             
             # ========== BUY LOGIC ==========
             else:
