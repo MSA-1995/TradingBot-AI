@@ -376,12 +376,13 @@ try:
                     try:
                         mtf_analysis = mtf_analyzer.analyze(symbol)
                         if mtf_analysis:
-                            mtf_boost = mtf_analysis['confidence_boost']
+                            mtf_boost = mtf_analysis.get('confidence_boost', 0) or 0
                             entry_point = mtf_analyzer.get_best_entry_point(symbol)
-                            if entry_point and entry_point['entry'] == 'EXCELLENT':
+                            if entry_point and entry_point.get('entry') == 'EXCELLENT':
                                 mtf_boost += 5
                     except Exception as e:
                         print(f"⚠️ MTF error {symbol}: {e}")
+                        mtf_boost = 0
                 
                 # Calculate price drop
                 price_drop = {'drop_percent': 0, 'confirmed': False}
@@ -413,10 +414,11 @@ try:
                             continue
                         
                         # حساب News Boost
-                        news_adjustment = news_analyzer.get_news_confidence_boost(symbol, hours=24)
-                        news_summary = news_analyzer.get_news_summary(symbol, hours=24)
+                        news_adjustment = news_analyzer.get_news_confidence_boost(symbol, hours=24) or 0
+                        news_summary = news_analyzer.get_news_summary(symbol, hours=24) or "No news"
                     except Exception as e:
-                        pass
+                        news_adjustment = 0
+                        news_summary = "No news"
                 
                 # Coin Ranking Check
                 coin_rank_adjustment = 0
@@ -426,9 +428,9 @@ try:
                         if not should_trade['trade']:
                             print(f"❌ {symbol:12} | SKIP: {should_trade['reason']}")
                             continue
-                        coin_rank_adjustment = should_trade['confidence_adjustment']
+                        coin_rank_adjustment = should_trade.get('confidence_adjustment', 0) or 0
                     except Exception as e:
-                        pass
+                        coin_rank_adjustment = 0
                 
                 # Anomaly Detection
                 if anomaly_detector:
@@ -448,12 +450,12 @@ try:
                             symbol, analysis, mtf, price_drop
                         )
                         if pattern_analysis:
-                            if pattern_analysis['recommendation'] == 'AVOID':
+                            if pattern_analysis.get('recommendation') == 'AVOID':
                                 print(f"⚠️ {symbol:12} | PATTERN: {pattern_analysis['recommendation']} - SKIP")
                                 continue
-                            pattern_adjustment = pattern_analysis['confidence_adjustment']
+                            pattern_adjustment = pattern_analysis.get('confidence_adjustment', 0) or 0
                     except Exception as e:
-                        pass
+                        pattern_adjustment = 0
                 
                 # AI Decision
                 if ai_brain:
