@@ -113,9 +113,9 @@ class CoinRankingModel:
             return 'STRONG_BUY'
         elif score >= 65 and win_rate >= 65:
             return 'BUY'
-        elif score >= 50 and win_rate >= 55:
+        elif score >= 50 and win_rate >= 60:
             return 'HOLD'
-        elif score >= 35:
+        elif score >= 35 and win_rate >= 60:
             return 'WATCH'
         else:
             return 'AVOID'
@@ -199,8 +199,8 @@ class CoinRankingModel:
         elif coin['recommendation'] == 'WATCH':
             return {
                 'trade': True,
-                'reason': 'Below average',
-                'confidence_adjustment': -5
+                'reason': 'Acceptable performer',
+                'confidence_adjustment': 0
             }
         else:  # AVOID
             return {
