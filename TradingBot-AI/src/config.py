@@ -6,8 +6,14 @@ All bot settings and constants
 # Trading Parameters
 MIN_CONFIDENCE = 55  # Changed from 60 - more aggressive
 MAX_POSITIONS = 20
-BASE_AMOUNT = 10
-BOOST_AMOUNT = 20
+
+# Trade Amount Limits
+MIN_TRADE_AMOUNT = 12  # Minimum trade size (safe for Binance $10 limit)
+MAX_TRADE_AMOUNT = 30  # Maximum trade size
+
+# Legacy (kept for compatibility)
+BASE_AMOUNT = 12
+BOOST_AMOUNT = 24
 
 # Risk Management
 STOP_LOSS_PERCENT = 2.0
