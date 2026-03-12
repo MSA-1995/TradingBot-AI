@@ -269,6 +269,9 @@ class DatabaseStorage:
             for symbol, config in positions.items():
                 if config.get('position'):
                     pos = config['position']
+                    # حساب invested من buy_price * amount
+                    invested = float(pos['buy_price']) * float(pos['amount'])
+                    
                     cursor.execute("""
                         INSERT INTO positions 
                         (symbol, buy_price, amount, highest_price, tp_level_1, tp_level_2, buy_time, invested, data)
@@ -281,7 +284,7 @@ class DatabaseStorage:
                         pos.get('tp_level_1', False),
                         pos.get('tp_level_2', False),
                         pos['buy_time'],
-                        float(pos['invested']),
+                        invested,
                         self.json.dumps(pos)
                     ))
             
