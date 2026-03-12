@@ -74,6 +74,16 @@ except Exception as e:
     print(f"⚠️ Advanced models not loaded: {e}")
     MODELS_ENABLED = False
 
+# News Analyzer
+try:
+    from news_analyzer import NewsAnalyzer
+    news_analyzer = NewsAnalyzer()
+    NEWS_ENABLED = news_analyzer.enabled
+except Exception as e:
+    print(f"⚠️ News Analyzer not loaded: {e}")
+    news_analyzer = None
+    NEWS_ENABLED = False
+
 init(autoreset=True)
 
 # ========== SETUP ==========
@@ -129,7 +139,8 @@ print("        📊 6 Advanced Models Integrated")
 print("        🧠 Multi-Timeframe + Risk Manager")
 print("        🏆 Coin Ranking + Anomaly Detection")
 print("        🎯 Exit Strategy + Pattern Recognition")
-print("        ✅ Version 7.0 - Full AI System 🤖🔥")
+print("        📰 News Sentiment Analysis")
+print("        ✅ Version 8.0 - AI + News Integration 🤖📰")
 print("  ✦•······················•✦•······················•✦\n")
 print("=" * 60)
 
@@ -154,6 +165,9 @@ if MODELS_ENABLED:
     print(f"🚨 Anomaly Detector: ACTIVE")
     print(f"🎯 Exit Strategy: ACTIVE")
     print(f"🧠 Pattern Recognition: ACTIVE")
+
+if NEWS_ENABLED:
+    print(f"📰 News Sentiment Analyzer: ACTIVE")
 
 print(f"💰 Boost: ${BASE_AMOUNT}-${BOOST_AMOUNT}")
 print(f"🎯 TP: {TAKE_PROFIT_PERCENT}% | SL: {STOP_LOSS_PERCENT}%")
@@ -388,6 +402,22 @@ try:
                 
                 confidence, reasons = calculate_dynamic_confidence(analysis, mtf)
                 
+                # News Sentiment Check
+                news_adjustment = 0
+                news_summary = "No news"
+                if news_analyzer and NEWS_ENABLED:
+                    try:
+                        # تجنب العملة إذا الأخبار سلبية جداً
+                        if news_analyzer.should_avoid_coin(symbol, hours=24):
+                            print(f"📰❌ {symbol:12} | SKIP: Negative news sentiment")
+                            continue
+                        
+                        # حساب News Boost
+                        news_adjustment = news_analyzer.get_news_confidence_boost(symbol, hours=24)
+                        news_summary = news_analyzer.get_news_summary(symbol, hours=24)
+                    except Exception as e:
+                        pass
+                
                 # Coin Ranking Check
                 coin_rank_adjustment = 0
                 if coin_ranker:
@@ -429,8 +459,8 @@ try:
                 if ai_brain:
                     decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop)
                     
-                    # Apply all adjustments
-                    total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment
+                    # Apply all adjustments (including news)
+                    total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment + news_adjustment
                     if total_adjustment != 0:
                         decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
                     
@@ -450,7 +480,8 @@ try:
                         else:
                             amount_usd = decision['amount']
                         
-                        print(f"{Fore.GREEN}🟢 BUY {symbol} 🧠 | AI Confidence:{decision['confidence']}/120 | ${amount_usd}{Style.RESET_ALL}")
+                        news_display = f" | {news_summary}" if news_adjustment != 0 else ""
+                        print(f"{Fore.GREEN}🟢 BUY {symbol} 🧠 | AI Confidence:{decision['confidence']}/120 | ${amount_usd}{news_display}{Style.RESET_ALL}")
                         
                         result = execute_buy(exchange, symbol, amount_usd, current_price, decision['confidence'])
                         if result['success']:
@@ -481,7 +512,8 @@ try:
                         macd = analysis.get('macd_diff', 0)
                         
                         vol_status = "🟢" if volume > 0.8 else "🔴"
-                        print(f"📊 {symbol:12} ${current_price:>8.2f} | RSI:{rsi:>5.1f} | Vol:{vol_status} {volume:.1f}x | MACD:{macd:>+6.1f} | Conf:{decision['confidence']}/120 | {decision['reason']}")
+                        news_display = f" | {news_summary}" if NEWS_ENABLED else ""
+                        print(f"📊 {symbol:12} ${current_price:>8.2f} | RSI:{rsi:>5.1f} | Vol:{vol_status} {volume:.1f}x | MACD:{macd:>+6.1f} | Conf:{decision['confidence']}/120{news_display} | {decision['reason']}")
                 else:
                     # Manual mode
                     if confidence >= MIN_CONFIDENCE:
