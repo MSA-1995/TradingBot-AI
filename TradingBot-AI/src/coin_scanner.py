@@ -115,9 +115,8 @@ class CoinScanner:
                 self.last_quick_scan = datetime.now()
             
             if hot_coins:
-                print(f"\n🔥 Quick scan found {len(hot_coins)} hot opportunities!")
-                for coin in hot_coins[:3]:
-                    print(f"   {coin['symbol']:12} | Vol:${coin['volume']/1e6:.1f}M | {coin['change']:+.2f}% | Score:{coin['score']:.0f}")
+                # طباعة صامتة - بدون عرض
+                pass
         
         except Exception as e:
             print(f"⚠️ Quick scan error: {e}")
@@ -176,9 +175,10 @@ class CoinScanner:
                 # تنظيف الذاكرة
                 gc.collect()
                 
-                # طباعة التقدم
-                progress = min(i + batch_size, len(filtered_coins))
-                print(f"   Progress: {progress}/{len(filtered_coins)} coins analyzed...")
+                # طباعة التقدم بهدوء (كل 50 عملة)
+                if (i + batch_size) % 250 == 0:  # كل 250 عملة بدل كل 50
+                    progress = min(i + batch_size, len(filtered_coins))
+                    print(f"   Progress: {progress}/{len(filtered_coins)} coins analyzed...")
             
             # المرحلة 3: اختيار أفضل 30 للتحليل الذكي
             print("🎯 Phase 3: Selecting top 30 for AI analysis...")
@@ -199,8 +199,8 @@ class CoinScanner:
                         if ai_score > 0:
                             ai_scores[symbol] = ai_score
                         
-                        # طباعة التقدم كل 10 عملات
-                        if idx % 10 == 0:
+                        # طباعة التقدم كل 20 عملة بدل 10
+                        if idx % 20 == 0:
                             print(f"   Progress: {idx}/30 coins analyzed with AI...")
                     except Exception as e:
                         # إذا فشل AI، استخدم الـScore الأساسي
