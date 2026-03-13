@@ -1,10 +1,9 @@
 """
-🧠 Smart AI - الذكاء الحقيقي
-يجمع Neural Network + Pattern Recognition + News Analysis
+🧠 Smart AI - الذكاء الحقيقي (بدون TensorFlow)
+يستخدم القواعد الذكية + التعلم من Database
 """
 
 import os
-import numpy as np
 import pandas as pd
 from datetime import datetime
 
