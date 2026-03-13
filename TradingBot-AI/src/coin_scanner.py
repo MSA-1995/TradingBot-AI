@@ -180,13 +180,9 @@ class CoinScanner:
                     progress = min(i + batch_size, len(filtered_coins))
                     print(f"   Progress: {progress}/{len(filtered_coins)} coins analyzed...")
             
-            # المرحلة 3: اختيار أفضل 30 للتحليل الذكي
-            print("🎯 Phase 3: Selecting top 30 for AI analysis...")
-            
+            # المرحلة 3: اختيار أفضل 30 للتحليل الذكي (صامت)
             sorted_coins = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
             top_30 = sorted_coins[:30]
-            
-            print(f"   ✅ Top 30 selected for AI analysis")
             
             # المرحلة 4: تحليل ذكي للـ30 الأفضل
             if self.ai_brain or self.mtf_analyzer:
@@ -199,13 +195,14 @@ class CoinScanner:
                         if ai_score > 0:
                             ai_scores[symbol] = ai_score
                         
-                        # طباعة التقدم كل 20 عملة بدل 10
-                        if idx % 20 == 0:
-                            print(f"   Progress: {idx}/30 coins analyzed with AI...")
+                        # طباعة التقدم مخفية
+                        # if idx % 20 == 0:
+                        #     print(f"   Progress: {idx}/30 coins analyzed with AI...")
                     except Exception as e:
                         # إذا فشل AI، استخدم الـScore الأساسي
                         ai_scores[symbol] = base_score
-                        print(f"   ⚠️ AI analysis failed for {symbol}: {e}")
+                        # طباعة الأخطاء مخفية
+                        # print(f"   ⚠️ AI analysis failed for {symbol}: {e}")
                     
                     # تنظيف
                     gc.collect()
@@ -214,7 +211,8 @@ class CoinScanner:
                 sorted_ai = sorted(ai_scores.items(), key=lambda x: x[1], reverse=True)
                 top_20 = sorted_ai[:20]
                 
-                print(f"   ✅ AI analysis complete (30 coins analyzed)")
+                # طباعة اكتمال التحليل مخفية
+                # print(f"   ✅ AI analysis complete (30 coins analyzed)")
             else:
                 # بدون AI، استخدم أفضل 20 من الـ30
                 top_20 = top_30[:20]
