@@ -41,30 +41,15 @@ except Exception as e:
     ai_brain = None
     AI_ENABLED = False
 
-# Advanced Models
-try:
-    import sys
-    import os
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-    
-    MODELS_ENABLED = False
-    mtf_analyzer = None
-    risk_manager = None
-    coin_ranker = None
-    anomaly_detector = None
-    exit_strategy = None
-    pattern_recognizer = None
-except Exception as e:
-    print(f"⚠️ Models setup: {e}")
-    MODELS_ENABLED = False
-    mtf_analyzer = None
-    risk_manager = None
-    coin_ranker = None
-    anomaly_detector = None
-    exit_strategy = None
-    pattern_recognizer = None
+# Advanced Models (معطل - توفير ذاكرة)
+print("⚠️ Advanced Models disabled to save memory")
+MODELS_ENABLED = False
+mtf_analyzer = None
+risk_manager = None
+coin_ranker = None
+anomaly_detector = None
+exit_strategy = None
+pattern_recognizer = None
 
 # News Analyzer
 try:
