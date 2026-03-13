@@ -106,10 +106,6 @@ exchange.set_sandbox_mode(True)
 # Storage
 storage = StorageManager()
 
-# Dynamic Coin Scanner (3 Levels System)
-coin_scanner = CoinScanner(exchange, ai_brain, mtf_analyzer, risk_manager)
-coin_scanner.start()  # تشغيل الـThreads
-
 # AI Brain
 ai_brain = AIBrain(AI_BOUNDARIES) if AI_ENABLED else None
 
@@ -128,6 +124,10 @@ else:
     anomaly_detector = None
     exit_strategy = None
     pattern_recognizer = None
+
+# Dynamic Coin Scanner (3 Levels System) - بعد تعريف AI Models
+coin_scanner = CoinScanner(exchange, ai_brain, mtf_analyzer, risk_manager)
+coin_scanner.start()  # تشغيل الـThreads
 
 # ========== BANNER ==========
 print("=" * 60)
