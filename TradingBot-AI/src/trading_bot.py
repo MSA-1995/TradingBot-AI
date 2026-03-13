@@ -670,4 +670,10 @@ try:
 except KeyboardInterrupt:
     print("\n\n🛑 Bot stopped")
 except Exception as e:
+    import traceback
     print(f"\n❌ Error: {e}")
+    print(f"\n📍 Full traceback:")
+    traceback.print_exc()
+    print(f"\n🔄 Restarting in 5 seconds...")
+    import time
+    time.sleep(5)
