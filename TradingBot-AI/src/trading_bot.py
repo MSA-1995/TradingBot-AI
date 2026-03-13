@@ -245,30 +245,35 @@ try:
                 sell_decision = None
                 
                 # Exit Strategy Model (أولوية)
+                mtf = None
                 if exit_strategy:
                     try:
+                        mtf = get_multi_timeframe_analysis(exchange, symbol)
                         exit_decision = exit_strategy.should_exit(
                             symbol, position, current_price, analysis, mtf
                         )
-                        if exit_decision['action'] == 'SELL':
+                        if exit_decision and exit_decision.get('action') == 'SELL':
                             sell_decision = exit_decision
-                            sell_reason = exit_decision['reason']
-                            profit_percent = exit_decision['profit']
+                            sell_reason = exit_decision.get('reason', 'Exit Strategy')
+                            profit_percent = exit_decision.get('profit', profit_percent)
                     except Exception as e:
+                        print(f"⚠️ Exit Strategy error {symbol}: {e}")
                         pass
                 
                 # AI Smart Sell (إذا Exit Strategy ما قرر)
                 if not sell_decision and ai_brain:
-                    mtf = get_multi_timeframe_analysis(exchange, symbol)
+                    if mtf is None:
+                        mtf = get_multi_timeframe_analysis(exchange, symbol)
+                    
                     sell_decision = ai_brain.should_sell(symbol, position, current_price, analysis, mtf)
                     
-                    if sell_decision['action'] == 'SELL':
-                        sell_reason = sell_decision['reason']
-                        profit_percent = sell_decision['profit']
-                    elif sell_decision['action'] == 'HOLD':
+                    if sell_decision and sell_decision.get('action') == 'SELL':
+                        sell_reason = sell_decision.get('reason', 'AI Sell')
+                        profit_percent = sell_decision.get('profit', profit_percent)
+                    elif sell_decision and sell_decision.get('action') == 'HOLD':
                         # عرض المركز بتفاصيل كاملة
                         profit_emoji = "📈" if profit_percent > 0 else "📉"
-                        print(f"{profit_emoji} {symbol:12} {format_price(current_price)} | Profit:{profit_percent:>+7.2f}% | Buy:{format_price(buy_price)} | High:{format_price(highest_price)} | {sell_decision['reason']}")
+                        print(f"{profit_emoji} {symbol:12} {format_price(current_price)} | Profit:{profit_percent:>+7.2f}% | Buy:{format_price(buy_price)} | High:{format_price(highest_price)} | {sell_decision.get('reason', 'Hold')}")
                         continue
                 else:
                     # Manual sell logic
@@ -281,7 +286,8 @@ try:
                     
                     # 2. Bearish trend
                     if not sell_reason:
-                        mtf = get_multi_timeframe_analysis(exchange, symbol)
+                        if mtf is None:
+                            mtf = get_multi_timeframe_analysis(exchange, symbol)
                         should_sell, profit = should_sell_bearish(mtf, current_price, buy_price)
                         if should_sell:
                             sell_reason = "BEARISH TREND"
@@ -461,10 +467,20 @@ try:
                 if ai_brain:
                     decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop)
                     
-                    # Apply all adjustments (including news)
-                    total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment + news_adjustment
-                    if total_adjustment != 0:
-                        decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
+                    # Apply all adjustments (including news) - with None protection
+                    try:
+                        # Ensure all adjustments are numbers
+                        mtf_boost = 0 if mtf_boost is None else mtf_boost
+                        coin_rank_adjustment = 0 if coin_rank_adjustment is None else coin_rank_adjustment
+                        pattern_adjustment = 0 if pattern_adjustment is None else pattern_adjustment
+                        news_adjustment = 0 if news_adjustment is None else news_adjustment
+                        
+                        total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment + news_adjustment
+                        if total_adjustment != 0:
+                            decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
+                    except Exception as e:
+                        print(f"⚠️ Adjustment error {symbol}: {e}")
+                        total_adjustment = 0
                     
                     if decision['action'] == 'BUY':
                         # Risk Manager - Calculate optimal amount
