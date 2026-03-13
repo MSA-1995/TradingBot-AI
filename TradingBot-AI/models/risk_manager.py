@@ -14,7 +14,7 @@ class RiskManager:
         self.min_sharpe_ratio = 0.5  # الحد الأدنى لـ Sharpe Ratio
         print("🛡️ Risk Manager initialized")
     
-    def calculate_optimal_amount(self, symbol, confidence, base_amount=10, max_amount=25):
+    def calculate_optimal_amount(self, symbol, confidence, base_amount=12, max_amount=30):
         """حساب المبلغ الأمثل باستخدام Kelly Criterion"""
         try:
             # جلب تاريخ الصفقات للعملة
@@ -51,25 +51,28 @@ class RiskManager:
             confidence_multiplier = self._get_confidence_multiplier(confidence)
             optimal_amount *= confidence_multiplier
             
-            # التأكد من البقاء ضمن الحدود
+            # التأكد من البقاء ضمن الحدود (لا تنزل تحت base_amount أبداً!)
             optimal_amount = max(base_amount, min(optimal_amount, max_amount))
             
             return round(optimal_amount, 2)
             
         except Exception as e:
             print(f"⚠️ Kelly calculation error: {e}")
-            return self._simple_amount_calculation(confidence, base_amount, max_amount)
+            return max(base_amount, self._simple_amount_calculation(confidence, base_amount, max_amount))
     
     def _simple_amount_calculation(self, confidence, base_amount, max_amount):
         """حساب بسيط للمبلغ"""
         if confidence >= 90:
-            return max_amount
+            amount = max_amount
         elif confidence >= 80:
-            return base_amount + (max_amount - base_amount) * 0.8
+            amount = base_amount + (max_amount - base_amount) * 0.8
         elif confidence >= 70:
-            return base_amount + (max_amount - base_amount) * 0.6
+            amount = base_amount + (max_amount - base_amount) * 0.6
         else:
-            return base_amount + (max_amount - base_amount) * 0.3
+            amount = base_amount + (max_amount - base_amount) * 0.3
+        
+        # التأكد من عدم النزول تحت base_amount
+        return max(base_amount, amount)
     
     def _get_confidence_multiplier(self, confidence):
         """مضاعف حسب الثقة"""
@@ -232,19 +235,22 @@ class RiskManager:
             optimal_amount = self.calculate_optimal_amount(
                 symbol, 
                 confidence, 
-                base_amount=10, 
-                max_amount=min(25, capital_per_position)
+                base_amount=12,  # الحد الأدنى 12 (آمن للبيع)
+                max_amount=min(30, capital_per_position)  # الحد الأقصى 30
             )
             
-            # التأكد من عدم تجاوز 5% من رأس المال في صفقة واحدة
+            # التأكد من عدم تجاوز 5% من رأس المال
             max_per_trade = total_balance * 0.05
             optimal_amount = min(optimal_amount, max_per_trade)
+            
+            # التأكد من عدم النزول تحت 12 (لتجنب العلق)
+            optimal_amount = max(12, optimal_amount)
             
             return round(optimal_amount, 2)
             
         except Exception as e:
             print(f"⚠️ Position size error: {e}")
-            return 10
+            return 12  # الحد الأدنى الآمن
     
     def calculate_risk_reward_ratio(self, entry_price, tp_price, sl_price):
         """حساب نسبة المخاطرة/العائد"""
