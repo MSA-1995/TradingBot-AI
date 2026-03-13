@@ -14,7 +14,14 @@ class PatternDetector:
         if not trade_result:
             return None
         
+        # حماية من None
         profit = trade_result.get('profit_percent', 0)
+        if profit is None:
+            profit = 0
+        try:
+            profit = float(profit)
+        except:
+            profit = 0
         
         # تحديد نوع النمط
         if profit >= 0.5:
@@ -50,6 +57,18 @@ class PatternDetector:
         symbol = trade.get('symbol', 'Unknown')
         confidence = trade.get('confidence', 0)
         profit = trade.get('profit_percent', 0)
+        
+        # حماية من None
+        if confidence is None:
+            confidence = 0
+        if profit is None:
+            profit = 0
+        try:
+            confidence = float(confidence)
+            profit = float(profit)
+        except:
+            confidence = 0
+            profit = 0
         
         if pattern_type == 'SUCCESS':
             return f"{symbol}: Confidence {confidence} → +{profit:.2f}%"
@@ -97,14 +116,23 @@ class PatternDetector:
     
     def _is_similar(self, trade1, trade2):
         """فحص إذا كانت صفقتين متشابهتين"""
-        # مقارنة RSI
-        rsi_diff = abs(trade1.get('rsi', 0) - trade2.get('rsi', 0))
-        if rsi_diff > 10:
-            return False
+        # حماية من None
+        rsi1 = trade1.get('rsi', 0) or 0
+        rsi2 = trade2.get('rsi', 0) or 0
+        conf1 = trade1.get('confidence', 0) or 0
+        conf2 = trade2.get('confidence', 0) or 0
         
-        # مقارنة Confidence
-        conf_diff = abs(trade1.get('confidence', 0) - trade2.get('confidence', 0))
-        if conf_diff > 5:
+        try:
+            # مقارنة RSI
+            rsi_diff = abs(float(rsi1) - float(rsi2))
+            if rsi_diff > 10:
+                return False
+            
+            # مقارنة Confidence
+            conf_diff = abs(float(conf1) - float(conf2))
+            if conf_diff > 5:
+                return False
+        except:
             return False
         
         return True
@@ -114,31 +142,46 @@ class PatternDetector:
         if not group:
             return None
         
-        # حساب المتوسطات
-        avg_confidence = sum(t.get('confidence', 0) for t in group) / len(group)
-        avg_rsi = sum(t.get('rsi', 0) for t in group) / len(group)
-        avg_volume = sum(t.get('volume_ratio', 0) for t in group) / len(group)
+        # حساب المتوسطات مع حماية من None
+        try:
+            confidences = [float(t.get('confidence', 0) or 0) for t in group]
+            rsis = [float(t.get('rsi', 0) or 0) for t in group]
+            volumes = [float(t.get('volume_ratio', 0) or 0) for t in group]
+            
+            avg_confidence = sum(confidences) / len(group) if group else 0
+            avg_rsi = sum(rsis) / len(group) if group else 0
+            avg_volume = sum(volumes) / len(group) if group else 0
+        except:
+            avg_confidence = 0
+            avg_rsi = 0
+            avg_volume = 0
         
-        # حساب نسبة النجاح
-        success_count = sum(1 for t in group if t.get('profit_percent', 0) > 0)
-        success_rate = success_count / len(group)
+        # حساب نسبة النجاح مع حماية من None
+        try:
+            success_count = sum(1 for t in group if (t.get('profit_percent', 0) or 0) > 0)
+            success_rate = success_count / len(group) if group else 0
+        except:
+            success_rate = 0
         
         # تحديد النوع
-        if success_rate >= 0.8:
-            pattern_type = 'SUCCESS'
-        elif success_rate <= 0.3:
-            pattern_type = 'TRAP'
-        else:
-            pattern_type = 'NEUTRAL'
-        
-        return {
-            'type': pattern_type,
-            'conditions': {
-                'confidence': avg_confidence,
-                'rsi': avg_rsi,
-                'volume_ratio': avg_volume
-            },
-            'success_rate': success_rate,
-            'trades_count': len(group),
-            'summary': f"Pattern: Confidence ~{avg_confidence:.0f}, Success: {success_rate:.0%}"
-        }
+        try:
+            if success_rate >= 0.8:
+                pattern_type = 'SUCCESS'
+            elif success_rate <= 0.3:
+                pattern_type = 'TRAP'
+            else:
+                pattern_type = 'NEUTRAL'
+            
+            return {
+                'type': pattern_type,
+                'conditions': {
+                    'confidence': avg_confidence,
+                    'rsi': avg_rsi,
+                    'volume_ratio': avg_volume
+                },
+                'success_rate': success_rate,
+                'trades_count': len(group),
+                'summary': f"Pattern: Confidence ~{avg_confidence:.0f}, Success: {success_rate:.0%}"
+            }
+        except:
+            return None
