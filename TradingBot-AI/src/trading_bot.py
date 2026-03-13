@@ -265,15 +265,6 @@ try:
         hot_opps = coin_scanner.get_hot_opportunities()
         scan_status = coin_scanner.get_scan_status()
         
-        # عرض الصفقات المفتوحة أولاً
-        open_positions = [symbol for symbol, data in SYMBOLS_DATA.items() if data.get('position')]
-        if open_positions:
-            print(f"{Fore.GREEN}💼 Open Positions ({len(open_positions)}):{Style.RESET_ALL}")
-            for symbol in open_positions:
-                position = SYMBOLS_DATA[symbol]['position']
-                buy_price = position['buy_price']
-                print(f"  • {symbol:12} | Buy: ${buy_price:.4f}")
-        
         # عرض أفضل 10 عملات للمراقبة (ديناميكية - تتغير حسب الأداء)
         if top_coins:
             monitoring_coins = [coin for coin, score in top_coins if coin not in open_positions]
