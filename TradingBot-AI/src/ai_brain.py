@@ -226,23 +226,35 @@ class AIBrain:
     
     def _is_trap_pattern(self, symbol, analysis):
         """فحص إذا كان النمط يشبه فخ سابق"""
-        for trap in self.trap_memory:
-            similarity = self._calculate_similarity(analysis, trap.get('pattern', {}))
-            if similarity > 0.85:  # 85% مشابه
-                return True
+        try:
+            for trap in self.trap_memory:
+                pattern = trap.get('pattern', {})
+                if not pattern:
+                    continue
+                similarity = self._calculate_similarity(analysis, pattern)
+                if similarity > 0.85:  # 85% مشابه
+                    return True
+        except Exception as e:
+            print(f"⚠️ Trap check error: {e}")
         return False
     
     def _find_similar_patterns(self, analysis, pattern_type='SUCCESS'):
         """البحث عن أنماط مشابهة"""
         similar = []
-        for pattern in self.learned_patterns:
-            if pattern.get('type') == pattern_type:
-                similarity = self._calculate_similarity(analysis, pattern.get('conditions', {}))
-                if similarity > 0.7:  # 70% مشابه
-                    similar.append({
-                        'pattern': pattern,
-                        'similarity': similarity
-                    })
+        try:
+            for pattern in self.learned_patterns:
+                if pattern.get('type') == pattern_type:
+                    conditions = pattern.get('conditions', {})
+                    if not conditions:
+                        continue
+                    similarity = self._calculate_similarity(analysis, conditions)
+                    if similarity > 0.7:  # 70% مشابه
+                        similar.append({
+                            'pattern': pattern,
+                            'similarity': similarity
+                        })
+        except Exception as e:
+            print(f"⚠️ Pattern search error: {e}")
         return similar
     
     def _calculate_similarity(self, current, stored):
