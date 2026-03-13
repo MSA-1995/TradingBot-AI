@@ -320,10 +320,18 @@ try:
                             # AI Learning - يتعلم من كل شيء
                             if ai_brain:
                                 try:
+                                    # حماية كاملة من None
+                                    safe_profit = 0
+                                    try:
+                                        if profit_percent is not None and isinstance(profit_percent, (int, float)):
+                                            safe_profit = float(profit_percent)
+                                    except:
+                                        safe_profit = 0
+                                    
                                     trade_result = {
                                         'symbol': symbol,
                                         'action': 'SELL',
-                                        'profit_percent': profit_percent if profit_percent is not None else 0,
+                                        'profit_percent': safe_profit,
                                         'sell_reason': sell_reason if sell_reason else 'Unknown',
                                         'tp_target': position.get('tp_target', 1.0),
                                         'sl_target': position.get('sl_target', 2.0),
@@ -342,8 +350,16 @@ try:
                             # Exit Strategy Learning
                             if exit_strategy:
                                 try:
+                                    # حماية من None
+                                    safe_profit = 0
+                                    try:
+                                        if profit_percent is not None and isinstance(profit_percent, (int, float)):
+                                            safe_profit = float(profit_percent)
+                                    except:
+                                        safe_profit = 0
+                                    
                                     exit_strategy.learn_from_exit(symbol, {
-                                        'profit_percent': profit_percent if profit_percent is not None else 0,
+                                        'profit_percent': safe_profit,
                                         'sell_reason': sell_reason if sell_reason else 'Unknown',
                                         'hours_held': (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600
                                     })
@@ -353,9 +369,17 @@ try:
                             # Pattern Recognition Learning
                             if pattern_recognizer:
                                 try:
+                                    # حماية من None
+                                    safe_profit = 0
+                                    try:
+                                        if profit_percent is not None and isinstance(profit_percent, (int, float)):
+                                            safe_profit = float(profit_percent)
+                                    except:
+                                        safe_profit = 0
+                                    
                                     pattern_recognizer.learn_pattern({
                                         'symbol': symbol,
-                                        'profit_percent': profit_percent if profit_percent is not None else 0,
+                                        'profit_percent': safe_profit,
                                         'features': position.get('ai_data', {})
                                     })
                                 except Exception as e:
