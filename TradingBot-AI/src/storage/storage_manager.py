@@ -16,7 +16,7 @@ class StorageManager:
             from .local_storage import LocalStorage
             self.storage = LocalStorage('data/')
         
-        print(f"💾 Storage Mode: {self.mode.upper()}")
+        # تهيئة صامتة للتخزين
     
     def detect_environment(self):
         """يكتشف البيئة تلقائياً"""
