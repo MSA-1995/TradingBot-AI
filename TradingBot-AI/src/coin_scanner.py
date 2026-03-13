@@ -10,6 +10,7 @@ import time
 import gc
 from datetime import datetime
 from colorama import Fore, Style
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class CoinScanner:
     def __init__(self, exchange, ai_brain=None, mtf_analyzer=None, risk_manager=None):
@@ -23,11 +24,7 @@ class CoinScanner:
         self.last_deep_scan = None
         self.last_quick_scan = None
         
-        print("🔍 Dynamic Coin Scanner initialized")
-        print("   Level 1: Quick scan every 1 minute")
-        print("   Level 2: Deep scan every 30 minutes")
-        if ai_brain:
-            print("   🧠 AI Brain: ACTIVE for deep analysis")
+        # تهيئة صامتة للماسح الضوئي
     
     def start(self):
         """تشغيل الـThreads"""
@@ -39,7 +36,7 @@ class CoinScanner:
         deep_thread = threading.Thread(target=self._deep_scanner_loop, daemon=True)
         deep_thread.start()
         
-        print("✅ Coin Scanner threads started!")
+        # تشغيل صامت للـThreads
     
     def _quick_scanner_loop(self):
         """Quick Scanner - كل دقيقة"""
@@ -156,47 +153,43 @@ class CoinScanner:
             # طباعة صامتة - بدون عرض نتائج الفلترة
             # print(f"   ✅ Filtered: {len(filtered_coins)} coins (from 995)")
             
-            # المرحلة 2: تحليل بـBatch (أفضل 200 فقط)
+            # المرحلة 2: تحليل متوازي بـThreads (أفضل 200 عملة)
             all_scores = {}
-            batch_size = 50
             
-            for i in range(0, len(top_200_symbols), batch_size):
-                batch = top_200_symbols[i:i+batch_size]
+            # استخدام ThreadPoolExecutor للتحليل المتوازي
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                # إرسال جميع المهام
+                future_to_symbol = {executor.submit(self._analyze_coin_quick, symbol): symbol 
+                                  for symbol in top_200_symbols}
                 
-                for symbol in batch:
+                # جمع النتائج
+                for future in as_completed(future_to_symbol):
+                    symbol = future_to_symbol[future]
                     try:
-                        score = self._analyze_coin_quick(symbol)
+                        score = future.result()
                         if score > 0:
                             all_scores[symbol] = score
-                    except:
+                    except Exception as e:
                         continue
-                
-                # تنظيف الذاكرة
-                gc.collect()
+            
+            # تنظيف الذاكرة
+            gc.collect()
             
             # المرحلة 3: اختيار أفضل 30 للتحليل الذكي (صامت)
             sorted_coins = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
             top_30 = sorted_coins[:30]
             
-            # المرحلة 4: تحليل ذكي للـ30 الأفضل
+            # المرحلة 4: تحليل ذكي للـ30 الأفضل (صامت)
             if self.ai_brain or self.mtf_analyzer:
-                print("🧠 Phase 4: AI deep analysis on top 30...")
-                
                 ai_scores = {}
                 for idx, (symbol, base_score) in enumerate(top_30, 1):
                     try:
                         ai_score = self._analyze_coin_with_ai(symbol, base_score)
                         if ai_score > 0:
                             ai_scores[symbol] = ai_score
-                        
-                        # طباعة التقدم مخفية
-                        # if idx % 20 == 0:
-                        #     print(f"   Progress: {idx}/30 coins analyzed with AI...")
                     except Exception as e:
                         # إذا فشل AI، استخدم الـScore الأساسي
                         ai_scores[symbol] = base_score
-                        # طباعة الأخطاء مخفية
-                        # print(f"   ⚠️ AI analysis failed for {symbol}: {e}")
                     
                     # تنظيف
                     gc.collect()
@@ -204,13 +197,9 @@ class CoinScanner:
                 # ترتيب حسب AI Score
                 sorted_ai = sorted(ai_scores.items(), key=lambda x: x[1], reverse=True)
                 top_20 = sorted_ai[:20]
-                
-                # طباعة اكتمال التحليل مخفية
-                # print(f"   ✅ AI analysis complete (30 coins analyzed)")
             else:
                 # بدون AI، استخدم أفضل 20 من الـ30
                 top_20 = top_30[:20]
-                print(f"   ⚠️ AI not available, using top 20 from basic analysis")
             
             # المرحلة 5: تحديث القائمة (صامت)
             with self.coins_lock:
