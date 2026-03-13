@@ -36,7 +36,9 @@ MIN_VOLUME_RATIO = 1.0
 LOOP_SLEEP = 10  # seconds
 REPORT_INTERVAL = 30  # minutes
 
-# Supported Coins
+# Supported Coins (Legacy - for fallback only)
+# النظام الجديد يستخدم Dynamic Scanner (995 عملة)
+# هذي القائمة تُستخدم فقط كـfallback إذا Scanner فشل
 SYMBOLS = [
     'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT',
     'ADA/USDT', 'AVAX/USDT', 'LINK/USDT',
@@ -47,5 +49,6 @@ SYMBOLS = [
 
 # Initialize symbol data structure
 def init_symbols():
-    """Initialize symbols dictionary"""
-    return {symbol: {'position': None} for symbol in SYMBOLS}
+    """Initialize symbols dictionary (dynamic)"""
+    # البداية بقائمة فارغة - سيتم ملؤها ديناميكياً
+    return {}
