@@ -1,10 +1,8 @@
 """
-🧠 Smart AI Models
-Neural Network + Training + Data Loading
+🧠 Smart AI Models (بدون TensorFlow)
+Rule-based AI + Database Learning
 """
 
 from .smart_ai import SmartAI
-from .simple_ai_trainer import SimpleAI
-from .data_loader import DataLoader
 
-__all__ = ['SmartAI', 'SimpleAI', 'DataLoader']
+__all__ = ['SmartAI']
