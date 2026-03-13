@@ -7,6 +7,10 @@ All bot settings and constants
 MIN_CONFIDENCE = 55  # Changed from 60 - more aggressive
 MAX_POSITIONS = 20
 
+# Capital Management
+MAX_CAPITAL = 300  # الحد الأقصى لرأس المال المستخدم ($200-$300)
+PROFIT_RESERVE = True  # حفظ الأرباح (لا يتداول فيها)
+
 # Trade Amount Limits
 MIN_TRADE_AMOUNT = 12  # Minimum trade size (safe for Binance $10 limit)
 MAX_TRADE_AMOUNT = 30  # Maximum trade size
