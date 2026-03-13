@@ -16,6 +16,8 @@ import time
 import gc
 from datetime import datetime, timedelta
 from colorama import init, Fore, Style
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 # Config
 from config_encrypted import get_api_keys, get_discord_webhook
@@ -88,6 +90,34 @@ capital_manager = CapitalManager(max_capital=MAX_CAPITAL, profit_reserve=PROFIT_
 coin_scanner = CoinScanner(exchange, ai_brain, None, None)
 coin_scanner.start()
 
+# Threading للتحليل السريع
+analysis_lock = threading.Lock()
+analysis_results = {}
+
+def analyze_symbol_threaded(symbol, exchange, symbols_data):
+    """تحليل العملة في Thread منفصل"""
+    try:
+        symbol_data = symbols_data.get(symbol, {'position': None})
+        position = symbol_data['position']
+        
+        # Get analysis
+        analysis = get_market_analysis(exchange, symbol)
+        if not analysis:
+            return {'symbol': symbol, 'status': 'failed', 'has_position': position is not None}
+        
+        current_price = analysis['close']
+        
+        return {
+            'symbol': symbol,
+            'status': 'success',
+            'analysis': analysis,
+            'current_price': current_price,
+            'position': position,
+            'symbol_data': symbol_data
+        }
+    except Exception as e:
+        return {'symbol': symbol, 'status': 'error', 'error': str(e), 'has_position': position is not None}
+
 # ========== BANNER ==========
 print("=" * 60)
 print("\n  ███╗   ███╗███████╗ █████╗ ")
@@ -111,15 +141,15 @@ print("=" * 60)
 # استخدام قائمة ديناميكية بدل SYMBOLS الثابتة
 def get_dynamic_symbols():
     """الحصول على القائمة الديناميكية + الصفقات المفتوحة"""
+    # الصفقات المفتوحة (أولوية - يجب عرضها دائماً)
+    open_positions = [symbol for symbol, data in SYMBOLS_DATA.items() if data.get('position')]
+    
     # القائمة الديناميكية من Scanner
     top_coins = coin_scanner.get_top_coins()
     dynamic_symbols = [coin for coin, score in top_coins]
     
-    # إضافة الصفقات المفتوحة (مهم!)
-    open_positions = [symbol for symbol, data in SYMBOLS_DATA.items() if data.get('position')]
-    
-    # دمج القوائم (بدون تكرار)
-    all_symbols = list(set(dynamic_symbols + open_positions))
+    # دمج القوائم (الصفقات المفتوحة أولاً، ثم الديناميكية)
+    all_symbols = open_positions + [symbol for symbol in dynamic_symbols if symbol not in open_positions]
     
     return all_symbols
 
@@ -230,50 +260,80 @@ try:
             print(f"  ✅ Tradable: ${tradable_balance:.2f} | Max Capital: ${MAX_CAPITAL}")
         print(f"{'█' * 60}{Style.RESET_ALL}\n")
         
-        # عرض القائمة الديناميكية
+        # عرض القائمة الديناميكية + الصفقات المفتوحة
         top_coins = coin_scanner.get_top_coins()
         hot_opps = coin_scanner.get_hot_opportunities()
         scan_status = coin_scanner.get_scan_status()
         
+        # عرض الصفقات المفتوحة أولاً
+        open_positions = [symbol for symbol, data in SYMBOLS_DATA.items() if data.get('position')]
+        if open_positions:
+            print(f"{Fore.GREEN}💼 Open Positions ({len(open_positions)}):{Style.RESET_ALL}")
+            for symbol in open_positions:
+                position = SYMBOLS_DATA[symbol]['position']
+                buy_price = position['buy_price']
+                print(f"  • {symbol:12} | Buy: ${buy_price:.4f}")
+        
+        # عرض أفضل 10 عملات للمراقبة (ديناميكية - تتغير حسب الأداء)
         if top_coins:
-            print(f"{Fore.YELLOW}🏆 Top 20 Dynamic Coins:{Style.RESET_ALL}")
-            for i, (symbol, score) in enumerate(top_coins[:10], 1):
-                print(f"  {i:2}. {symbol:12} | Score:{score:>5.0f}")
-            if len(top_coins) > 10:
-                print(f"  ... and {len(top_coins)-10} more")
+            monitoring_coins = [coin for coin, score in top_coins if coin not in open_positions]
+            if monitoring_coins:
+                display_count = min(10, len(monitoring_coins))  # أفضل 10 أو أقل إذا كان العدد أقل
+                print(f"{Fore.YELLOW}🔍 Top {display_count} Best Coins (Dynamic):{Style.RESET_ALL}")
+                
+                displayed = 0
+                for i, (symbol, score) in enumerate(top_coins, 1):
+                    if symbol not in open_positions and displayed < 10:
+                        print(f"  {displayed+1:2}. {symbol:12} | Score:{score:>5.0f}")
+                        displayed += 1
+                
+                if len(monitoring_coins) > 10:
+                    print(f"  ... and {len(monitoring_coins)-10} more coins being monitored")
             
             # آخر فحص
             if scan_status['last_deep_scan']:
                 elapsed = (datetime.now() - scan_status['last_deep_scan']).total_seconds() / 60
                 print(f"  📊 Last deep scan: {elapsed:.0f}min ago")
         
-        if hot_opps:
-            print(f"\n{Fore.RED}🔥 Hot Opportunities:{Style.RESET_ALL}")
-            for opp in hot_opps[:3]:
-                print(f"  • {opp['symbol']:12} | Vol:${opp['volume']/1e6:.1f}M | {opp['change']:+.2f}%")
-        
         print()
         
         # الحصول على القائمة الديناميكية
         current_symbols = get_dynamic_symbols()
         
-        # Process each symbol
-        for symbol in current_symbols:
-            # إضافة العملة للقائمة إذا مو موجودة
-            if symbol not in SYMBOLS_DATA:
-                SYMBOLS_DATA[symbol] = {'position': None}
+        # تحليل متعدد الخيوط (Threading)
+        print(f"📊 Analyzing {len(current_symbols)} coins with threading...")
+        
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            # إرسال جميع العملات للتحليل
+            future_to_symbol = {
+                executor.submit(analyze_symbol_threaded, symbol, exchange, SYMBOLS_DATA): symbol 
+                for symbol in current_symbols
+            }
             
-            symbol_data = SYMBOLS_DATA[symbol]
-            position = symbol_data['position']
-            
-            # Get analysis
-            analysis = get_market_analysis(exchange, symbol)
-            if not analysis:
-                if position:
-                    print(f"⚠️ {symbol}: Analysis failed (has position)")
+            # جمع النتائج
+            analysis_results = []
+            for future in as_completed(future_to_symbol):
+                result = future.result()
+                analysis_results.append(result)
+        
+        print(f"✅ Analysis complete! Processing {len(analysis_results)} results...")
+        
+        # Process results
+        for result in analysis_results:
+            if result['status'] != 'success':
+                if result.get('has_position'):
+                    print(f"⚠️ {result['symbol']}: Analysis failed (has position)")
                 continue
             
-            current_price = analysis['close']
+            symbol = result['symbol']
+            analysis = result['analysis']
+            current_price = result['current_price']
+            position = result['position']
+            symbol_data = result['symbol_data']
+            
+            # إضافة العملة للقائمة إذا مو موجودة
+            if symbol not in SYMBOLS_DATA:
+                SYMBOLS_DATA[symbol] = symbol_data
             
             # ========== SELL LOGIC ==========
             if position:
