@@ -255,21 +255,34 @@ class AIBrain:
         
         # مقارنة RSI
         if 'rsi' in stored and 'rsi' in current:
-            diff = abs(current['rsi'] - stored['rsi'])
-            score += max(0, 1 - diff / 100)
-            count += 1
+            # حماية من None
+            current_rsi = current.get('rsi')
+            stored_rsi = stored.get('rsi')
+            
+            if current_rsi is not None and stored_rsi is not None:
+                diff = abs(current_rsi - stored_rsi)
+                score += max(0, 1 - diff / 100)
+                count += 1
         
         # مقارنة Volume
         if 'volume_ratio' in stored and 'volume_ratio' in current:
-            diff = abs(current['volume_ratio'] - stored['volume_ratio'])
-            score += max(0, 1 - diff / 2)
-            count += 1
+            current_vol = current.get('volume_ratio')
+            stored_vol = stored.get('volume_ratio')
+            
+            if current_vol is not None and stored_vol is not None:
+                diff = abs(current_vol - stored_vol)
+                score += max(0, 1 - diff / 2)
+                count += 1
         
         # مقارنة MACD
         if 'macd_diff' in stored and 'macd_diff' in current:
-            diff = abs(current['macd_diff'] - stored['macd_diff'])
-            score += max(0, 1 - diff / 50)
-            count += 1
+            current_macd = current.get('macd_diff')
+            stored_macd = stored.get('macd_diff')
+            
+            if current_macd is not None and stored_macd is not None:
+                diff = abs(current_macd - stored_macd)
+                score += max(0, 1 - diff / 50)
+                count += 1
         
         return score / count if count > 0 else 0
     
