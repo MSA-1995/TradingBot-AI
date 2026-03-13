@@ -319,44 +319,47 @@ try:
                             
                             # AI Learning - يتعلم من كل شيء
                             if ai_brain:
-                                trade_result = {
-                                    'symbol': symbol,
-                                    'action': 'SELL',
-                                    'profit_percent': profit_percent,
-                                    'sell_reason': sell_reason,
-                                    'tp_target': position.get('tp_target', 1.0),
-                                    'sl_target': position.get('sl_target', 2.0),
-                                    'max_wait_hours': position.get('max_wait_hours', 48),
-                                    'hours_held': (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600
-                                }
-                                
-                                # إضافة ai_data إذا موجود
-                                if 'ai_data' in position:
-                                    trade_result.update(position['ai_data'])
-                                
-                                ai_brain.learn_from_trade(trade_result)
+                                try:
+                                    trade_result = {
+                                        'symbol': symbol,
+                                        'action': 'SELL',
+                                        'profit_percent': profit_percent if profit_percent is not None else 0,
+                                        'sell_reason': sell_reason if sell_reason else 'Unknown',
+                                        'tp_target': position.get('tp_target', 1.0),
+                                        'sl_target': position.get('sl_target', 2.0),
+                                        'max_wait_hours': position.get('max_wait_hours', 48),
+                                        'hours_held': (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600
+                                    }
+                                    
+                                    # إضافة ai_data إذا موجود
+                                    if 'ai_data' in position:
+                                        trade_result.update(position['ai_data'])
+                                    
+                                    ai_brain.learn_from_trade(trade_result)
+                                except Exception as e:
+                                    print(f"⚠️ AI Learning error: {e}")
                             
                             # Exit Strategy Learning
                             if exit_strategy:
                                 try:
                                     exit_strategy.learn_from_exit(symbol, {
-                                        'profit_percent': profit_percent,
-                                        'sell_reason': sell_reason,
+                                        'profit_percent': profit_percent if profit_percent is not None else 0,
+                                        'sell_reason': sell_reason if sell_reason else 'Unknown',
                                         'hours_held': (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600
                                     })
-                                except:
-                                    pass
+                                except Exception as e:
+                                    print(f"⚠️ Exit Strategy Learning error: {e}")
                             
                             # Pattern Recognition Learning
                             if pattern_recognizer:
                                 try:
                                     pattern_recognizer.learn_pattern({
                                         'symbol': symbol,
-                                        'profit_percent': profit_percent,
+                                        'profit_percent': profit_percent if profit_percent is not None else 0,
                                         'features': position.get('ai_data', {})
                                     })
-                                except:
-                                    pass
+                                except Exception as e:
+                                    print(f"⚠️ Pattern Learning error: {e}")
                             
                             symbol_data['position'] = None
                             storage.save_positions(SYMBOLS_DATA)
