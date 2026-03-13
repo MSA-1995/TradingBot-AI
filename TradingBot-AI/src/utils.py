@@ -6,16 +6,20 @@ Helper functions
 from datetime import datetime, timedelta
 
 def calculate_dynamic_confidence(analysis, mtf_analysis):
-    """Calculate confidence score (0-120)"""
+    """حساب نقاط الثقة (0-120)"""
     confidence = 0
     reasons = []
     
-    rsi = analysis['rsi']
-    macd_diff = analysis['macd_diff']
-    volume_ratio = analysis['volume'] / analysis['volume_sma'] if analysis['volume_sma'] > 0 else 0
+    # حماية من None
+    rsi = analysis.get('rsi', 50) if analysis.get('rsi') is not None else 50
+    macd_diff = analysis.get('macd_diff', 0) if analysis.get('macd_diff') is not None else 0
+    volume = analysis.get('volume', 0) if analysis.get('volume') is not None else 0
+    volume_sma = analysis.get('volume_sma', 1) if analysis.get('volume_sma') is not None else 1
+    
+    volume_ratio = volume / volume_sma if volume_sma > 0 else 0
     
     # Trend check
-    if mtf_analysis['trend'] == 'bearish':
+    if mtf_analysis.get('trend') == 'bearish':
         return 0, ["Bearish trend"]
     
     # RSI scoring (0-30)
@@ -53,10 +57,10 @@ def calculate_dynamic_confidence(analysis, mtf_analysis):
         reasons.append(f"Volume {volume_ratio:.1f}x (Normal)")
     
     # Trend bonus (0-30)
-    if mtf_analysis['trend'] == 'bullish':
-        trend_score = mtf_analysis['total'] * 10
+    if mtf_analysis.get('trend') == 'bullish':
+        trend_score = mtf_analysis.get('total', 0) * 10
         confidence += trend_score
-        reasons.append(f"Bullish trend ({mtf_analysis['total']}/3)")
+        reasons.append(f"Bullish trend ({mtf_analysis.get('total', 0)}/3)")
     
     return confidence, reasons
 
@@ -65,12 +69,15 @@ def get_active_positions_count(symbols_dict):
     return sum(1 for data in symbols_dict.values() if data['position'] is not None)
 
 def get_total_invested(symbols_dict):
-    """Calculate total invested amount"""
+    """حساب إجمالي المبلغ المستثمر"""
     total = 0
     for data in symbols_dict.values():
         if data['position']:
             pos = data['position']
-            total += pos['amount'] * pos['buy_price']
+            # حماية من None
+            amount = pos.get('amount', 0) if pos.get('amount') is not None else 0
+            buy_price = pos.get('buy_price', 0) if pos.get('buy_price') is not None else 0
+            total += amount * buy_price
     return total
 
 def should_send_report(last_report_time, interval_minutes=30):
@@ -93,5 +100,8 @@ def format_price(price):
         return f"${price:>8.8f}"  # للعملات الرخيصة مثل SHIB
 
 def calculate_profit_percent(current_price, buy_price):
-    """Calculate profit percentage"""
+    """حساب نسبة الربح"""
+    # حماية من None
+    if current_price is None or buy_price is None or buy_price == 0:
+        return 0
     return ((current_price - buy_price) / buy_price) * 100
