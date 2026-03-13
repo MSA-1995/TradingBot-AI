@@ -26,8 +26,7 @@ class SmartAI:
         self.correct_predictions = 0
         
     def _load_model(self):
-        """تعطيل Neural Network - استخدام القواعد الذكية فقط"""
-        print("⚠️ TensorFlow disabled - Using rule-based AI with database learning")
+        """استخدام القواعد الذكية + التعلم من Database"""
         self.nn_model = None
         self.scaler = None
         self.enabled = True  # تفعيل الذكاء بدون TensorFlow
