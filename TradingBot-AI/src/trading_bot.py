@@ -42,7 +42,6 @@ except Exception as e:
     AI_ENABLED = False
 
 # Advanced Models (معطل - توفير ذاكرة)
-print("⚠️ Advanced Models disabled to save memory")
 MODELS_ENABLED = False
 mtf_analyzer = None
 risk_manager = None
