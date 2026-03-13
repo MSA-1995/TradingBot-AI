@@ -89,13 +89,13 @@ class CoinScanner:
                     price_change = ticker.get('percentage', 0) or 0
                     last_price = ticker.get('last', 0) or 0
                     
-                    # شروط الفرصة الساخنة:
-                    # 1. Volume عالي جداً (> $5M)
+                    # شروط الفرصة الساخنة (مخففة لـTestnet):
+                    # 1. Volume عالي (> $500K)
                     # 2. انخفاض قوي (-2% إلى -8%)
-                    # 3. سعر معقول (> $0.01)
-                    if volume_24h > 5_000_000:
+                    # 3. سعر معقول (> $0.001)
+                    if volume_24h > 500_000:  # كان $5M
                         if -8 < price_change < -2:
-                            if last_price > 0.01:
+                            if last_price > 0.001:  # كان $0.01
                                 hot_coins.append({
                                     'symbol': symbol,
                                     'volume': volume_24h,
@@ -147,9 +147,9 @@ class CoinScanner:
                     volume_24h = ticker.get('quoteVolume', 0) or 0
                     last_price = ticker.get('last', 0) or 0
                     
-                    # فلترة أولية
-                    if volume_24h > 1_000_000:  # Volume > $1M
-                        if last_price > 0.01:  # Price > $0.01
+                    # فلترة أولية (مخففة لـTestnet)
+                    if volume_24h > 100_000:  # Volume > $100K (كان $1M)
+                        if last_price > 0.001:  # Price > $0.001 (كان $0.01)
                             filtered_coins.append(symbol)
                 except:
                     continue
@@ -180,20 +180,20 @@ class CoinScanner:
                 progress = min(i + batch_size, len(filtered_coins))
                 print(f"   Progress: {progress}/{len(filtered_coins)} coins analyzed...")
             
-            # المرحلة 3: اختيار أفضل 50 للتحليل الذكي
-            print("🎯 Phase 3: Selecting top 50 for AI analysis...")
+            # المرحلة 3: اختيار أفضل 30 للتحليل الذكي
+            print("🎯 Phase 3: Selecting top 30 for AI analysis...")
             
             sorted_coins = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
-            top_50 = sorted_coins[:50]
+            top_30 = sorted_coins[:30]
             
-            print(f"   ✅ Top 50 selected for AI analysis")
+            print(f"   ✅ Top 30 selected for AI analysis")
             
-            # المرحلة 4: تحليل ذكي للـ50 الأفضل
+            # المرحلة 4: تحليل ذكي للـ30 الأفضل
             if self.ai_brain or self.mtf_analyzer:
-                print("🧠 Phase 4: AI deep analysis on top 50...")
+                print("🧠 Phase 4: AI deep analysis on top 30...")
                 
                 ai_scores = {}
-                for idx, (symbol, base_score) in enumerate(top_50, 1):
+                for idx, (symbol, base_score) in enumerate(top_30, 1):
                     try:
                         ai_score = self._analyze_coin_with_ai(symbol, base_score)
                         if ai_score > 0:
@@ -201,7 +201,7 @@ class CoinScanner:
                         
                         # طباعة التقدم كل 10 عملات
                         if idx % 10 == 0:
-                            print(f"   Progress: {idx}/50 coins analyzed with AI...")
+                            print(f"   Progress: {idx}/30 coins analyzed with AI...")
                     except Exception as e:
                         # إذا فشل AI، استخدم الـScore الأساسي
                         ai_scores[symbol] = base_score
@@ -214,10 +214,10 @@ class CoinScanner:
                 sorted_ai = sorted(ai_scores.items(), key=lambda x: x[1], reverse=True)
                 top_20 = sorted_ai[:20]
                 
-                print(f"   ✅ AI analysis complete (50 coins analyzed)")
+                print(f"   ✅ AI analysis complete (30 coins analyzed)")
             else:
-                # بدون AI، استخدم أفضل 20 من الـ50
-                top_20 = top_50[:20]
+                # بدون AI، استخدم أفضل 20 من الـ30
+                top_20 = top_30[:20]
                 print(f"   ⚠️ AI not available, using top 20 from basic analysis")
             
             # المرحلة 5: تحديث القائمة
