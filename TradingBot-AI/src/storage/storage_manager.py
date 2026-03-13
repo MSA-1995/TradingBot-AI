@@ -89,6 +89,15 @@ class StorageManager:
         except:
             return []
     
+    def get_symbol_trades(self, symbol, limit=20):
+        """جلب صفقات عملة محددة"""
+        try:
+            all_trades = self.storage.load_trades(limit=100)
+            symbol_trades = [t for t in all_trades if t.get('symbol') == symbol]
+            return symbol_trades[:limit]
+        except:
+            return []
+    
     # ========== Auto Cleanup ==========
     def cleanup_old_data(self):
         """حذف البيانات القديمة تلقائياً"""
