@@ -18,6 +18,10 @@ class SmartAI:
         # محاولة تحميل النموذج
         self._load_model()
         
+        # تحميل الأفخاخ من Database
+        self.trap_memory = []
+        self._load_traps()
+        
         # إحصائيات
         self.predictions_count = 0
         self.correct_predictions = 0
@@ -51,6 +55,18 @@ class SmartAI:
             print(f"⚠️ Smart AI: Could not load model - {e}")
             self.enabled = False
     
+    def _load_traps(self):
+        """تحميل الأفخاخ من Database"""
+        try:
+            from storage import StorageManager
+            storage = StorageManager()
+            self.trap_memory = storage.load_traps()
+            if self.trap_memory:
+                print(f"🚨 Loaded {len(self.trap_memory)} traps from database")
+        except Exception as e:
+            print(f"⚠️ Could not load traps: {e}")
+            self.trap_memory = []
+    
     def should_buy(self, symbol, analysis, mtf, price_drop, news_sentiment=None):
         """
         القرار الذكي: هل نشتري؟
@@ -60,7 +76,15 @@ class SmartAI:
             return self._fallback_decision(analysis, mtf, price_drop)
         
         try:
-            # 1. تحضير Features للـ Neural Network
+            # 1. فحص الأفخاخ
+            if self._is_trap(symbol, analysis):
+                return {
+                    'action': 'SKIP',
+                    'confidence': 0,
+                    'reason': '🚨 Matches known trap pattern'
+                }
+            
+            # 2. تحضير Features للـ Neural Network
             features = self._prepare_features(analysis, mtf, price_drop, news_sentiment)
             
             # 2. التنبؤ بالـ Neural Network
@@ -171,6 +195,61 @@ class SmartAI:
         # تحويل news sentiment (-10 to +10) إلى (0 to 1)
         score = (news_sentiment + 10) / 20
         return max(0, min(1, score))
+    
+    def _is_trap(self, symbol, analysis):
+        """فحص إذا كان النمط يشبه فخ سابق"""
+        if not self.trap_memory:
+            return False
+        
+        try:
+            current_pattern = {
+                'rsi': analysis.get('rsi'),
+                'macd_diff': analysis.get('macd_diff'),
+                'volume': analysis.get('volume_ratio')
+            }
+            
+            for trap in self.trap_memory:
+                trap_pattern = trap.get('pattern', {})
+                if not trap_pattern:
+                    continue
+                
+                # حساب التشابه
+                similarity = self._calculate_pattern_similarity(current_pattern, trap_pattern)
+                
+                if similarity > 0.85:  # 85% مشابه
+                    return True
+            
+            return False
+        except Exception as e:
+            return False
+    
+    def _calculate_pattern_similarity(self, pattern1, pattern2):
+        """حساب التشابه بين نمطين"""
+        try:
+            score = 0
+            count = 0
+            
+            # RSI
+            if pattern1.get('rsi') and pattern2.get('rsi'):
+                diff = abs(pattern1['rsi'] - pattern2['rsi'])
+                score += max(0, 1 - diff / 100)
+                count += 1
+            
+            # Volume
+            if pattern1.get('volume') and pattern2.get('volume'):
+                diff = abs(pattern1['volume'] - pattern2['volume'])
+                score += max(0, 1 - diff / 2)
+                count += 1
+            
+            # MACD
+            if pattern1.get('macd_diff') and pattern2.get('macd_diff'):
+                diff = abs(pattern1['macd_diff'] - pattern2['macd_diff'])
+                score += max(0, 1 - diff / 50)
+                count += 1
+            
+            return score / count if count > 0 else 0
+        except:
+            return 0
     
     def _combine_decisions(self, nn_prob, pattern_score, news_score):
         """دمج القرارات بأوزان ذكية"""
@@ -326,6 +405,22 @@ class SmartAI:
             
             # حفظ الصفقة
             storage.save_trade(trade_result)
+            
+            # حفظ الفخ إذا خسرانة
+            if trade_result.get('profit_percent', 0) < -1.5:  # خسارة > 1.5%
+                trap_data = {
+                    'symbol': trade_result.get('symbol'),
+                    'pattern': {
+                        'rsi': trade_result.get('rsi'),
+                        'macd_diff': trade_result.get('macd_diff'),
+                        'volume': trade_result.get('volume'),
+                        'confidence': trade_result.get('confidence')
+                    },
+                    'loss': trade_result.get('profit_percent'),
+                    'reason': trade_result.get('sell_reason')
+                }
+                storage.save_trap(trap_data)
+                print(f"🚨 Trap detected and saved: {trade_result.get('symbol')} ({trade_result.get('profit_percent'):.2f}%)")
             
             # تحديث الإحصائيات
             self.predictions_count += 1
