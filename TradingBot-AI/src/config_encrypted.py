@@ -16,7 +16,7 @@ _MASTER_CIPHER = Fernet(_MASTER_KEY)
 
 def get_encryption_key():
     """Get encryption key - supports Fernet encrypted password"""
-    # Try Environment Variable first
+    # Try Environment Variable first (Koyeb/Production)
     encrypted_key = os.getenv('ENCRYPTION_KEY')
     
     if encrypted_key:
@@ -36,29 +36,25 @@ def get_encryption_key():
                 print("✅ Encryption key loaded from environment variable")
                 return encrypted_key
     
-    # Try flash drive
+    # Try flash drive (Local development only)
     key_file = r"D:\bot_keys.txt"
-    try:
-        if os.path.exists(key_file):
+    if os.path.exists(key_file):
+        try:
             with open(key_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
                 key = lines[2].strip()  # السطر الثالث (المفتاح)
             print("✅ Encryption key loaded from flash drive")
             return key
-        else:
-            print("\n" + "="*60)
-            print("⚠️  Flash drive not found!")
-            print("📌 Please connect D:\\ drive with bot_keys.txt")
-            print("📌 Or set ENCRYPTION_KEY environment variable")
-            print("="*60 + "\n")
-            return None
-    except Exception as e:
-        print("\n" + "="*60)
-        print("⚠️  Error reading encryption key!")
-        print("📌 Make sure bot_keys.txt exists in D:\\")
-        print("📌 Or set ENCRYPTION_KEY environment variable")
-        print("="*60 + "\n")
-        return None
+        except Exception as e:
+            print(f"⚠️ Error reading flash drive: {e}")
+    
+    # No key found - exit
+    print("\n" + "="*60)
+    print("❌ ENCRYPTION_KEY not found!")
+    print("📌 Set ENCRYPTION_KEY environment variable on Koyeb")
+    print("📌 Or connect D:\\ flash drive for local development")
+    print("="*60 + "\n")
+    return None
 
 _KEY = get_encryption_key()
 
