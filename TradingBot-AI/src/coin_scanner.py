@@ -153,11 +153,10 @@ class CoinScanner:
                 except:
                     continue
             
-            print(f"   ✅ Filtered: {len(filtered_coins)} coins (from 995)")
+            # طباعة صامتة - بدون عرض نتائج الفلترة
+            # print(f"   ✅ Filtered: {len(filtered_coins)} coins (from 995)")
             
-            # المرحلة 2: تحليل بـBatch
-            print("🧠 Phase 2: Deep analysis...")
-            
+            # المرحلة 2: تحليل بـBatch (صامت)
             all_scores = {}
             batch_size = 50
             
@@ -218,8 +217,7 @@ class CoinScanner:
                 top_20 = top_30[:20]
                 print(f"   ⚠️ AI not available, using top 20 from basic analysis")
             
-            # المرحلة 5: تحديث القائمة
-            print("🏆 Phase 5: Updating top 20 list...")
+            # المرحلة 5: تحديث القائمة (صامت)
             with self.coins_lock:
                 old_top = [coin for coin, score in self.top_coins]
                 self.top_coins = top_20
