@@ -309,7 +309,14 @@ class EnhancedPatternRecognition:
     def learn_pattern(self, trade_data):
         """التعلم من صفقة"""
         try:
+            # حماية من None
             profit = trade_data.get('profit_percent', 0)
+            if profit is None:
+                profit = 0
+            try:
+                profit = float(profit)
+            except:
+                profit = 0
             
             # تصنيف النمط
             if profit >= 0.5:
