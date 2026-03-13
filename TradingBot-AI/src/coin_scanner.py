@@ -193,14 +193,19 @@ class CoinScanner:
                 print("🧠 Phase 4: AI deep analysis on top 50...")
                 
                 ai_scores = {}
-                for symbol, base_score in top_50:
+                for idx, (symbol, base_score) in enumerate(top_50, 1):
                     try:
                         ai_score = self._analyze_coin_with_ai(symbol, base_score)
                         if ai_score > 0:
                             ai_scores[symbol] = ai_score
+                        
+                        # طباعة التقدم كل 10 عملات
+                        if idx % 10 == 0:
+                            print(f"   Progress: {idx}/50 coins analyzed with AI...")
                     except Exception as e:
                         # إذا فشل AI، استخدم الـScore الأساسي
                         ai_scores[symbol] = base_score
+                        print(f"   ⚠️ AI analysis failed for {symbol}: {e}")
                     
                     # تنظيف
                     gc.collect()
@@ -209,10 +214,11 @@ class CoinScanner:
                 sorted_ai = sorted(ai_scores.items(), key=lambda x: x[1], reverse=True)
                 top_20 = sorted_ai[:20]
                 
-                print(f"   ✅ AI analysis complete")
+                print(f"   ✅ AI analysis complete (50 coins analyzed)")
             else:
                 # بدون AI، استخدم أفضل 20 من الـ50
                 top_20 = top_50[:20]
+                print(f"   ⚠️ AI not available, using top 20 from basic analysis")
             
             # المرحلة 5: تحديث القائمة
             print("🏆 Phase 5: Updating top 20 list...")
