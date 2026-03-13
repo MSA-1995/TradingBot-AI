@@ -265,35 +265,12 @@ try:
         hot_opps = coin_scanner.get_hot_opportunities()
         scan_status = coin_scanner.get_scan_status()
         
-        # عرض أفضل 10 عملات للمراقبة (ديناميكية - تتغير حسب الأداء)
-        if top_coins:
-            monitoring_coins = [coin for coin, score in top_coins if coin not in open_positions]
-            if monitoring_coins:
-                display_count = min(10, len(monitoring_coins))  # أفضل 10 أو أقل إذا كان العدد أقل
-                print(f"{Fore.YELLOW}🔍 Top {display_count} Best Coins (Dynamic):{Style.RESET_ALL}")
-                
-                displayed = 0
-                for i, (symbol, score) in enumerate(top_coins, 1):
-                    if symbol not in open_positions and displayed < 10:
-                        print(f"  {displayed+1:2}. {symbol:12} | Score:{score:>5.0f}")
-                        displayed += 1
-                
-                if len(monitoring_coins) > 10:
-                    print(f"  ... and {len(monitoring_coins)-10} more coins being monitored")
-            
-            # آخر فحص
-            if scan_status['last_deep_scan']:
-                elapsed = (datetime.now() - scan_status['last_deep_scan']).total_seconds() / 60
-                print(f"  📊 Last deep scan: {elapsed:.0f}min ago")
-        
         print()
         
         # الحصول على القائمة الديناميكية
         current_symbols = get_dynamic_symbols()
         
         # تحليل متعدد الخيوط (Threading)
-        print(f"📊 Analyzing {len(current_symbols)} coins with threading...")
-        
         with ThreadPoolExecutor(max_workers=5) as executor:
             # إرسال جميع العملات للتحليل
             future_to_symbol = {
@@ -307,10 +284,25 @@ try:
                 result = future.result()
                 analysis_results.append(result)
         
-        print(f"✅ Analysis complete! Processing {len(analysis_results)} results...")
+        # ترتيب النتائج: الصفقات المفتوحة أولاً، ثم أفضل 10 من الباقي
+        open_positions = [symbol for symbol, data in SYMBOLS_DATA.items() if data.get('position')]
+        
+        # فصل النتائج
+        position_results = [r for r in analysis_results if r['symbol'] in open_positions]
+        monitoring_results = [r for r in analysis_results if r['symbol'] not in open_positions]
+        
+        # ترتيب عملات المراقبة حسب Score وأخذ أفضل 10
+        top_coins = coin_scanner.get_top_coins()
+        coin_scores = {coin: score for coin, score in top_coins}
+        
+        monitoring_results.sort(key=lambda x: coin_scores.get(x['symbol'], 0), reverse=True)
+        top_10_monitoring = monitoring_results[:10]
+        
+        # دمج القوائم: الصفقات المفتوحة + أفضل 10
+        final_results = position_results + top_10_monitoring
         
         # Process results
-        for result in analysis_results:
+        for result in final_results:
             if result['status'] != 'success':
                 if result.get('has_position'):
                     print(f"⚠️ {result['symbol']}: Analysis failed (has position)")
