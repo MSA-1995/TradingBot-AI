@@ -8,21 +8,11 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
-# تثبيت المكتبات إذا مو موجودة
-def install_requirements():
-    import subprocess
-    import sys
-    
-    required = ['tensorflow', 'scikit-learn']
-    for package in required:
-        try:
-            __import__(package)
-        except ImportError:
-            print(f"📦 Installing {package}...")
-            subprocess.run([sys.executable, '-m', 'pip', 'install', package], 
-                         capture_output=True)
+# تثبيت المكتبات من requirements.txt
+# def install_requirements():
+#     pass
 
-install_requirements()
+# install_requirements()  # Disabled - Koyeb installs from requirements.txt
 
 import tensorflow as tf
 from tensorflow import keras
