@@ -149,8 +149,8 @@ print("        🧠 Multi-Timeframe + Risk Manager")
 print("        🏆 Coin Ranking + Anomaly Detection")
 print("        🎯 Exit Strategy + Pattern Recognition")
 print("        📰 News Sentiment Analysis")
-print("        🔍 Dynamic Coin Scanner (3 Levels)")
-print("        ✅ Version 9.0 - Dynamic 995 Coins 🚀")
+print("        🔍 Dynamic Coin Scanner (Top 10)")
+print("        ✅ Version 10.0 - MSA © 2026")
 print("  ✦•······················•✦•······················•✦\n")
 print("=" * 60)
 
@@ -227,25 +227,10 @@ try:
             print(f"  ✅ Tradable: ${tradable_balance:.2f} | Max Capital: ${MAX_CAPITAL}")
         print(f"{'█' * 60}{Style.RESET_ALL}\n")
         
-        # عرض القائمة الديناميكية
+        # عرض صامت للعملات الديناميكية
         top_coins = coin_scanner.get_top_coins()
         hot_opps = coin_scanner.get_hot_opportunities()
         scan_status = coin_scanner.get_scan_status()
-        
-        if top_coins:
-            print(f"{Fore.YELLOW}🏆 Top 10 Dynamic Coins:{Style.RESET_ALL}")
-            for i, (symbol, score) in enumerate(top_coins[:10], 1):
-                print(f"  {i:2}. {symbol:12} | Score:{score:>5.0f}")
-            
-            # آخر فحص
-            if scan_status['last_deep_scan']:
-                elapsed = (datetime.now() - scan_status['last_deep_scan']).total_seconds() / 60
-                print(f"  📊 Last deep scan: {elapsed:.0f}min ago")
-        
-        if hot_opps:
-            print(f"\n{Fore.RED}🔥 Hot Opportunities:{Style.RESET_ALL}")
-            for opp in hot_opps[:3]:
-                print(f"  • {opp['symbol']:12} | Vol:${opp['volume']/1e6:.1f}M | {opp['change']:+.2f}%")
         
         print()
         
