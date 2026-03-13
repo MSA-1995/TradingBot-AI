@@ -5,13 +5,13 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # نسخ requirements.txt أولاً
-COPY requirements.txt .
+COPY TradingBot-AI/requirements.txt .
 
 # تثبيت المكتبات (قبل نسخ الكود)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # نسخ باقي الملفات
-COPY . .
+COPY TradingBot-AI/ .
 
 # تعيين مجلد العمل للـ src
 WORKDIR /app/src
