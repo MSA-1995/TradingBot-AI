@@ -283,10 +283,27 @@ class ExitStrategyModel:
             if symbol not in self.exit_patterns:
                 self.exit_patterns[symbol] = []
             
+            # حماية من None
+            profit = exit_data.get('profit_percent', 0)
+            if profit is None:
+                profit = 0
+            try:
+                profit = float(profit)
+            except:
+                profit = 0
+            
+            hours_held = exit_data.get('hours_held', 0)
+            if hours_held is None:
+                hours_held = 0
+            try:
+                hours_held = float(hours_held)
+            except:
+                hours_held = 0
+            
             self.exit_patterns[symbol].append({
-                'profit': exit_data.get('profit_percent', 0),
+                'profit': profit,
                 'reason': exit_data.get('sell_reason', ''),
-                'duration': exit_data.get('hours_held', 0),
+                'duration': hours_held,
                 'timestamp': datetime.now().isoformat()
             })
             
