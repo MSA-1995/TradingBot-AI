@@ -52,7 +52,7 @@ class CoinScanner:
                 time.sleep(60)
     
     def _deep_scanner_loop(self):
-        """Deep Scanner - كل 30 دقيقة"""
+        """Deep Scanner - كل 60 دقيقة (مسرع)"""
         # فحص أولي فوري
         try:
             self._deep_scan()
@@ -61,11 +61,11 @@ class CoinScanner:
         
         while True:
             try:
-                time.sleep(1800)  # 30 دقيقة
+                time.sleep(3600)  # 60 دقيقة بدل 30
                 self._deep_scan()
             except Exception as e:
                 print(f"⚠️ Deep scanner error: {e}")
-                time.sleep(1800)
+                time.sleep(3600)
     
     def _quick_scan(self):
         """فحص سريع للفرص الساخنة"""
@@ -234,12 +234,8 @@ class CoinScanner:
                 removed = [c for c in old_top if c not in new_top]
                 
                 if added or removed:
-                    print(f"\n🔄 Top 20 Updated!")
-                    for coin in added:
-                        score = next(s for c, s in top_20 if c == coin)
-                        print(f"   ✅ Added: {coin:12} | Score:{score:.0f}")
-                    for coin in removed:
-                        print(f"   ❌ Removed: {coin:12}")
+                    # طباعة صامتة - بدون عرض القائمة الكاملة
+                    print(f"\n🔄 Top 20 Updated! (+{len(added)} -{len(removed)})")
             
             elapsed = time.time() - start_time
             print(f"\n✅ Deep scan complete in {elapsed:.1f} seconds!")
