@@ -422,16 +422,19 @@ try:
                 try:
                     df = analysis['df']
                     if len(df) >= 12:
-                        highest_price = df['high'].tail(12).max()
-                        current_price = df['close'].iloc[-1]
-                        drop_percent = ((highest_price - current_price) / highest_price) * 100
-                        price_drop = {
-                            'drop_percent': drop_percent,
-                            'highest_1h': highest_price,
-                            'current': current_price,
-                            'confirmed': drop_percent >= 2.0
-                        }
-                except:
+                        highest_price_1h = df['high'].tail(12).max()
+                        current_price_df = df['close'].iloc[-1]
+                        
+                        # حماية من None
+                        if highest_price_1h is not None and current_price_df is not None and highest_price_1h > 0:
+                            drop_percent = ((highest_price_1h - current_price_df) / highest_price_1h) * 100
+                            price_drop = {
+                                'drop_percent': drop_percent,
+                                'highest_1h': highest_price_1h,
+                                'current': current_price_df,
+                                'confirmed': drop_percent >= 2.0
+                            }
+                except Exception as e:
                     pass
                 
                 confidence, reasons = calculate_dynamic_confidence(analysis, mtf)
