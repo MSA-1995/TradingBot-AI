@@ -35,6 +35,7 @@ from trading import execute_buy, execute_sell, calculate_sell_value, should_sell
 from notifications import send_buy_notification, send_sell_notification, send_positions_report, send_startup_notification
 from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent, format_price
 from storage import StorageManager
+from coin_scanner import CoinScanner  # نظام الفحص الديناميكي
 
 # AI Brain
 AI_BOUNDARIES = {
@@ -105,6 +106,10 @@ exchange.set_sandbox_mode(True)
 # Storage
 storage = StorageManager()
 
+# Dynamic Coin Scanner (3 Levels System)
+coin_scanner = CoinScanner(exchange, ai_brain, mtf_analyzer, risk_manager)
+coin_scanner.start()  # تشغيل الـThreads
+
 # AI Brain
 ai_brain = AIBrain(AI_BOUNDARIES) if AI_ENABLED else None
 
@@ -140,17 +145,37 @@ print("        🧠 Multi-Timeframe + Risk Manager")
 print("        🏆 Coin Ranking + Anomaly Detection")
 print("        🎯 Exit Strategy + Pattern Recognition")
 print("        📰 News Sentiment Analysis")
-print("        ✅ Version 8.0 - AI + News Integration 🤖📰")
+print("        🔍 Dynamic Coin Scanner (3 Levels)")
+print("        ✅ Version 9.0 - Dynamic 995 Coins 🚀")
 print("  ✦•······················•✦•······················•✦\n")
 print("=" * 60)
 
 # ========== LOAD POSITIONS ==========
+# استخدام قائمة ديناميكية بدل SYMBOLS الثابتة
+def get_dynamic_symbols():
+    """الحصول على القائمة الديناميكية + الصفقات المفتوحة"""
+    # القائمة الديناميكية من Scanner
+    top_coins = coin_scanner.get_top_coins()
+    dynamic_symbols = [coin for coin, score in top_coins]
+    
+    # إضافة الصفقات المفتوحة (مهم!)
+    open_positions = [symbol for symbol, data in SYMBOLS_DATA.items() if data.get('position')]
+    
+    # دمج القوائم (بدون تكرار)
+    all_symbols = list(set(dynamic_symbols + open_positions))
+    
+    return all_symbols
+
 SYMBOLS_DATA = init_symbols()
 loaded = storage.load_positions()
 for symbol, pos in loaded.items():
     if symbol in SYMBOLS_DATA:
         SYMBOLS_DATA[symbol]['position'] = pos
         print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f}")
+    else:
+        # إضافة الصفقة المفتوحة للقائمة
+        SYMBOLS_DATA[symbol] = {'position': pos}
+        print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f} (not in top 20)")
 
 print(f"\n🤖 Bot started!")
 if ai_brain:
@@ -215,8 +240,39 @@ try:
         print(f"  💼 Balance: ${available:.2f} | Invested: ${invested:.2f} | Active: {active_count}/{MAX_POSITIONS}")
         print(f"{'█' * 60}{Style.RESET_ALL}\n")
         
+        # عرض القائمة الديناميكية
+        top_coins = coin_scanner.get_top_coins()
+        hot_opps = coin_scanner.get_hot_opportunities()
+        scan_status = coin_scanner.get_scan_status()
+        
+        if top_coins:
+            print(f"{Fore.YELLOW}🏆 Top 20 Dynamic Coins:{Style.RESET_ALL}")
+            for i, (symbol, score) in enumerate(top_coins[:10], 1):
+                print(f"  {i:2}. {symbol:12} | Score:{score:>5.0f}")
+            if len(top_coins) > 10:
+                print(f"  ... and {len(top_coins)-10} more")
+            
+            # آخر فحص
+            if scan_status['last_deep_scan']:
+                elapsed = (datetime.now() - scan_status['last_deep_scan']).total_seconds() / 60
+                print(f"  📊 Last deep scan: {elapsed:.0f}min ago")
+        
+        if hot_opps:
+            print(f"\n{Fore.RED}🔥 Hot Opportunities:{Style.RESET_ALL}")
+            for opp in hot_opps[:3]:
+                print(f"  • {opp['symbol']:12} | Vol:${opp['volume']/1e6:.1f}M | {opp['change']:+.2f}%")
+        
+        print()
+        
+        # الحصول على القائمة الديناميكية
+        current_symbols = get_dynamic_symbols()
+        
         # Process each symbol
-        for symbol in SYMBOLS:
+        for symbol in current_symbols:
+            # إضافة العملة للقائمة إذا مو موجودة
+            if symbol not in SYMBOLS_DATA:
+                SYMBOLS_DATA[symbol] = {'position': None}
+            
             symbol_data = SYMBOLS_DATA[symbol]
             position = symbol_data['position']
             
