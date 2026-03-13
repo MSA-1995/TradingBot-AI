@@ -38,22 +38,15 @@ from storage import StorageManager
 from coin_scanner import CoinScanner  # نظام الفحص الديناميكي
 from capital_manager import CapitalManager  # إدارة رأس المال
 
-# AI Brain
-AI_BOUNDARIES = {
-    'min_confidence': 60,
-    'max_confidence': 75,
-    'min_volume': 0.8,
-    'max_volume': 3.0,
-    'min_amount': 10,
-    'max_amount': 20,
-    'max_loss_per_trade': 2.0,
-    'max_daily_loss': 5.0
-}
-
+# Smart AI (الذكاء الحقيقي)
 try:
-    from ai_brain import AIBrain
-    AI_ENABLED = True
-except:
+    from models.smart_ai import SmartAI
+    ai_brain = SmartAI()
+    AI_ENABLED = ai_brain.enabled
+    print(f"🧠 Smart AI: {'ACTIVE' if AI_ENABLED else 'Training mode'}")
+except Exception as e:
+    print(f"❌ Smart AI failed to load: {e}")
+    ai_brain = None
     AI_ENABLED = False
 
 # Advanced Models
@@ -64,17 +57,22 @@ try:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
     
-    from models.multi_timeframe_analyzer import MultiTimeframeAnalyzer
-    from models.risk_manager import RiskManager
-    from models.coin_ranking_model import CoinRankingModel
-    from models.anomaly_detector import AnomalyDetector
-    from models.exit_strategy_model import ExitStrategyModel
-    from models.enhanced_pattern_recognition import EnhancedPatternRecognition
-    
-    MODELS_ENABLED = True
-except Exception as e:
-    print(f"⚠️ Advanced models not loaded: {e}")
     MODELS_ENABLED = False
+    mtf_analyzer = None
+    risk_manager = None
+    coin_ranker = None
+    anomaly_detector = None
+    exit_strategy = None
+    pattern_recognizer = None
+except Exception as e:
+    print(f"⚠️ Models setup: {e}")
+    MODELS_ENABLED = False
+    mtf_analyzer = None
+    risk_manager = None
+    coin_ranker = None
+    anomaly_detector = None
+    exit_strategy = None
+    pattern_recognizer = None
 
 # News Analyzer
 try:
@@ -110,28 +108,9 @@ storage = StorageManager()
 # Capital Manager
 capital_manager = CapitalManager(max_capital=MAX_CAPITAL, profit_reserve=PROFIT_RESERVE)
 
-# AI Brain
-ai_brain = AIBrain(AI_BOUNDARIES) if AI_ENABLED else None
-
-# Advanced Models
-if MODELS_ENABLED:
-    mtf_analyzer = MultiTimeframeAnalyzer(exchange)
-    risk_manager = RiskManager(storage)
-    coin_ranker = CoinRankingModel(storage)
-    anomaly_detector = AnomalyDetector(exchange)
-    exit_strategy = ExitStrategyModel(storage)
-    pattern_recognizer = EnhancedPatternRecognition(storage)
-else:
-    mtf_analyzer = None
-    risk_manager = None
-    coin_ranker = None
-    anomaly_detector = None
-    exit_strategy = None
-    pattern_recognizer = None
-
-# Dynamic Coin Scanner (3 Levels System) - بعد تعريف AI Models
-coin_scanner = CoinScanner(exchange, ai_brain, mtf_analyzer, risk_manager)
-coin_scanner.start()  # تشغيل الـThreads
+# Dynamic Coin Scanner
+coin_scanner = CoinScanner(exchange, ai_brain, None, None)
+coin_scanner.start()
 
 # ========== BANNER ==========
 print("=" * 60)
@@ -144,13 +123,11 @@ print("  ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝\n")
 print("  ✦•······················•✦•······················•✦")
 print("        🚀 MSA Smart Trading Bot")
 print("        💰 Binance Testnet - AI Powered")
-print("        📊 6 Advanced Models Integrated")
-print("        🧠 Multi-Timeframe + Risk Manager")
-print("        🏆 Coin Ranking + Anomaly Detection")
-print("        🎯 Exit Strategy + Pattern Recognition")
+print("        🧠 Smart AI (Neural Network)")
 print("        📰 News Sentiment Analysis")
-print("        🔍 Dynamic Coin Scanner (3 Levels)")
-print("        ✅ Version 9.0 - Dynamic 995 Coins 🚀")
+print("        🔍 Dynamic Coin Scanner (995 Coins)")
+print("        💰 Capital Management System")
+print("        ✅ Version 10.0 - Smart AI 🧠")
 print("  ✦•······················•✦•······················•✦\n")
 print("=" * 60)
 
@@ -182,26 +159,50 @@ for symbol, pos in loaded.items():
         print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f} (not in top 20)")
 
 print(f"\n🤖 Bot started!")
-if ai_brain:
-    print(f"🧠 AI Brain: ACTIVE")
-else:
-    print(f"⚙️ AI Brain: DISABLED")
 
-if MODELS_ENABLED:
-    print(f"📊 Multi-Timeframe Analyzer: ACTIVE")
-    print(f"🛡️ Risk Manager: ACTIVE")
-    print(f"🏆 Coin Ranking: ACTIVE")
-    print(f"🚨 Anomaly Detector: ACTIVE")
-    print(f"🎯 Exit Strategy: ACTIVE")
-    print(f"🧠 Pattern Recognition: ACTIVE")
+# Auto-train Smart AI if not trained yet
+if ai_brain and not ai_brain.enabled:
+    print("\n🎓 Smart AI not trained yet - Starting initial training...")
+    try:
+        import subprocess
+        import sys
+        result = subprocess.run(
+            [sys.executable, 'simple_ai_trainer.py'],
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        if result.returncode == 0:
+            print("✅ Initial training completed!")
+            # إعادة تحميل Smart AI
+            from smart_ai import SmartAI
+            ai_brain = SmartAI()
+            AI_ENABLED = ai_brain.enabled
+            if AI_ENABLED:
+                print("🧠 Smart AI: NOW ACTIVE")
+            else:
+                print("❌ Training failed - not enough data")
+                print("   Bot will collect data and train automatically")
+        else:
+            print(f"⚠️ Training failed: {result.stderr}")
+            print("   Bot will collect data and train automatically")
+    except Exception as e:
+        print(f"⚠️ Auto-training error: {e}")
+        print("   Bot will collect data and train automatically")
+
+if ai_brain and ai_brain.enabled:
+    print(f"🧠 Active AI: Smart AI (Neural Network) ✅")
+elif ai_brain:
+    print(f"📊 Active AI: Learning Mode (Collecting data...)")
+else:
+    print(f"❌ AI: DISABLED - Check errors above")
 
 if NEWS_ENABLED:
     print(f"📰 News Sentiment Analyzer: ACTIVE")
 
-print(f"💰 Boost: ${BASE_AMOUNT}-${BOOST_AMOUNT}")
+print(f"💰 Trade Amount: ${BASE_AMOUNT}-${BOOST_AMOUNT}")
 print(f"🎯 TP: {TAKE_PROFIT_PERCENT}% | SL: {STOP_LOSS_PERCENT}%")
-print(f"🎯 Min Confidence: {MIN_CONFIDENCE}/120")
-print(f"🔺 Max Confidence: {AI_BOUNDARIES['max_confidence']}/120\n")
+print(f"💰 Max Capital: ${MAX_CAPITAL} | Profit Reserve: {PROFIT_RESERVE}\n")
 
 # Send startup notification to Discord
 send_startup_notification()
@@ -582,7 +583,15 @@ try:
                 
                 # AI Decision
                 if ai_brain:
-                    decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop)
+                    # جمع news_sentiment
+                    news_sentiment_value = None
+                    if news_analyzer and NEWS_ENABLED:
+                        try:
+                            news_sentiment_value = news_analyzer.get_news_confidence_boost(symbol, hours=24)
+                        except:
+                            news_sentiment_value = None
+                    
+                    decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop, news_sentiment_value)
                     
                     # Apply all adjustments (including news) - with None protection
                     try:
@@ -746,6 +755,19 @@ try:
                         print(f"  Success Rate: {pattern_stats['success_rate']:.1f}%")
                 except Exception as e:
                     print(f"⚠️ Pattern stats error: {e}")
+            
+            # Smart AI Statistics
+            if ai_brain and ai_brain.enabled:
+                try:
+                    ai_stats = ai_brain.get_statistics()
+                    if ai_stats:
+                        print(f"\n🧠 Smart AI Statistics:")
+                        print(f"  Total Predictions: {ai_stats['total_predictions']}")
+                        print(f"  Correct: {ai_stats['correct']}")
+                        print(f"  Accuracy: {ai_stats['accuracy']:.1f}%")
+                        print(f"  Status: {'ACTIVE' if ai_stats['enabled'] else 'TRAINING'}")
+                except Exception as e:
+                    print(f"⚠️ Smart AI stats error: {e}")
             
             last_report_time = datetime.now()
         
