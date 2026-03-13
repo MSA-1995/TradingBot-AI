@@ -36,6 +36,7 @@ from notifications import send_buy_notification, send_sell_notification, send_po
 from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent, format_price
 from storage import StorageManager
 from coin_scanner import CoinScanner  # نظام الفحص الديناميكي
+from capital_manager import CapitalManager  # إدارة رأس المال
 
 # AI Brain
 AI_BOUNDARIES = {
@@ -105,6 +106,9 @@ exchange.set_sandbox_mode(True)
 
 # Storage
 storage = StorageManager()
+
+# Capital Manager
+capital_manager = CapitalManager(max_capital=MAX_CAPITAL, profit_reserve=PROFIT_RESERVE)
 
 # AI Brain
 ai_brain = AIBrain(AI_BOUNDARIES) if AI_ENABLED else None
@@ -236,8 +240,17 @@ try:
         active_count = get_active_positions_count(SYMBOLS_DATA)
         invested = get_total_invested(SYMBOLS_DATA)
         
+        # Capital Management
+        capital_status = capital_manager.get_tradable_balance(available, invested)
+        tradable_balance = capital_status['tradable']
+        locked_profit = capital_status['locked_profit']
+        
         print(f"\n{Fore.CYAN}{Style.BRIGHT}{'█' * 60}")
         print(f"  💼 Balance: ${available:.2f} | Invested: ${invested:.2f} | Active: {active_count}/{MAX_POSITIONS}")
+        if locked_profit > 0:
+            print(f"  🔒 Locked Profit: ${locked_profit:.2f} | ✅ Tradable: ${tradable_balance:.2f}")
+        else:
+            print(f"  ✅ Tradable: ${tradable_balance:.2f} | Max Capital: ${MAX_CAPITAL}")
         print(f"{'█' * 60}{Style.RESET_ALL}\n")
         
         # عرض القائمة الديناميكية
@@ -453,7 +466,9 @@ try:
                 if active_count >= MAX_POSITIONS:
                     continue
                 
-                if available < BASE_AMOUNT:
+                # Capital Management Check
+                can_trade, reason = capital_manager.can_trade(BASE_AMOUNT, available, invested)
+                if not can_trade:
                     continue
                 
                 # Get MTF and calculate confidence
