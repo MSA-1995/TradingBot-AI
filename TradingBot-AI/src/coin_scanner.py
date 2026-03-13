@@ -234,12 +234,12 @@ class CoinScanner:
                 removed = [c for c in old_top if c not in new_top]
                 
                 if added or removed:
-                    # طباعة صامتة - بدون عرض القائمة الكاملة
-                    print(f"\n🔄 Top 20 Updated! (+{len(added)} -{len(removed)})")
+                    # طباعة صامتة - بدون عرض تحديثات القائمة
+                    pass
             
             elapsed = time.time() - start_time
-            print(f"\n✅ Deep scan complete in {elapsed:.1f} seconds!")
-            print(f"{'='*60}\n")
+            # طباعة صامتة - بدون عرض تفاصيل Deep Scan
+            pass
         
         except Exception as e:
             print(f"❌ Deep scan error: {e}")
