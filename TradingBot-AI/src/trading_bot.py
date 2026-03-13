@@ -4,19 +4,11 @@ Lightweight main loop that imports from organized modules
 """
 
 # ========== AUTO-INSTALL ==========
-def install_dependencies():
-    import sys
-    required = ['ccxt', 'cryptography', 'requests', 'pandas', 'ta', 'colorama']
-    for package in required:
-        try:
-            __import__(package)
-        except ImportError:
-            print(f"📦 Installing {package}...")
-            import subprocess
-            subprocess.run([sys.executable, '-m', 'pip', 'install', package], 
-                         shell=False, capture_output=True)
+# Disabled - Koyeb installs from requirements.txt
+# def install_dependencies():
+#     pass
 
-install_dependencies()
+# install_dependencies()
 
 # ========== IMPORTS ==========
 import ccxt
