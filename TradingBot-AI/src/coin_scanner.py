@@ -122,18 +122,14 @@ class CoinScanner:
             print(f"⚠️ Quick scan error: {e}")
     
     def _deep_scan(self):
-        """فحص عميق شامل"""
-        print(f"\n{'='*60}")
-        print(f"🔍 Deep Scan Started - Analyzing 995 coins...")
-        print(f"{'='*60}")
-        
+        """فحص عميق محدود (200 عملة بدل 995 - أسرع)"""
         start_time = time.time()
         
         try:
-            # المرحلة 1: فلترة سريعة
-            print("📊 Phase 1: Quick filtering...")
+            # المرحلة 1: فلترة سريعة وترتيب حسب Volume
             tickers = self.exchange.fetch_tickers()
             
+            # فلترة أولية وترتيب حسب Volume (أفضل 200 فقط)
             filtered_coins = []
             for symbol, ticker in tickers.items():
                 if not symbol.endswith('/USDT'):
@@ -146,22 +142,26 @@ class CoinScanner:
                     volume_24h = ticker.get('quoteVolume', 0) or 0
                     last_price = ticker.get('last', 0) or 0
                     
-                    # فلترة أولية (مخففة لـTestnet)
-                    if volume_24h > 100_000:  # Volume > $100K (كان $1M)
-                        if last_price > 0.001:  # Price > $0.001 (كان $0.01)
-                            filtered_coins.append(symbol)
+                    # فلترة أولية
+                    if volume_24h > 100_000:  # Volume > $100K
+                        if last_price > 0.001:  # Price > $0.001
+                            filtered_coins.append((symbol, volume_24h))
                 except:
                     continue
+            
+            # ترتيب حسب Volume وأخذ أفضل 200 فقط
+            filtered_coins.sort(key=lambda x: x[1], reverse=True)
+            top_200_symbols = [symbol for symbol, volume in filtered_coins[:200]]
             
             # طباعة صامتة - بدون عرض نتائج الفلترة
             # print(f"   ✅ Filtered: {len(filtered_coins)} coins (from 995)")
             
-            # المرحلة 2: تحليل بـBatch (صامت)
+            # المرحلة 2: تحليل بـBatch (أفضل 200 فقط)
             all_scores = {}
             batch_size = 50
             
-            for i in range(0, len(filtered_coins), batch_size):
-                batch = filtered_coins[i:i+batch_size]
+            for i in range(0, len(top_200_symbols), batch_size):
+                batch = top_200_symbols[i:i+batch_size]
                 
                 for symbol in batch:
                     try:
@@ -173,11 +173,6 @@ class CoinScanner:
                 
                 # تنظيف الذاكرة
                 gc.collect()
-                
-                # طباعة التقدم بهدوء (كل 50 عملة)
-                if (i + batch_size) % 250 == 0:  # كل 250 عملة بدل كل 50
-                    progress = min(i + batch_size, len(filtered_coins))
-                    print(f"   Progress: {progress}/{len(filtered_coins)} coins analyzed...")
             
             # المرحلة 3: اختيار أفضل 30 للتحليل الذكي (صامت)
             sorted_coins = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
