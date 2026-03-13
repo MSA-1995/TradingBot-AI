@@ -27,33 +27,11 @@ class SmartAI:
         self.correct_predictions = 0
         
     def _load_model(self):
-        """تحميل Neural Network إذا موجود"""
-        try:
-            import tensorflow as tf
-            from tensorflow import keras
-            import pickle
-            
-            model_path = 'simple_ai_model.h5'
-            scaler_path = 'scaler.pkl'
-            
-            if os.path.exists(model_path) and os.path.exists(scaler_path):
-                self.nn_model = keras.models.load_model(model_path)
-                
-                with open(scaler_path, 'rb') as f:
-                    self.scaler = pickle.load(f)
-                
-                with open('feature_names.pkl', 'rb') as f:
-                    self.feature_names = pickle.load(f)
-                
-                self.enabled = True
-                print("🧠 Smart AI: ACTIVE (Neural Network loaded)")
-            else:
-                print("⚠️ Smart AI: Model not found - will train on first run")
-                self.enabled = False
-                
-        except Exception as e:
-            print(f"⚠️ Smart AI: Could not load model - {e}")
-            self.enabled = False
+        """تعطيل Neural Network - استخدام القواعد الذكية فقط"""
+        print("⚠️ TensorFlow disabled - Using rule-based AI with database learning")
+        self.nn_model = None
+        self.scaler = None
+        self.enabled = True  # تفعيل الذكاء بدون TensorFlow
     
     def _load_traps(self):
         """تحميل الأفخاخ من Database"""
@@ -69,12 +47,8 @@ class SmartAI:
     
     def should_buy(self, symbol, analysis, mtf, price_drop, news_sentiment=None):
         """
-        القرار الذكي: هل نشتري؟
+        القرار الذكي: هل نشتري؟ (بدون TensorFlow)
         """
-        # لو النموذج مو جاهز - استخدم القواعد البسيطة
-        if not self.enabled:
-            return self._fallback_decision(analysis, mtf, price_drop)
-        
         try:
             # 1. فحص الأفخاخ
             if self._is_trap(symbol, analysis):
@@ -84,30 +58,27 @@ class SmartAI:
                     'reason': '🚨 Matches known trap pattern'
                 }
             
-            # 2. تحضير Features للـ Neural Network
-            features = self._prepare_features(analysis, mtf, price_drop, news_sentiment)
-            
-            # 2. التنبؤ بالـ Neural Network
-            nn_probability = self._predict_with_nn(features)
-            
-            # 3. تحليل إضافي (Pattern + News)
+            # 2. تحليل الأنماط (بدون NN)
             pattern_score = self._analyze_patterns(analysis, mtf)
-            news_score = self._analyze_news(news_sentiment) if news_sentiment else 0
+            news_score = self._analyze_news(news_sentiment) if news_sentiment else 0.5
+            
+            # 3. تحليل من Database
+            db_score = self._analyze_from_database(symbol, analysis)
             
             # 4. دمج القرارات
-            final_confidence = self._combine_decisions(
-                nn_probability, 
-                pattern_score, 
-                news_score
+            final_confidence = (
+                pattern_score * 0.4 +  # 40% للأنماط
+                news_score * 0.2 +      # 20% للأخبار
+                db_score * 0.4          # 40% للتعلم من Database
             )
             
             # 5. القرار النهائي
-            if final_confidence >= 0.75:  # 75% ثقة
+            if final_confidence >= 0.70:  # 70% ثقة
                 return {
                     'action': 'BUY',
                     'confidence': int(final_confidence * 100),
                     'amount': self._calculate_smart_amount(final_confidence, analysis),
-                    'reason': f'Smart AI: NN={nn_probability:.2f} Pattern={pattern_score:.2f} News={news_score:.2f}',
+                    'reason': f'Smart AI: Pattern={pattern_score:.2f} News={news_score:.2f} DB={db_score:.2f}',
                     'tp_target': self._calculate_tp(final_confidence),
                     'sl_target': self._calculate_sl(final_confidence),
                     'max_wait_hours': self._calculate_wait_time(final_confidence)
@@ -123,45 +94,7 @@ class SmartAI:
             print(f"⚠️ Smart AI error: {e}")
             return self._fallback_decision(analysis, mtf, price_drop)
     
-    def _prepare_features(self, analysis, mtf, price_drop, news_sentiment):
-        """تحضير Features للـ Neural Network"""
-        rsi = analysis.get('rsi', 50)
-        macd_diff = analysis.get('macd_diff', 0)
-        volume = analysis.get('volume_ratio', 1.0)
-        
-        # حساب confidence أساسي
-        confidence = 50
-        if rsi < 30:
-            confidence += 20
-        if macd_diff > 0:
-            confidence += 10
-        if volume > 1.5:
-            confidence += 10
-        
-        # Handle NaN
-        if pd.isna(rsi):
-            rsi = 50
-        if pd.isna(macd_diff):
-            macd_diff = 0
-        if pd.isna(volume):
-            volume = 1.0
-        
-        return [rsi, macd_diff, volume, confidence]
-    
-    def _predict_with_nn(self, features):
-        """التنبؤ باستخدام Neural Network"""
-        try:
-            # Normalize
-            features_scaled = self.scaler.transform([features])
-            
-            # Predict
-            probability = self.nn_model.predict(features_scaled, verbose=0)[0][0]
-            
-            return float(probability)
-        except Exception as e:
-            print(f"⚠️ NN prediction error: {e}")
-            return 0.5  # محايد
-    
+
     def _analyze_patterns(self, analysis, mtf):
         """تحليل الأنماط"""
         score = 0.5  # محايد
@@ -186,6 +119,47 @@ class SmartAI:
             score += 0.10
         
         return max(0, min(1, score))
+    
+    def _analyze_from_database(self, symbol, analysis):
+        """تحليل من الصفقات السابقة في Database"""
+        try:
+            from storage import StorageManager
+            storage = StorageManager()
+            
+            # جلب آخر 20 صفقة للعملة
+            trades = storage.get_symbol_trades(symbol, limit=20)
+            
+            if not trades or len(trades) < 5:
+                return 0.5  # محايد - ما فيه بيانات كافية
+            
+            # حساب Win Rate
+            wins = sum(1 for t in trades if t.get('profit_percent', 0) > 0)
+            win_rate = wins / len(trades)
+            
+            # حساب متوسط الربح
+            avg_profit = sum(t.get('profit_percent', 0) for t in trades) / len(trades)
+            
+            # حساب Score
+            score = 0.5
+            
+            # Win Rate Boost
+            if win_rate > 0.7:  # 70% نجاح
+                score += 0.2
+            elif win_rate > 0.6:
+                score += 0.1
+            elif win_rate < 0.4:  # 40% فشل
+                score -= 0.2
+            
+            # Average Profit Boost
+            if avg_profit > 2.0:  # ربح عالي
+                score += 0.1
+            elif avg_profit < -1.0:  # خسارة
+                score -= 0.1
+            
+            return max(0, min(1, score))
+            
+        except Exception as e:
+            return 0.5  # محايد
     
     def _analyze_news(self, news_sentiment):
         """تحليل الأخبار"""
@@ -251,21 +225,7 @@ class SmartAI:
         except:
             return 0
     
-    def _combine_decisions(self, nn_prob, pattern_score, news_score):
-        """دمج القرارات بأوزان ذكية"""
-        # الأوزان
-        nn_weight = 0.5      # 50% للـ Neural Network
-        pattern_weight = 0.3  # 30% للأنماط
-        news_weight = 0.2     # 20% للأخبار
-        
-        final = (
-            nn_prob * nn_weight +
-            pattern_score * pattern_weight +
-            news_score * news_weight
-        )
-        
-        return final
-    
+
     def _calculate_smart_amount(self, confidence, analysis):
         """حساب المبلغ الذكي"""
         from config import MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT
@@ -397,7 +357,7 @@ class SmartAI:
     
     def learn_from_trade(self, trade_result):
         """
-        التعلم من الصفقة
+        التعلم من الصفقة (حفظ في Database فقط)
         """
         try:
             from storage import StorageManager
@@ -427,39 +387,15 @@ class SmartAI:
             if trade_result.get('profit_percent', 0) > 0:
                 self.correct_predictions += 1
             
-            # إعادة التدريب كل 50 صفقة
-            if self.predictions_count % 50 == 0:
-                print(f"\n🎓 Auto-retraining after {self.predictions_count} trades...")
-                self._auto_retrain()
+            # إعادة تحميل الأفخاخ كل 10 صفقات
+            if self.predictions_count % 10 == 0:
+                self._load_traps()
+                print(f"🔄 Traps reloaded after {self.predictions_count} trades")
             
         except Exception as e:
             print(f"⚠️ Learning error: {e}")
     
-    def _auto_retrain(self):
-        """إعادة التدريب التلقائي"""
-        try:
-            print("🔄 Starting auto-retrain...")
-            
-            # تشغيل التدريب
-            import subprocess
-            import sys
-            result = subprocess.run(
-                [sys.executable, 'simple_ai_trainer.py'],
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 دقائق max
-            )
-            
-            if result.returncode == 0:
-                print("✅ Auto-retrain completed!")
-                # إعادة تحميل النموذج
-                self._load_model()
-            else:
-                print(f"⚠️ Auto-retrain failed: {result.stderr}")
-                
-        except Exception as e:
-            print(f"⚠️ Auto-retrain error: {e}")
-    
+
     def get_statistics(self):
         """إحصائيات الأداء"""
         if self.predictions_count == 0:
