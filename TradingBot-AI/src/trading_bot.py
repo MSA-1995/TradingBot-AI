@@ -397,6 +397,14 @@ try:
                                     except:
                                         safe_profit = 0
                                     
+                                    # حساب hours_held بحماية من None
+                                    hours_held = 24  # default
+                                    try:
+                                        if position.get('buy_time'):
+                                            hours_held = (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600
+                                    except:
+                                        hours_held = 24
+                                    
                                     trade_result = {
                                         'symbol': symbol,
                                         'action': 'SELL',
@@ -405,7 +413,7 @@ try:
                                         'tp_target': position.get('tp_target', 1.0),
                                         'sl_target': position.get('sl_target', 2.0),
                                         'max_wait_hours': position.get('max_wait_hours', 48),
-                                        'hours_held': (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600
+                                        'hours_held': hours_held
                                     }
                                     
                                     # إضافة ai_data إذا موجود
@@ -427,10 +435,18 @@ try:
                                     except:
                                         safe_profit = 0
                                     
+                                    # حساب hours_held بحماية من None
+                                    hours_held = 24  # default
+                                    try:
+                                        if position.get('buy_time'):
+                                            hours_held = (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600
+                                    except:
+                                        hours_held = 24
+                                    
                                     exit_strategy.learn_from_exit(symbol, {
                                         'profit_percent': safe_profit,
                                         'sell_reason': sell_reason if sell_reason else 'Unknown',
-                                        'hours_held': (datetime.now() - datetime.fromisoformat(position['buy_time'])).total_seconds() / 3600
+                                        'hours_held': hours_held
                                     })
                                 except Exception as e:
                                     print(f"⚠️ Exit Strategy Learning error: {e}")
