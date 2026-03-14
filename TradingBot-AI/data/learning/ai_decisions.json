@@ -1,0 +1,707 @@
+[
+  {
+    "symbol": "ETH/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 23,
+    "timestamp": "2026-03-12T00:30:03.062216"
+  },
+  {
+    "symbol": "ADA/USDT",
+    "decision": "BUY",
+    "confidence": 60,
+    "amount": 10,
+    "tp_target": 0.8,
+    "sl_target": 1.2,
+    "max_wait_hours": 24,
+    "base_confidence": 60,
+    "reasoning": "AI optimized from 60 to 60",
+    "timestamp": "2026-03-12T00:30:08.896782"
+  },
+  {
+    "symbol": "LINK/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 34,
+    "timestamp": "2026-03-12T00:30:14.840259"
+  },
+  {
+    "symbol": "DOT/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 29,
+    "timestamp": "2026-03-12T00:30:17.555742"
+  },
+  {
+    "symbol": "UNI/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 38,
+    "timestamp": "2026-03-12T00:30:19.179530"
+  },
+  {
+    "symbol": "ATOM/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 63,
+    "timestamp": "2026-03-12T00:30:22.100836"
+  },
+  {
+    "symbol": "XRP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 24,
+    "timestamp": "2026-03-12T00:30:26.848028"
+  },
+  {
+    "symbol": "DOGE/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 20,
+    "timestamp": "2026-03-12T00:30:29.294498"
+  },
+  {
+    "symbol": "SHIB/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 58,
+    "timestamp": "2026-03-12T00:30:30.750065"
+  },
+  {
+    "symbol": "TRX/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 43,
+    "timestamp": "2026-03-12T00:30:32.273338"
+  },
+  {
+    "symbol": "OP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:30:37.502463"
+  },
+  {
+    "symbol": "FIL/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:30:40.272172"
+  },
+  {
+    "symbol": "ETH/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 18,
+    "timestamp": "2026-03-12T00:30:56.646604"
+  },
+  {
+    "symbol": "LINK/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:31:06.123512"
+  },
+  {
+    "symbol": "DOT/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 48,
+    "timestamp": "2026-03-12T00:31:08.392624"
+  },
+  {
+    "symbol": "UNI/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 38,
+    "timestamp": "2026-03-12T00:31:10.411646"
+  },
+  {
+    "symbol": "ATOM/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 63,
+    "timestamp": "2026-03-12T00:31:11.748091"
+  },
+  {
+    "symbol": "XRP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:31:15.361443"
+  },
+  {
+    "symbol": "DOGE/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 26,
+    "timestamp": "2026-03-12T00:31:17.502477"
+  },
+  {
+    "symbol": "SHIB/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 58,
+    "timestamp": "2026-03-12T00:31:18.881673"
+  },
+  {
+    "symbol": "TRX/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 43,
+    "timestamp": "2026-03-12T00:31:20.234994"
+  },
+  {
+    "symbol": "OP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:31:27.025121"
+  },
+  {
+    "symbol": "FIL/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:31:28.415135"
+  },
+  {
+    "symbol": "ETH/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 15,
+    "timestamp": "2026-03-12T00:31:44.419164"
+  },
+  {
+    "symbol": "LINK/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 15,
+    "timestamp": "2026-03-12T00:31:55.371733"
+  },
+  {
+    "symbol": "DOT/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 48,
+    "timestamp": "2026-03-12T00:31:59.484992"
+  },
+  {
+    "symbol": "UNI/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 38,
+    "timestamp": "2026-03-12T00:32:01.384098"
+  },
+  {
+    "symbol": "ATOM/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 63,
+    "timestamp": "2026-03-12T00:32:03.240879"
+  },
+  {
+    "symbol": "XRP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:32:08.250718"
+  },
+  {
+    "symbol": "DOGE/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 26,
+    "timestamp": "2026-03-12T00:32:10.695255"
+  },
+  {
+    "symbol": "SHIB/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 58,
+    "timestamp": "2026-03-12T00:32:12.757546"
+  },
+  {
+    "symbol": "TRX/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 43,
+    "timestamp": "2026-03-12T00:32:14.334641"
+  },
+  {
+    "symbol": "OP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:32:20.909598"
+  },
+  {
+    "symbol": "FIL/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:32:22.532897"
+  },
+  {
+    "symbol": "ETH/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 16,
+    "timestamp": "2026-03-12T00:32:39.373242"
+  },
+  {
+    "symbol": "LINK/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 15,
+    "timestamp": "2026-03-12T00:32:58.441980"
+  },
+  {
+    "symbol": "DOT/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 48,
+    "timestamp": "2026-03-12T00:33:03.107133"
+  },
+  {
+    "symbol": "UNI/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 38,
+    "timestamp": "2026-03-12T00:33:06.269849"
+  },
+  {
+    "symbol": "ATOM/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 29,
+    "timestamp": "2026-03-12T00:33:08.759067"
+  },
+  {
+    "symbol": "XRP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 44,
+    "timestamp": "2026-03-12T00:33:17.568840"
+  },
+  {
+    "symbol": "DOGE/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 26,
+    "timestamp": "2026-03-12T00:33:21.106350"
+  },
+  {
+    "symbol": "SHIB/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 58,
+    "timestamp": "2026-03-12T00:33:22.984071"
+  },
+  {
+    "symbol": "TRX/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 43,
+    "timestamp": "2026-03-12T00:33:25.522964"
+  },
+  {
+    "symbol": "OP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:33:30.754601"
+  },
+  {
+    "symbol": "FIL/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:33:32.374440"
+  },
+  {
+    "symbol": "ETH/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 16,
+    "timestamp": "2026-03-12T00:33:49.393894"
+  },
+  {
+    "symbol": "LINK/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 15,
+    "timestamp": "2026-03-12T00:33:57.823270"
+  },
+  {
+    "symbol": "DOT/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 48,
+    "timestamp": "2026-03-12T00:33:59.573896"
+  },
+  {
+    "symbol": "UNI/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 38,
+    "timestamp": "2026-03-12T00:34:01.357921"
+  },
+  {
+    "symbol": "ATOM/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 29,
+    "timestamp": "2026-03-12T00:34:02.690655"
+  },
+  {
+    "symbol": "XRP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 50,
+    "timestamp": "2026-03-12T00:34:05.990769"
+  },
+  {
+    "symbol": "DOGE/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 26,
+    "timestamp": "2026-03-12T00:34:07.825296"
+  },
+  {
+    "symbol": "SHIB/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 58,
+    "timestamp": "2026-03-12T00:34:09.467758"
+  },
+  {
+    "symbol": "TRX/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 43,
+    "timestamp": "2026-03-12T00:34:11.545898"
+  },
+  {
+    "symbol": "OP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:34:16.998381"
+  },
+  {
+    "symbol": "FIL/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:34:19.140964"
+  },
+  {
+    "symbol": "ETH/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 17,
+    "timestamp": "2026-03-12T00:34:33.784365"
+  },
+  {
+    "symbol": "LINK/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 15,
+    "timestamp": "2026-03-12T00:34:42.902091"
+  },
+  {
+    "symbol": "DOT/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 48,
+    "timestamp": "2026-03-12T00:34:46.763657"
+  },
+  {
+    "symbol": "UNI/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 38,
+    "timestamp": "2026-03-12T00:34:48.902498"
+  },
+  {
+    "symbol": "ATOM/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 14,
+    "timestamp": "2026-03-12T00:34:50.872485"
+  },
+  {
+    "symbol": "XRP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 55,
+    "timestamp": "2026-03-12T00:34:55.153843"
+  },
+  {
+    "symbol": "DOGE/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 26,
+    "timestamp": "2026-03-12T00:34:56.691381"
+  },
+  {
+    "symbol": "SHIB/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 58,
+    "timestamp": "2026-03-12T00:34:58.624244"
+  },
+  {
+    "symbol": "TRX/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 43,
+    "timestamp": "2026-03-12T00:35:00.623709"
+  },
+  {
+    "symbol": "OP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:35:06.698572"
+  },
+  {
+    "symbol": "FIL/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:35:08.927947"
+  },
+  {
+    "symbol": "ETH/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:35:27.145908"
+  },
+  {
+    "symbol": "LINK/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:35:38.134081"
+  },
+  {
+    "symbol": "DOT/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 48,
+    "timestamp": "2026-03-12T00:35:40.639847"
+  },
+  {
+    "symbol": "UNI/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 38,
+    "timestamp": "2026-03-12T00:35:42.039012"
+  },
+  {
+    "symbol": "ATOM/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:35:43.764600"
+  },
+  {
+    "symbol": "XRP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 15,
+    "timestamp": "2026-03-12T00:35:47.055270"
+  },
+  {
+    "symbol": "DOGE/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 21,
+    "timestamp": "2026-03-12T00:35:48.499701"
+  },
+  {
+    "symbol": "SHIB/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 58,
+    "timestamp": "2026-03-12T00:35:52.137371"
+  },
+  {
+    "symbol": "TRX/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 43,
+    "timestamp": "2026-03-12T00:35:53.958733"
+  },
+  {
+    "symbol": "OP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:36:03.150418"
+  },
+  {
+    "symbol": "FIL/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:36:05.626249"
+  },
+  {
+    "symbol": "ETH/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 20,
+    "timestamp": "2026-03-12T00:36:24.198303"
+  },
+  {
+    "symbol": "LINK/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:36:34.141434"
+  },
+  {
+    "symbol": "DOT/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 48,
+    "timestamp": "2026-03-12T00:36:36.478688"
+  },
+  {
+    "symbol": "UNI/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 38,
+    "timestamp": "2026-03-12T00:36:39.931448"
+  },
+  {
+    "symbol": "ATOM/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:36:41.932881"
+  },
+  {
+    "symbol": "XRP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 15,
+    "timestamp": "2026-03-12T00:36:46.369512"
+  },
+  {
+    "symbol": "DOGE/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:36:47.909870"
+  },
+  {
+    "symbol": "SHIB/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 58,
+    "timestamp": "2026-03-12T00:36:49.792021"
+  },
+  {
+    "symbol": "TRX/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 43,
+    "timestamp": "2026-03-12T00:36:51.240707"
+  },
+  {
+    "symbol": "OP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:36:56.275626"
+  },
+  {
+    "symbol": "FIL/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:36:58.026217"
+  },
+  {
+    "symbol": "ETH/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 22,
+    "timestamp": "2026-03-12T00:37:14.509292"
+  },
+  {
+    "symbol": "LINK/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:37:24.378549"
+  },
+  {
+    "symbol": "DOT/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 48,
+    "timestamp": "2026-03-12T00:37:26.034423"
+  },
+  {
+    "symbol": "UNI/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 38,
+    "timestamp": "2026-03-12T00:37:29.267594"
+  },
+  {
+    "symbol": "ATOM/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:37:31.924399"
+  },
+  {
+    "symbol": "XRP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 17,
+    "timestamp": "2026-03-12T00:37:35.298864"
+  },
+  {
+    "symbol": "DOGE/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:37:36.657832"
+  },
+  {
+    "symbol": "SHIB/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 58,
+    "timestamp": "2026-03-12T00:37:38.618758"
+  },
+  {
+    "symbol": "TRX/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 43,
+    "timestamp": "2026-03-12T00:37:40.425865"
+  },
+  {
+    "symbol": "OP/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 28,
+    "timestamp": "2026-03-12T00:37:47.844272"
+  },
+  {
+    "symbol": "FIL/USDT",
+    "decision": "SKIP",
+    "reason": "Safety check failed",
+    "confidence": 33,
+    "timestamp": "2026-03-12T00:37:49.702059"
+  }
+]
