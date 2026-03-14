@@ -13,6 +13,8 @@ class NewsAnalyzer:
     def __init__(self):
         self.database_url = os.getenv("DATABASE_URL")
         self.enabled = bool(self.database_url)
+        self.cache = {}  # Cache للأخبار
+        self.cache_duration = 300  # 5 دقائق
         
         if self.enabled:
             print("📰 News Analyzer: ACTIVE")
@@ -40,11 +42,18 @@ class NewsAnalyzer:
     
     def get_news_sentiment(self, symbol, hours=24):
         """
-        جلب أخبار العملة من آخر X ساعة
+        جلب أخبار العملة من آخر X ساعة (مع Cache)
         Returns: {'positive': 5, 'negative': 1, 'neutral': 3, 'score': 0.45}
         """
         if not self.enabled:
             return None
+        
+        # فحص Cache
+        cache_key = f"{symbol}_{hours}"
+        if cache_key in self.cache:
+            cached_data, cached_time = self.cache[cache_key]
+            if (datetime.now() - cached_time).total_seconds() < self.cache_duration:
+                return cached_data
         
         try:
             conn = self.get_db_connection()
@@ -87,7 +96,7 @@ class NewsAnalyzer:
                 # Score من -10 إلى +10
                 news_score = (pos_ratio - neg_ratio) * 10
             
-            return {
+            result = {
                 'positive': positive,
                 'negative': negative,
                 'neutral': neutral,
@@ -96,6 +105,11 @@ class NewsAnalyzer:
                 'news_score': news_score,  # -10 to +10
                 'latest_news': news[:3]  # آخر 3 أخبار
             }
+            
+            # حفظ في Cache
+            self.cache[cache_key] = (result, datetime.now())
+            
+            return result
             
         except Exception as e:
             print(f"⚠️ News sentiment error for {symbol}: {e}")
