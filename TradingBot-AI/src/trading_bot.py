@@ -301,6 +301,18 @@ def get_dynamic_symbols():
     # دمج القوائم (بدون تكرار)
     all_symbols = list(set(dynamic_symbols + open_positions))
     
+    # تحديث SYMBOLS_DATA - حذف العملات القديمة
+    with symbols_data_lock:
+        # حذف العملات اللي مو موجودة بالقائمة الجديدة ومو فيها صفقات مفتوحة
+        symbols_to_remove = [s for s in SYMBOLS_DATA.keys() if s not in all_symbols]
+        for symbol in symbols_to_remove:
+            del SYMBOLS_DATA[symbol]
+        
+        # إضافة العملات الجديدة من السكانر
+        for symbol in dynamic_symbols:
+            if symbol not in SYMBOLS_DATA:
+                SYMBOLS_DATA[symbol] = {'position': None}
+    
     return all_symbols
 
 SYMBOLS_DATA = init_symbols()
@@ -349,10 +361,11 @@ symbols_data_lock = threading.Lock()
 def analyze_single_symbol(symbol, exchange_instance, active_count, available, invested):
     """تحليل عملة واحدة - يعمل في thread منفصل"""
     try:
-        # إضافة العملة للقائمة إذا مو موجودة
+        # Get symbol data (don't add if not exists)
         with symbols_data_lock:
             if symbol not in SYMBOLS_DATA:
-                SYMBOLS_DATA[symbol] = {'position': None}
+                # Skip coins not in scanner or open positions
+                return None
             symbol_data = SYMBOLS_DATA[symbol]
             position = symbol_data['position']
         
@@ -656,10 +669,11 @@ try:
         current_time = datetime.now().strftime("%H:%M:%S")
         print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
         
-        # Update coin rankings (صامت)
+        # Update coin rankings (صامت) - استخدام العملات الديناميكية
         if coin_ranker and loop_count % 60 == 1:
             try:
-                rankings = coin_ranker.rank_all_coins(SYMBOLS)
+                current_symbols = get_dynamic_symbols()
+                rankings = coin_ranker.rank_all_coins(current_symbols)
             except Exception as e:
                 pass
         
