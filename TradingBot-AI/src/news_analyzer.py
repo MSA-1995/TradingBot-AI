@@ -14,7 +14,7 @@ class NewsAnalyzer:
         self.database_url = os.getenv("DATABASE_URL")
         self.enabled = bool(self.database_url)
         self.cache = {}  # Cache للأخبار
-        self.cache_duration = 300  # 5 دقائق
+        self.cache_duration = 30  # 30 ثانية - تحديث سريع
         
         if self.enabled:
             print("📰 News Analyzer: ACTIVE")
