@@ -291,20 +291,9 @@ print("=" * 60)
 # استخدام قائمة ديناميكية بدل SYMBOLS الثابتة
 def get_dynamic_symbols():
     """الحصول على القائمة الديناميكية + الصفقات المفتوحة"""
-    # القائمة الديناميكية من Scanner
+    # القائمة الديناميكية من Scanner (already verified)
     top_coins = coin_scanner.get_top_coins()
     dynamic_symbols = [coin for coin, score in top_coins]
-    
-    # Filter: Verify coins exist in exchange before adding
-    verified_symbols = []
-    
-    for symbol in dynamic_symbols:
-        try:
-            # Quick check if symbol exists
-            exchange.fetch_ticker(symbol)
-            verified_symbols.append(symbol)
-        except:
-            continue
     
     # تنظيف SYMBOLS_DATA أولاً - حذف كل العملات القديمة
     with symbols_data_lock:
@@ -319,26 +308,27 @@ def get_dynamic_symbols():
         for symbol, data in open_positions_data.items():
             SYMBOLS_DATA[symbol] = data
         
-        # 2. إضافة العملات المفحوصة من السكانر
-        for symbol in verified_symbols:
+        # 2. إضافة العملات من السكانر (already verified by scanner)
+        for symbol in dynamic_symbols:
             if symbol not in SYMBOLS_DATA:
                 SYMBOLS_DATA[symbol] = {'position': None}
     
     # الحصول على القائمة النهائية
     open_positions = list(open_positions_data.keys())
-    all_symbols = list(set(verified_symbols + open_positions))
+    all_symbols = list(set(dynamic_symbols + open_positions))
     
     return all_symbols
 
 SYMBOLS_DATA = init_symbols()
 loaded = storage.load_positions()
-
 for symbol, pos in loaded.items():
     if symbol in SYMBOLS_DATA:
         SYMBOLS_DATA[symbol]['position'] = pos
+        print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f}")
     else:
         # إضافة الصفقة المفتوحة للقائمة
         SYMBOLS_DATA[symbol] = {'position': pos}
+        print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f} (not in top 20)")
 
 print(f"\n🤖 Bot started!")
 if ai_brain:
