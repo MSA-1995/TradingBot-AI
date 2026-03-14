@@ -33,7 +33,6 @@ class DatabaseStorage:
         self.json = json_module
         self.RealDictCursor = RealDictCursor
         self._create_tables()
-        print("✅ Connected to PostgreSQL (Supabase)")
     
     def _create_tables(self):
         """إنشاء الجداول إذا لم تكن موجودة"""
@@ -106,7 +105,6 @@ class DatabaseStorage:
             
             self.conn.commit()
             cursor.close()
-            print("✅ Database tables ready")
         except Exception as e:
             print(f"⚠️ Table creation error: {e}")
             self.conn.rollback()
