@@ -227,10 +227,15 @@ try:
             print(f"  ✅ Tradable: ${tradable_balance:.2f} | Max Capital: ${MAX_CAPITAL}")
         print(f"{'█' * 60}{Style.RESET_ALL}\n")
         
-        # عرض صامت للعملات الديناميكية
+        # عرض العملات المرشحة أفقياً (بسيط)
         top_coins = coin_scanner.get_top_coins()
         hot_opps = coin_scanner.get_hot_opportunities()
         scan_status = coin_scanner.get_scan_status()
+        
+        if top_coins:
+            # عرض أفقي بسيط
+            coins_display = " | ".join([f"{symbol}" for symbol, score in top_coins[:10]])
+            print(f"🎯 Monitoring: {coins_display}")
         
         print()
         
