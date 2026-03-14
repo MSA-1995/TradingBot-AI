@@ -289,45 +289,24 @@ print("=" * 60)
 
 # ========== LOAD POSITIONS ==========
 # استخدام قائمة ديناميكية بدل SYMBOLS الثابتة
-# Cache for verified symbols (refresh every 10 minutes)
-verified_symbols_cache = {'symbols': [], 'last_update': None}
-CACHE_DURATION_MINUTES = 10
-
 def get_dynamic_symbols():
     """الحصول على القائمة الديناميكية + الصفقات المفتوحة"""
-    global verified_symbols_cache
-    
     # القائمة الديناميكية من Scanner
     top_coins = coin_scanner.get_top_coins()
     dynamic_symbols = [coin for coin, score in top_coins]
     
-    # Check if we need to refresh the cache
-    now = datetime.now()
-    cache_expired = (
-        verified_symbols_cache['last_update'] is None or 
-        (now - verified_symbols_cache['last_update']).total_seconds() > CACHE_DURATION_MINUTES * 60
-    )
+    # Filter: Verify coins exist in Testnet (parallel for speed)
+    def verify_symbol(symbol):
+        try:
+            exchange.fetch_ticker(symbol)
+            return symbol
+        except:
+            return None
     
-    # Filter: Verify coins exist in Testnet (use cache if available)
-    if cache_expired:
-        def verify_symbol(symbol):
-            try:
-                exchange.fetch_ticker(symbol)
-                return symbol
-            except:
-                return None
-        
-        verified_symbols = []
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            results = executor.map(verify_symbol, dynamic_symbols)
-            verified_symbols = [s for s in results if s is not None]
-        
-        # Update cache
-        verified_symbols_cache['symbols'] = verified_symbols
-        verified_symbols_cache['last_update'] = now
-    else:
-        # Use cached verified symbols
-        verified_symbols = verified_symbols_cache['symbols']
+    verified_symbols = []
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = executor.map(verify_symbol, dynamic_symbols)
+        verified_symbols = [s for s in results if s is not None]
     
     # تنظيف SYMBOLS_DATA أولاً - حذف كل العملات القديمة
     with symbols_data_lock:
