@@ -80,7 +80,14 @@ except Exception as e:
 
 # News Analyzer
 try:
-    from src.news_analyzer import NewsAnalyzer
+    import sys
+    import os
+    # Add src to path if not already there
+    src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+    
+    from news_analyzer import NewsAnalyzer
     news_analyzer = NewsAnalyzer()
     NEWS_ENABLED = news_analyzer.enabled
 except Exception as e:
