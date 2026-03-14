@@ -197,8 +197,8 @@ try:
         current_time = datetime.now().strftime("%H:%M:%S")
         print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
         
-        # فحص العملات كل 10 حلقات
-        if loop_count % 10 == 1:
+        # فحص العملات كل حلقة (سريع)
+        if loop_count % 1 == 0:  # كل 10 ثواني
             coin_scanner.scan_coins()
         
         # Update coin rankings (صامت)
@@ -231,9 +231,16 @@ try:
             print(f"  ✅ Tradable: ${tradable_balance:.2f} | Max Capital: ${MAX_CAPITAL}")
         print(f"{'█' * 60}{Style.RESET_ALL}\n")
         
-        # عرض العملات المرشحة (صامت)
+        # عرض العملات أفقياً
         top_coins = coin_scanner.get_top_coins()
         scan_status = coin_scanner.get_scan_status()
+        
+        if top_coins:
+            # عرض أفقي بسيط
+            coins_display = " | ".join([f"{symbol}" for symbol, score in top_coins])
+            print(f"🎯 {coins_display}")
+        
+        print()
         
         # الحصول على القائمة الديناميكية
         current_symbols = get_dynamic_symbols()
