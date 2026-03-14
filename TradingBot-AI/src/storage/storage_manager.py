@@ -15,8 +15,6 @@ class StorageManager:
         else:  # local
             from .local_storage import LocalStorage
             self.storage = LocalStorage('data/')
-        
-        print(f"💾 Storage Mode: {self.mode.upper()}")
     
     def detect_environment(self):
         """يكتشف البيئة تلقائياً"""
