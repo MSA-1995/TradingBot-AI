@@ -42,7 +42,7 @@ from capital_manager import CapitalManager  # إدارة رأس المال
 
 # AI Brain
 AI_BOUNDARIES = {
-    'min_confidence': 60,
+    'min_confidence': 55,  # Changed from 60 - more aggressive for Testnet learning
     'max_confidence': 75,
     'min_volume': 0.8,
     'max_volume': 3.0,
