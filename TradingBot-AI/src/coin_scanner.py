@@ -22,19 +22,8 @@ class CoinScanner:
         self.conn = None
         self._connect_db()
         
-        # Fallback list (if database fails)
-        self.fallback_coins = [
-            'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT',
-            'POL/USDT', 'AVAX/USDT', 'LINK/USDT', 'DOT/USDT', 'UNI/USDT',
-            'ATOM/USDT', 'ALGO/USDT', 'XRP/USDT', 'LTC/USDT', 'BCH/USDT',
-            'ETC/USDT', 'FIL/USDT', 'AAVE/USDT', 'DOGE/USDT', 'TRX/USDT',
-            'XLM/USDT', 'HBAR/USDT', 'VET/USDT', 'ICP/USDT', 'APT/USDT',
-            'NEAR/USDT', 'OP/USDT', 'ARB/USDT', 'SUI/USDT', 'INJ/USDT',
-            'SEI/USDT', 'TIA/USDT', 'RUNE/USDT', 'TON/USDT', 'SHIB/USDT',
-            'SAND/USDT', 'MANA/USDT', 'AXS/USDT', 'GALA/USDT', 'ENJ/USDT',
-            'CHZ/USDT', 'THETA/USDT', 'XTZ/USDT', 'IMX/USDT', 'ASTR/USDT',
-            'KAVA/USDT', 'ZIL/USDT', 'ONE/USDT', 'CELO/USDT', 'ROSE/USDT'
-        ]
+        # Fallback list (if database fails) - Empty, rely on scanner
+        self.fallback_coins = []
         
         # Initialize with fallback
         self.top_coins = [(symbol, 0) for symbol in self.fallback_coins]
