@@ -304,7 +304,7 @@ def get_dynamic_symbols():
             return None
     
     verified_symbols = []
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         results = executor.map(verify_symbol, dynamic_symbols)
         verified_symbols = [s for s in results if s is not None]
     
