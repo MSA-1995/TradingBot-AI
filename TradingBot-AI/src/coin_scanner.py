@@ -142,23 +142,29 @@ class CoinScanner:
                 except:
                     continue
             
-            # تحليل بـBatch صامت
-            all_scores = {}
-            batch_size = 50
+            # تحليل بـBatch مع 20 threads للتسريع
+            from concurrent.futures import ThreadPoolExecutor, as_completed
             
-            for i in range(0, len(filtered_coins), batch_size):
-                batch = filtered_coins[i:i+batch_size]
+            all_scores = {}
+            
+            # استخدام ThreadPoolExecutor مع 20 threads
+            with ThreadPoolExecutor(max_workers=20) as executor:
+                # إرسال جميع المهام
+                future_to_symbol = {executor.submit(self._analyze_coin_quick, symbol): symbol 
+                                  for symbol in filtered_coins}
                 
-                for symbol in batch:
+                # جمع النتائج
+                for future in as_completed(future_to_symbol):
+                    symbol = future_to_symbol[future]
                     try:
-                        score = self._analyze_coin_quick(symbol)
+                        score = future.result()
                         if score > 0:
                             all_scores[symbol] = score
-                    except:
+                    except Exception as e:
                         continue
-                
-                # تنظيف الذاكرة
-                gc.collect()
+            
+            # تنظيف الذاكرة
+            gc.collect()
             
             # اختيار أفضل 30 للتحليل الذكي
             sorted_coins = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
