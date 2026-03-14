@@ -217,18 +217,12 @@ try:
         current_time = datetime.now().strftime("%H:%M:%S")
         print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
         
-        # Update coin rankings every 10 loops (~100 seconds)
+        # Update coin rankings (صامت)
         if coin_ranker and loop_count % 10 == 1:
             try:
-                print("\n🏆 Updating coin rankings...")
                 rankings = coin_ranker.rank_all_coins(SYMBOLS)
-                if rankings:
-                    top_5 = coin_ranker.get_top_coins(5)
-                    print(f"🌟 Top 5 Coins:")
-                    for coin in top_5:
-                        print(f"  {coin['rank']}. {coin['symbol']:12} | Score:{coin['score']:>5.1f} | WR:{coin['win_rate']:>5.1f}% | {coin['recommendation']}")
             except Exception as e:
-                print(f"⚠️ Ranking error: {e}")
+                pass
         
         # Balance
         try:
@@ -253,14 +247,8 @@ try:
             print(f"  ✅ Tradable: ${tradable_balance:.2f} | Max Capital: ${MAX_CAPITAL}")
         print(f"{'█' * 60}{Style.RESET_ALL}\n")
         
-        # عرض العملات أفقياً (فوري)
+        # عرض العملات (صامت)
         top_coins = coin_scanner.get_top_coins()
-        
-        if top_coins:
-            coins_display = " | ".join([f"{symbol}" for symbol, score in top_coins])
-            print(f"🎯 {coins_display}")
-        
-        print()
         
         # الحصول على القائمة الديناميكية
         current_symbols = get_dynamic_symbols()
