@@ -714,6 +714,8 @@ try:
                     print(f"⚠️ {symbol}: Thread error - {e}")
         
         # ========== PROCESS RESULTS ==========
+        # Filter: Show only active coins and open positions
+        active_results = []
         for result in results:
             if not result:
                 continue
@@ -721,14 +723,35 @@ try:
             symbol = result['symbol']
             action = result['action']
             
-            # Error handling
-            if action == 'ERROR':
-                print(f"⚠️ {symbol}: {result.get('message', 'Unknown error')}")
+            # Always show open positions (HOLD, SELL, SELL_WAIT)
+            if action in ['HOLD', 'SELL', 'SELL_WAIT']:
+                active_results.append(result)
                 continue
             
-            # Skip
+            # Show BUY signals (active trading opportunities)
+            if action == 'BUY':
+                active_results.append(result)
+                continue
+            
+            # Show DISPLAY only if confidence is good (active coin)
+            if action == 'DISPLAY':
+                if result.get('confidence', 0) >= 55:  # Active threshold
+                    active_results.append(result)
+                continue
+            
+            # Skip errors and low-confidence coins silently
+        
+        # Process and display active results
+        for result in active_results:
+            symbol = result['symbol']
+            action = result['action']
+            
+            # Error handling (silent - already filtered)
+            if action == 'ERROR':
+                continue
+            
+            # Skip (silent - already filtered)
             if action == 'SKIP':
-                print(f"❌ {symbol:12} | SKIP: {result['reason']}")
                 continue
             
             # Hold position
