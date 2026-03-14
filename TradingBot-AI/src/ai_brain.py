@@ -449,11 +449,11 @@ class AIBrain:
             sl = 2.5  # صبر أكثر
             wait_hours = 72  # انتظار أطول
         elif confidence >= 65:
-            tp = 1.2
+            tp = 2.0
             sl = 2.0
             wait_hours = 60
         else:  # 60-64
-            tp = 0.8  # هدف سريع
+            tp = 1.0  # هدف سريع
             sl = 1.5  # حماية سريعة
             wait_hours = 36  # انتظار أقل
         
