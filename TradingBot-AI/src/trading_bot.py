@@ -289,20 +289,40 @@ print("=" * 60)
 
 # ========== LOAD POSITIONS ==========
 # استخدام قائمة ديناميكية بدل SYMBOLS الثابتة
+# Cache for filtered symbols - only refresh when scanner updates
+last_scanner_coins = []
+filtered_symbols_cache = []
+
 def get_dynamic_symbols():
     """الحصول على القائمة الديناميكية + الصفقات المفتوحة"""
+    global last_scanner_coins, filtered_symbols_cache
+    
     # القائمة الديناميكية من Scanner
     top_coins = coin_scanner.get_top_coins()
     dynamic_symbols = [coin for coin, score in top_coins]
     
-    # Filter: Verify coins exist in Testnet (simple loop, no threads)
-    verified_symbols = []
-    for symbol in dynamic_symbols:
-        try:
-            exchange.fetch_ticker(symbol)
-            verified_symbols.append(symbol)
-        except:
-            pass
+    # Check if scanner updated the list
+    scanner_changed = (dynamic_symbols != last_scanner_coins)
+    
+    # Filter only if scanner changed or cache is empty (first run)
+    if scanner_changed or not filtered_symbols_cache:
+        if scanner_changed:
+            print("🔄 Scanner updated coins - Running filter...")
+        
+        verified_symbols = []
+        for symbol in dynamic_symbols:
+            try:
+                exchange.fetch_ticker(symbol)
+                verified_symbols.append(symbol)
+            except:
+                pass
+        
+        # Update cache
+        last_scanner_coins = dynamic_symbols.copy()
+        filtered_symbols_cache = verified_symbols.copy()
+    else:
+        # Use cached filtered symbols
+        verified_symbols = filtered_symbols_cache
     
     # تنظيف SYMBOLS_DATA أولاً - حذف كل العملات القديمة
     with symbols_data_lock:
