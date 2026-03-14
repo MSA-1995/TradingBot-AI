@@ -810,6 +810,9 @@ try:
                 
                 sell_result = execute_sell(exchange, symbol, result['amount'], result['reason'])
                 if sell_result['success']:
+                    # Add to cooldown
+                    sell_cooldown[symbol] = datetime.now()
+                    
                     sell_value = calculate_sell_value(result['amount'], result['price'])
                     send_sell_notification(symbol, result['amount'], result['price'], sell_value, result['profit'], result['reason'])
                     
