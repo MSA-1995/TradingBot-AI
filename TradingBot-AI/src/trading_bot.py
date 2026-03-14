@@ -38,7 +38,7 @@ from storage import StorageManager
 from coin_scanner import CoinScanner  # نظام الفحص الديناميكي
 from capital_manager import CapitalManager  # إدارة رأس المال
 
-# AI Brain
+# AIBrain
 AI_BOUNDARIES = {
     'min_confidence': 60,
     'max_confidence': 75,
