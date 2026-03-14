@@ -296,11 +296,23 @@ def get_dynamic_symbols():
     dynamic_symbols = [coin for coin, score in top_coins]
     
     print(f"\n🔍 DEBUG: Scanner returned {len(dynamic_symbols)} coins")
-    print(f"📋 Scanner coins (first 20): {', '.join(dynamic_symbols[:20])}")
-    print(f"📋 Scanner coins (all): {', '.join(sorted(dynamic_symbols))}\n")
     
-    print(f"🔍 DEBUG: SYMBOLS_DATA before cleanup has {len(SYMBOLS_DATA)} coins:")
-    print(f"   {', '.join(sorted(list(SYMBOLS_DATA.keys())[:20]))}...")
+    # Filter: Verify coins exist in exchange before adding
+    verified_symbols = []
+    skipped_symbols = []
+    
+    for symbol in dynamic_symbols:
+        try:
+            # Quick check if symbol exists
+            exchange.fetch_ticker(symbol)
+            verified_symbols.append(symbol)
+        except:
+            skipped_symbols.append(symbol)
+    
+    if skipped_symbols:
+        print(f"⚠️ Skipped {len(skipped_symbols)} unavailable coins: {', '.join(skipped_symbols[:10])}...")
+    
+    print(f"✅ Verified {len(verified_symbols)} available coins")
     
     # تنظيف SYMBOLS_DATA أولاً - حذف كل العملات القديمة
     with symbols_data_lock:
@@ -315,19 +327,17 @@ def get_dynamic_symbols():
         for symbol, data in open_positions_data.items():
             SYMBOLS_DATA[symbol] = data
         
-        # 2. إضافة العملات من السكانر
-        for symbol in dynamic_symbols:
+        # 2. إضافة العملات المفحوصة من السكانر
+        for symbol in verified_symbols:
             if symbol not in SYMBOLS_DATA:
                 SYMBOLS_DATA[symbol] = {'position': None}
     
     # الحصول على القائمة النهائية
     open_positions = list(open_positions_data.keys())
-    all_symbols = list(set(dynamic_symbols + open_positions))
+    all_symbols = list(set(verified_symbols + open_positions))
     
     print(f"📂 Open positions: {len(open_positions)} - {', '.join(open_positions) if open_positions else 'None'}")
     print(f"✅ SYMBOLS_DATA rebuilt: {len(SYMBOLS_DATA)} coins")
-    print(f"   Rebuilt with: {', '.join(sorted(list(SYMBOLS_DATA.keys())[:20]))}...")
-    print(f"🎯 all_symbols to return: {', '.join(sorted(all_symbols)[:20])}...")
     print(f"🎯 Final symbols to analyze: {len(all_symbols)}\n")
     
     return all_symbols
@@ -728,13 +738,6 @@ try:
         
         # الحصول على القائمة الديناميكية
         current_symbols = get_dynamic_symbols()
-        
-        print(f"🔍 DEBUG: current_symbols returned from get_dynamic_symbols():")
-        print(f"   {', '.join(sorted(current_symbols)[:20])}...")
-        print(f"   Total: {len(current_symbols)} coins\n")
-        
-        print(f"🎯 About to analyze these {len(current_symbols)} symbols:")
-        print(f"   {', '.join(sorted(current_symbols))}\n")
         
         # ========== PARALLEL PROCESSING ==========
         # Process symbols in parallel (5 threads at a time)
