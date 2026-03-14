@@ -6,6 +6,7 @@ All bot settings and constants
 # Trading Parameters
 MIN_CONFIDENCE = 55  # Changed from 60 - more aggressive
 MAX_POSITIONS = 20  # الحد الأقصى للمراكز المفتوحة
+TOTAL_COINS_TO_SCAN = 50  # إجمالي العملات للفحص (يعرض النشطة فقط)
 
 # Capital Management
 MAX_CAPITAL = 300  # الحد الأقصى لرأس المال المستخدم ($200-$300)
