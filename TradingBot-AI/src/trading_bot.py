@@ -80,7 +80,7 @@ except Exception as e:
 
 # News Analyzer
 try:
-    from news_analyzer import NewsAnalyzer
+    from src.news_analyzer import NewsAnalyzer
     news_analyzer = NewsAnalyzer()
     NEWS_ENABLED = news_analyzer.enabled
 except Exception as e:
