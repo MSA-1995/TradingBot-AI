@@ -37,7 +37,7 @@ MACD_SIGNAL = 9
 MIN_VOLUME_RATIO = 1.0
 
 # Timing
-LOOP_SLEEP = 5  # seconds - أسرع
+LOOP_SLEEP = 1  # seconds - أسرع
 REPORT_INTERVAL = 30  # minutes
 
 # Supported Coins (Legacy - for fallback only)
