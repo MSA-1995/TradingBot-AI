@@ -129,9 +129,9 @@ else:
     exit_strategy = None
     pattern_recognizer = None
 
-# Dynamic Coin Scanner (يفحص جميع العملات ويختار أفضل 10)
+# Dynamic Coin Scanner (20 عملة مشهورة)
 coin_scanner = CoinScanner(exchange, ai_brain, mtf_analyzer, risk_manager)
-coin_scanner.start()  # تشغيل الـThreads
+# لا نحتاج start() - النظام الجديد بسيط
 
 # ========== BANNER ==========
 print("=" * 60)
@@ -197,6 +197,10 @@ try:
         current_time = datetime.now().strftime("%H:%M:%S")
         print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
         
+        # فحص العملات كل 10 حلقات
+        if loop_count % 10 == 1:
+            coin_scanner.scan_coins()
+        
         # Update coin rankings (صامت)
         if coin_ranker and loop_count % 10 == 1:
             try:
@@ -227,17 +231,9 @@ try:
             print(f"  ✅ Tradable: ${tradable_balance:.2f} | Max Capital: ${MAX_CAPITAL}")
         print(f"{'█' * 60}{Style.RESET_ALL}\n")
         
-        # عرض العملات المرشحة أفقياً (بسيط)
+        # عرض العملات المرشحة (صامت)
         top_coins = coin_scanner.get_top_coins()
-        hot_opps = coin_scanner.get_hot_opportunities()
         scan_status = coin_scanner.get_scan_status()
-        
-        if top_coins:
-            # عرض أفقي بسيط
-            coins_display = " | ".join([f"{symbol}" for symbol, score in top_coins[:10]])
-            print(f"🎯 Monitoring: {coins_display}")
-        
-        print()
         
         # الحصول على القائمة الديناميكية
         current_symbols = get_dynamic_symbols()
