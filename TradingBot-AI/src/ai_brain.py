@@ -107,7 +107,7 @@ class AIBrain:
             return decision
         
         # 6. القرار النهائي
-        if optimized_confidence >= 60:  # استخدام 60 (الحد الجديد)
+        if optimized_confidence >= 55:  # استخدام 55 (أكثر عدوانية للتعلم على Testnet)
             # حساب المبلغ الذكي
             amount = self._calculate_smart_amount(optimized_confidence, analysis)
             
@@ -141,7 +141,7 @@ class AIBrain:
         else:
             decision = {
                 'action': 'SKIP',
-                'reason': f'Confidence {optimized_confidence} < 60',
+                'reason': f'Confidence {optimized_confidence} < 55',
                 'confidence': optimized_confidence
             }
             return decision
