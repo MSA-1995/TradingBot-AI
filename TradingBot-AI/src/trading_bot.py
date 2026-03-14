@@ -372,6 +372,10 @@ last_report_time = datetime.now()
 balance_lock = threading.Lock()
 symbols_data_lock = threading.Lock()
 
+# Cooldown tracking: {symbol: sell_timestamp}
+sell_cooldown = {}
+COOLDOWN_MINUTES = 20
+
 # ========== PARALLEL ANALYSIS FUNCTION ==========
 def analyze_single_symbol(symbol, exchange_instance, active_count, available, invested):
     """تحليل عملة واحدة - يعمل في thread منفصل"""
@@ -504,6 +508,12 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
         else:
             if active_count >= MAX_POSITIONS:
                 return None
+            
+            # Check cooldown: Don't buy if recently sold
+            if symbol in sell_cooldown:
+                time_since_sell = (datetime.now() - sell_cooldown[symbol]).total_seconds() / 60
+                if time_since_sell < COOLDOWN_MINUTES:
+                    return {'symbol': symbol, 'action': 'COOLDOWN', 'minutes_left': COOLDOWN_MINUTES - time_since_sell}
             
             # Capital Management Check
             can_trade, reason = capital_manager.can_trade(BASE_AMOUNT, available, invested)
