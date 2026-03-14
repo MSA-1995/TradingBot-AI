@@ -295,8 +295,14 @@ def get_dynamic_symbols():
     top_coins = coin_scanner.get_top_coins()
     dynamic_symbols = [coin for coin, score in top_coins]
     
+    print(f"\n🔍 DEBUG: Scanner returned {len(dynamic_symbols)} coins")
+    print(f"📋 Scanner coins: {', '.join(dynamic_symbols[:10])}...")
+    
     # إضافة الصفقات المفتوحة (مهم!)
     open_positions = [symbol for symbol, data in SYMBOLS_DATA.items() if data.get('position')]
+    
+    print(f"📂 Open positions: {len(open_positions)} - {', '.join(open_positions) if open_positions else 'None'}")
+    print(f"📊 SYMBOLS_DATA before cleanup: {len(SYMBOLS_DATA)} coins")
     
     # دمج القوائم (بدون تكرار)
     all_symbols = list(set(dynamic_symbols + open_positions))
@@ -305,6 +311,10 @@ def get_dynamic_symbols():
     with symbols_data_lock:
         # حذف العملات اللي مو موجودة بالقائمة الجديدة ومو فيها صفقات مفتوحة
         symbols_to_remove = [s for s in SYMBOLS_DATA.keys() if s not in all_symbols]
+        
+        if symbols_to_remove:
+            print(f"🗑️ Removing {len(symbols_to_remove)} old coins: {', '.join(symbols_to_remove[:10])}...")
+        
         for symbol in symbols_to_remove:
             del SYMBOLS_DATA[symbol]
         
@@ -313,18 +323,26 @@ def get_dynamic_symbols():
             if symbol not in SYMBOLS_DATA:
                 SYMBOLS_DATA[symbol] = {'position': None}
     
+    print(f"✅ SYMBOLS_DATA after cleanup: {len(SYMBOLS_DATA)} coins")
+    print(f"🎯 Final symbols to analyze: {len(all_symbols)}\n")
+    
     return all_symbols
 
 SYMBOLS_DATA = init_symbols()
 loaded = storage.load_positions()
+
+print(f"\n📥 Loading positions from database...")
+print(f"📊 Found {len(loaded)} positions in database")
+
 for symbol, pos in loaded.items():
+    print(f"  📂 Loading: {symbol} - ${pos['buy_price']:.2f}")
     if symbol in SYMBOLS_DATA:
         SYMBOLS_DATA[symbol]['position'] = pos
-        print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f}")
     else:
         # إضافة الصفقة المفتوحة للقائمة
         SYMBOLS_DATA[symbol] = {'position': pos}
-        print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f} (not in top 20)")
+
+print(f"✅ SYMBOLS_DATA initialized with {len(SYMBOLS_DATA)} coins\n")
 
 print(f"\n🤖 Bot started!")
 if ai_brain:
