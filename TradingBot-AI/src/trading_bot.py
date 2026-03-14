@@ -295,18 +295,14 @@ def get_dynamic_symbols():
     top_coins = coin_scanner.get_top_coins()
     dynamic_symbols = [coin for coin, score in top_coins]
     
-    # Filter: Verify coins exist in Testnet (parallel for speed)
-    def verify_symbol(symbol):
+    # Filter: Verify coins exist in Testnet (simple loop, no threads)
+    verified_symbols = []
+    for symbol in dynamic_symbols:
         try:
             exchange.fetch_ticker(symbol)
-            return symbol
+            verified_symbols.append(symbol)
         except:
-            return None
-    
-    verified_symbols = []
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        results = executor.map(verify_symbol, dynamic_symbols)
-        verified_symbols = [s for s in results if s is not None]
+            pass
     
     # تنظيف SYMBOLS_DATA أولاً - حذف كل العملات القديمة
     with symbols_data_lock:
