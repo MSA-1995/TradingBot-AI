@@ -24,6 +24,8 @@ import time
 import gc
 from datetime import datetime, timedelta
 from colorama import init, Fore, Style
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 # Config
 from config_encrypted import get_api_keys, get_discord_webhook
@@ -208,6 +210,312 @@ send_startup_notification()
 
 last_report_time = datetime.now()
 
+# Thread lock for shared variables
+balance_lock = threading.Lock()
+symbols_data_lock = threading.Lock()
+
+# ========== PARALLEL ANALYSIS FUNCTION ==========
+def analyze_single_symbol(symbol, exchange_instance, active_count, available, invested):
+    """تحليل عملة واحدة - يعمل في thread منفصل"""
+    try:
+        # إضافة العملة للقائمة إذا مو موجودة
+        with symbols_data_lock:
+            if symbol not in SYMBOLS_DATA:
+                SYMBOLS_DATA[symbol] = {'position': None}
+            symbol_data = SYMBOLS_DATA[symbol]
+            position = symbol_data['position']
+        
+        # Get analysis
+        analysis = get_market_analysis(exchange_instance, symbol)
+        if not analysis:
+            if position:
+                return {'symbol': symbol, 'action': 'ERROR', 'message': 'Analysis failed (has position)'}
+            return None
+        
+        current_price = analysis['close']
+        
+        # ========== SELL LOGIC ==========
+        if position:
+            buy_price = position['buy_price']
+            amount = position['amount']
+            highest_price = position.get('highest_price', buy_price)
+            
+            # Update highest
+            highest_price = update_highest_price(current_price, highest_price)
+            with symbols_data_lock:
+                position['highest_price'] = highest_price
+            
+            profit_percent = calculate_profit_percent(current_price, buy_price)
+            
+            # Check sell conditions
+            sell_decision = None
+            
+            # Exit Strategy Model (أولوية)
+            mtf = None
+            if exit_strategy:
+                try:
+                    mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
+                    exit_decision = exit_strategy.should_exit(
+                        symbol, position, current_price, analysis, mtf
+                    )
+                    if exit_decision and exit_decision.get('action') == 'SELL':
+                        sell_decision = exit_decision
+                        sell_reason = exit_decision.get('reason', 'Exit Strategy')
+                        profit_percent = exit_decision.get('profit', profit_percent)
+                except Exception as e:
+                    pass
+            
+            # AI Smart Sell (إذا Exit Strategy ما قرر)
+            if not sell_decision and ai_brain:
+                if mtf is None:
+                    mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
+                
+                sell_decision = ai_brain.should_sell(symbol, position, current_price, analysis, mtf)
+                
+                if sell_decision and sell_decision.get('action') == 'SELL':
+                    sell_reason = sell_decision.get('reason', 'AI Sell')
+                    profit_percent = sell_decision.get('profit', profit_percent)
+                elif sell_decision and sell_decision.get('action') == 'HOLD':
+                    return {
+                        'symbol': symbol,
+                        'action': 'HOLD',
+                        'price': current_price,
+                        'profit': profit_percent,
+                        'buy_price': buy_price,
+                        'highest': highest_price,
+                        'reason': sell_decision.get('reason', 'Hold')
+                    }
+            else:
+                # Manual sell logic
+                sell_reason = None
+                
+                # 1. Fast TP
+                should_sell, profit = should_sell_fast_tp(current_price, buy_price, position.get('partial_sold', False), TAKE_PROFIT_PERCENT)
+                if should_sell:
+                    sell_reason = f"FAST TP"
+                
+                # 2. Bearish trend
+                if not sell_reason:
+                    if mtf is None:
+                        mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
+                    should_sell, profit = should_sell_bearish(mtf, current_price, buy_price)
+                    if should_sell:
+                        sell_reason = "BEARISH TREND"
+                
+                # 3. Stop loss
+                if not sell_reason:
+                    should_sell, profit, reason = should_sell_stop_loss(current_price, highest_price, buy_price, STOP_LOSS_PERCENT)
+                    if should_sell:
+                        sell_reason = reason
+                
+                if not sell_reason:
+                    return {
+                        'symbol': symbol,
+                        'action': 'HOLD',
+                        'price': current_price,
+                        'profit': profit_percent,
+                        'buy_price': buy_price,
+                        'highest': highest_price,
+                        'reason': 'Hold'
+                    }
+            
+            # Execute sell
+            if sell_reason:
+                sell_value = calculate_sell_value(amount, current_price)
+                
+                if sell_value < 9.99:
+                    return {
+                        'symbol': symbol,
+                        'action': 'SELL_WAIT',
+                        'reason': sell_reason,
+                        'value': sell_value
+                    }
+                else:
+                    return {
+                        'symbol': symbol,
+                        'action': 'SELL',
+                        'amount': amount,
+                        'price': current_price,
+                        'profit': profit_percent,
+                        'reason': sell_reason,
+                        'position': position
+                    }
+        
+        # ========== BUY LOGIC ==========
+        else:
+            if active_count >= MAX_POSITIONS:
+                return None
+            
+            # Capital Management Check
+            can_trade, reason = capital_manager.can_trade(BASE_AMOUNT, available, invested)
+            if not can_trade:
+                return None
+            
+            # Get MTF and calculate confidence
+            mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
+            
+            # Advanced MTF Analysis
+            mtf_boost = 0
+            if mtf_analyzer:
+                try:
+                    mtf_analysis = mtf_analyzer.analyze(symbol)
+                    if mtf_analysis:
+                        mtf_boost = mtf_analysis.get('confidence_boost', 0) or 0
+                        entry_point = mtf_analyzer.get_best_entry_point(symbol)
+                        if entry_point and entry_point.get('entry') == 'EXCELLENT':
+                            mtf_boost += 5
+                except Exception as e:
+                    mtf_boost = 0
+            
+            # Calculate price drop
+            price_drop = {'drop_percent': 0, 'confirmed': False}
+            try:
+                df = analysis['df']
+                if len(df) >= 12:
+                    highest_price_1h = df['high'].tail(12).max()
+                    current_price_df = df['close'].iloc[-1]
+                    
+                    if highest_price_1h is not None and current_price_df is not None and highest_price_1h > 0:
+                        drop_percent = ((highest_price_1h - current_price_df) / highest_price_1h) * 100
+                        price_drop = {
+                            'drop_percent': drop_percent,
+                            'highest_1h': highest_price_1h,
+                            'current': current_price_df,
+                            'confirmed': drop_percent >= 2.0
+                        }
+            except Exception as e:
+                pass
+            
+            confidence, reasons = calculate_dynamic_confidence(analysis, mtf)
+            
+            # News Sentiment Check
+            news_adjustment = 0
+            news_summary = "No news"
+            if news_analyzer and NEWS_ENABLED:
+                try:
+                    if news_analyzer.should_avoid_coin(symbol, hours=24):
+                        return {'symbol': symbol, 'action': 'SKIP', 'reason': 'Negative news sentiment'}
+                    
+                    news_adjustment = news_analyzer.get_news_confidence_boost(symbol, hours=24) or 0
+                    news_summary = news_analyzer.get_news_summary(symbol, hours=24) or "No news"
+                except Exception as e:
+                    news_adjustment = 0
+                    news_summary = "No news"
+            
+            # Coin Ranking Check
+            coin_rank_adjustment = 0
+            if coin_ranker:
+                try:
+                    should_trade = coin_ranker.should_trade_coin(symbol)
+                    if not should_trade['trade']:
+                        return {'symbol': symbol, 'action': 'SKIP', 'reason': should_trade['reason']}
+                    coin_rank_adjustment = should_trade.get('confidence_adjustment', 0) or 0
+                except Exception as e:
+                    coin_rank_adjustment = 0
+            
+            # Anomaly Detection
+            if anomaly_detector:
+                try:
+                    anomaly_result = anomaly_detector.detect_anomalies(symbol, analysis)
+                    if not anomaly_result['safe_to_trade']:
+                        return {'symbol': symbol, 'action': 'SKIP', 'reason': f"ANOMALY: {anomaly_result['severity']}"}
+                except Exception as e:
+                    pass
+            
+            # Pattern Recognition
+            pattern_adjustment = 0
+            if pattern_recognizer:
+                try:
+                    pattern_analysis = pattern_recognizer.analyze_entry_pattern(
+                        symbol, analysis, mtf, price_drop
+                    )
+                    if pattern_analysis:
+                        if pattern_analysis.get('recommendation') == 'AVOID':
+                            return {'symbol': symbol, 'action': 'SKIP', 'reason': f"PATTERN: {pattern_analysis['recommendation']}"}
+                        pattern_adjustment = pattern_analysis.get('confidence_adjustment', 0) or 0
+                except Exception as e:
+                    pattern_adjustment = 0
+            
+            # AI Decision
+            if ai_brain:
+                decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop)
+                
+                # Apply all adjustments
+                try:
+                    mtf_boost = 0 if mtf_boost is None else mtf_boost
+                    coin_rank_adjustment = 0 if coin_rank_adjustment is None else coin_rank_adjustment
+                    pattern_adjustment = 0 if pattern_adjustment is None else pattern_adjustment
+                    news_adjustment = 0 if news_adjustment is None else news_adjustment
+                    
+                    total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment + news_adjustment
+                    if total_adjustment != 0:
+                        decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
+                except Exception as e:
+                    total_adjustment = 0
+                
+                if decision['action'] == 'BUY':
+                    # Risk Manager - Calculate optimal amount
+                    if risk_manager:
+                        try:
+                            optimal_amount = risk_manager.get_position_size(
+                                symbol, 
+                                decision['confidence'], 
+                                available + invested,
+                                MAX_POSITIONS
+                            )
+                            amount_usd = optimal_amount
+                        except:
+                            amount_usd = decision['amount']
+                    else:
+                        amount_usd = decision['amount']
+                    
+                    return {
+                        'symbol': symbol,
+                        'action': 'BUY',
+                        'amount': amount_usd,
+                        'price': current_price,
+                        'confidence': decision['confidence'],
+                        'decision': decision,
+                        'analysis': analysis,
+                        'news_summary': news_summary if news_adjustment != 0 else None
+                    }
+                else:
+                    return {
+                        'symbol': symbol,
+                        'action': 'DISPLAY',
+                        'price': current_price,
+                        'rsi': analysis.get('rsi', 0),
+                        'volume': analysis.get('volume_ratio', 0),
+                        'macd': analysis.get('macd_diff', 0),
+                        'confidence': decision['confidence'],
+                        'reason': decision['reason'],
+                        'news_summary': news_summary if NEWS_ENABLED else None
+                    }
+            else:
+                # Manual mode
+                if confidence >= MIN_CONFIDENCE:
+                    return {
+                        'symbol': symbol,
+                        'action': 'BUY',
+                        'amount': BASE_AMOUNT,
+                        'price': current_price,
+                        'confidence': confidence,
+                        'analysis': analysis
+                    }
+                else:
+                    return {
+                        'symbol': symbol,
+                        'action': 'DISPLAY',
+                        'price': current_price,
+                        'rsi': analysis.get('rsi', 0),
+                        'volume': analysis.get('volume_ratio', 0),
+                        'macd': analysis.get('macd_diff', 0),
+                        'confidence': confidence
+                    }
+    
+    except Exception as e:
+        return {'symbol': symbol, 'action': 'ERROR', 'message': str(e)}
+
 # ========== MAIN LOOP ==========
 try:
     loop_count = 0
@@ -254,406 +562,182 @@ try:
         # الحصول على القائمة الديناميكية
         current_symbols = get_dynamic_symbols()
         
-        # Process each symbol
-        for symbol in current_symbols:
-            # إضافة العملة للقائمة إذا مو موجودة
-            if symbol not in SYMBOLS_DATA:
-                SYMBOLS_DATA[symbol] = {'position': None}
+        # ========== PARALLEL PROCESSING ==========
+        # Process symbols in parallel (5 threads at a time)
+        results = []
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            # Submit all symbols for analysis
+            future_to_symbol = {
+                executor.submit(analyze_single_symbol, symbol, exchange, active_count, available, invested): symbol
+                for symbol in current_symbols
+            }
             
-            symbol_data = SYMBOLS_DATA[symbol]
-            position = symbol_data['position']
-            
-            # Get analysis
-            analysis = get_market_analysis(exchange, symbol)
-            if not analysis:
-                if position:
-                    print(f"⚠️ {symbol}: Analysis failed (has position)")
+            # Collect results as they complete
+            for future in as_completed(future_to_symbol):
+                try:
+                    result = future.result()
+                    if result:
+                        results.append(result)
+                except Exception as e:
+                    symbol = future_to_symbol[future]
+                    print(f"⚠️ {symbol}: Thread error - {e}")
+        
+        # ========== PROCESS RESULTS ==========
+        for result in results:
+            if not result:
                 continue
             
-            current_price = analysis['close']
+            symbol = result['symbol']
+            action = result['action']
             
-            # ========== SELL LOGIC ==========
-            if position:
-                buy_price = position['buy_price']
-                amount = position['amount']
-                highest_price = position.get('highest_price', buy_price)
-                
-                # Update highest
-                highest_price = update_highest_price(current_price, highest_price)
-                position['highest_price'] = highest_price
-                
-                profit_percent = calculate_profit_percent(current_price, buy_price)
-                
-                # Check sell conditions
-                sell_decision = None
-                
-                # Exit Strategy Model (أولوية)
-                mtf = None
-                if exit_strategy:
-                    try:
-                        mtf = get_multi_timeframe_analysis(exchange, symbol)
-                        exit_decision = exit_strategy.should_exit(
-                            symbol, position, current_price, analysis, mtf
-                        )
-                        if exit_decision and exit_decision.get('action') == 'SELL':
-                            sell_decision = exit_decision
-                            sell_reason = exit_decision.get('reason', 'Exit Strategy')
-                            profit_percent = exit_decision.get('profit', profit_percent)
-                    except Exception as e:
-                        print(f"⚠️ Exit Strategy error {symbol}: {e}")
-                        pass
-                
-                # AI Smart Sell (إذا Exit Strategy ما قرر)
-                if not sell_decision and ai_brain:
-                    if mtf is None:
-                        mtf = get_multi_timeframe_analysis(exchange, symbol)
-                    
-                    sell_decision = ai_brain.should_sell(symbol, position, current_price, analysis, mtf)
-                    
-                    if sell_decision and sell_decision.get('action') == 'SELL':
-                        sell_reason = sell_decision.get('reason', 'AI Sell')
-                        profit_percent = sell_decision.get('profit', profit_percent)
-                    elif sell_decision and sell_decision.get('action') == 'HOLD':
-                        # عرض المركز بتفاصيل كاملة
-                        profit_emoji = "📈" if profit_percent > 0 else "📉"
-                        print(f"{profit_emoji} {symbol:12} {format_price(current_price)} | Profit:{profit_percent:>+7.2f}% | Buy:{format_price(buy_price)} | High:{format_price(highest_price)} | {sell_decision.get('reason', 'Hold')}")
-                        continue
-                else:
-                    # Manual sell logic
-                    sell_reason = None
-                    
-                    # 1. Fast TP
-                    should_sell, profit = should_sell_fast_tp(current_price, buy_price, position.get('partial_sold', False), TAKE_PROFIT_PERCENT)
-                    if should_sell:
-                        sell_reason = f"FAST TP"
-                    
-                    # 2. Bearish trend
-                    if not sell_reason:
-                        if mtf is None:
-                            mtf = get_multi_timeframe_analysis(exchange, symbol)
-                        should_sell, profit = should_sell_bearish(mtf, current_price, buy_price)
-                        if should_sell:
-                            sell_reason = "BEARISH TREND"
-                    
-                    # 3. Stop loss
-                    if not sell_reason:
-                        should_sell, profit, reason = should_sell_stop_loss(current_price, highest_price, buy_price, STOP_LOSS_PERCENT)
-                        if should_sell:
-                            sell_reason = reason
-                    
-                    if not sell_reason:
-                        # عرض المركز بتفاصيل كاملة
-                        profit_emoji = "📈" if profit_percent > 0 else "📉"
-                        print(f"{profit_emoji} {symbol:12} {format_price(current_price)} | Profit:{profit_percent:>+7.2f}% | Buy:{format_price(buy_price)} | High:{format_price(highest_price)} | Hold")
-                        continue
-                
-                # Execute sell
-                if sell_reason:
-                    sell_value = calculate_sell_value(amount, current_price)
-                    
-                    if sell_value < 9.99:
-                        print(f"{Fore.YELLOW}⏳ {symbol} | {sell_reason} but value ${sell_value:.4f} < $10 minimum - Waiting{Style.RESET_ALL}")
-                    else:
-                        print(f"{Fore.RED}🔴 SELL {symbol} | {sell_reason} | Profit: {profit_percent:+.2f}%{Style.RESET_ALL}")
-                        
-                        result = execute_sell(exchange, symbol, amount, sell_reason)
-                        if result['success']:
-                            send_sell_notification(symbol, amount, current_price, sell_value, profit_percent, sell_reason)
-                            
-                            # AI Learning - يتعلم من كل شيء
-                            if ai_brain:
-                                try:
-                                    # حماية كاملة من None
-                                    safe_profit = 0
-                                    try:
-                                        if profit_percent is not None and isinstance(profit_percent, (int, float)):
-                                            safe_profit = float(profit_percent)
-                                    except:
-                                        safe_profit = 0
-                                    
-                                    # حساب hours_held بحماية من None
-                                    hours_held = 24  # default
-                                    try:
-                                        buy_time_str = position.get('buy_time')
-                                        if buy_time_str and isinstance(buy_time_str, str):
-                                            buy_time = datetime.fromisoformat(buy_time_str)
-                                            hours_held = (datetime.now() - buy_time).total_seconds() / 3600
-                                    except:
-                                        hours_held = 24
-                                    
-                                    trade_result = {
-                                        'symbol': symbol,
-                                        'action': 'SELL',
-                                        'profit_percent': safe_profit,
-                                        'sell_reason': sell_reason if sell_reason else 'Unknown',
-                                        'tp_target': position.get('tp_target', 1.0),
-                                        'sl_target': position.get('sl_target', 2.0),
-                                        'max_wait_hours': position.get('max_wait_hours', 48),
-                                        'hours_held': hours_held
-                                    }
-                                    
-                                    # إضافة ai_data إذا موجود
-                                    if 'ai_data' in position:
-                                        trade_result.update(position['ai_data'])
-                                    
-                                    ai_brain.learn_from_trade(trade_result)
-                                except Exception as e:
-                                    print(f"⚠️ AI Learning error: {e}")
-                            
-                            # Exit Strategy Learning
-                            if exit_strategy:
-                                try:
-                                    # حماية من None
-                                    safe_profit = 0
-                                    try:
-                                        if profit_percent is not None and isinstance(profit_percent, (int, float)):
-                                            safe_profit = float(profit_percent)
-                                    except:
-                                        safe_profit = 0
-                                    
-                                    # حساب hours_held بحماية من None
-                                    hours_held = 24  # default
-                                    try:
-                                        buy_time_str = position.get('buy_time')
-                                        if buy_time_str and isinstance(buy_time_str, str):
-                                            buy_time = datetime.fromisoformat(buy_time_str)
-                                            hours_held = (datetime.now() - buy_time).total_seconds() / 3600
-                                    except:
-                                        hours_held = 24
-                                    
-                                    exit_strategy.learn_from_exit(symbol, {
-                                        'profit_percent': safe_profit,
-                                        'sell_reason': sell_reason if sell_reason else 'Unknown',
-                                        'hours_held': hours_held
-                                    })
-                                except Exception as e:
-                                    print(f"⚠️ Exit Strategy Learning error: {e}")
-                            
-                            # Pattern Recognition Learning
-                            if pattern_recognizer:
-                                try:
-                                    # حماية من None
-                                    safe_profit = 0
-                                    try:
-                                        if profit_percent is not None and isinstance(profit_percent, (int, float)):
-                                            safe_profit = float(profit_percent)
-                                    except:
-                                        safe_profit = 0
-                                    
-                                    pattern_recognizer.learn_pattern({
-                                        'symbol': symbol,
-                                        'profit_percent': safe_profit,
-                                        'features': position.get('ai_data', {})
-                                    })
-                                except Exception as e:
-                                    print(f"⚠️ Pattern Learning error: {e}")
-                            
-                            symbol_data['position'] = None
-                            storage.save_positions(SYMBOLS_DATA)
-                else:
-                    # Hold - عرض المركز بتفاصيل كاملة
-                    profit_emoji = "📈" if profit_percent > 0 else "📉"
-                    print(f"{profit_emoji} {symbol:12} {format_price(current_price)} | Profit:{profit_percent:>+7.2f}% | Buy:{format_price(buy_price)} | High:{format_price(highest_price)} | Hold")
+            # Error handling
+            if action == 'ERROR':
+                print(f"⚠️ {symbol}: {result.get('message', 'Unknown error')}")
+                continue
             
-            # ========== BUY LOGIC ==========
-            else:
-                if active_count >= MAX_POSITIONS:
-                    continue
+            # Skip
+            if action == 'SKIP':
+                print(f"❌ {symbol:12} | SKIP: {result['reason']}")
+                continue
+            
+            # Hold position
+            if action == 'HOLD':
+                profit_emoji = "📈" if result['profit'] > 0 else "📉"
+                print(f"{profit_emoji} {symbol:12} {format_price(result['price'])} | Profit:{result['profit']:>+7.2f}% | Buy:{format_price(result['buy_price'])} | High:{format_price(result['highest'])} | {result['reason']}")
+                continue
+            
+            # Sell (waiting for minimum)
+            if action == 'SELL_WAIT':
+                print(f"{Fore.YELLOW}⏳ {symbol} | {result['reason']} but value ${result['value']:.4f} < $10 minimum - Waiting{Style.RESET_ALL}")
+                continue
+            
+            # Execute Sell
+            if action == 'SELL':
+                print(f"{Fore.RED}🔴 SELL {symbol} | {result['reason']} | Profit: {result['profit']:+.2f}%{Style.RESET_ALL}")
                 
-                # Capital Management Check
-                can_trade, reason = capital_manager.can_trade(BASE_AMOUNT, available, invested)
-                if not can_trade:
-                    continue
-                
-                # Get MTF and calculate confidence
-                mtf = get_multi_timeframe_analysis(exchange, symbol)
-                
-                # Advanced MTF Analysis
-                mtf_boost = 0
-                if mtf_analyzer:
-                    try:
-                        mtf_analysis = mtf_analyzer.analyze(symbol)
-                        if mtf_analysis:
-                            mtf_boost = mtf_analysis.get('confidence_boost', 0) or 0
-                            entry_point = mtf_analyzer.get_best_entry_point(symbol)
-                            if entry_point and entry_point.get('entry') == 'EXCELLENT':
-                                mtf_boost += 5
-                    except Exception as e:
-                        print(f"⚠️ MTF error {symbol}: {e}")
-                        mtf_boost = 0
-                
-                # Calculate price drop
-                price_drop = {'drop_percent': 0, 'confirmed': False}
-                try:
-                    df = analysis['df']
-                    if len(df) >= 12:
-                        highest_price_1h = df['high'].tail(12).max()
-                        current_price_df = df['close'].iloc[-1]
-                        
-                        # حماية من None
-                        if highest_price_1h is not None and current_price_df is not None and highest_price_1h > 0:
-                            drop_percent = ((highest_price_1h - current_price_df) / highest_price_1h) * 100
-                            price_drop = {
-                                'drop_percent': drop_percent,
-                                'highest_1h': highest_price_1h,
-                                'current': current_price_df,
-                                'confirmed': drop_percent >= 2.0
-                            }
-                except Exception as e:
-                    pass
-                
-                confidence, reasons = calculate_dynamic_confidence(analysis, mtf)
-                
-                # News Sentiment Check
-                news_adjustment = 0
-                news_summary = "No news"
-                if news_analyzer and NEWS_ENABLED:
-                    try:
-                        # تجنب العملة إذا الأخبار سلبية جداً
-                        if news_analyzer.should_avoid_coin(symbol, hours=24):
-                            print(f"📰❌ {symbol:12} | SKIP: Negative news sentiment")
-                            continue
-                        
-                        # حساب News Boost
-                        news_adjustment = news_analyzer.get_news_confidence_boost(symbol, hours=24) or 0
-                        news_summary = news_analyzer.get_news_summary(symbol, hours=24) or "No news"
-                    except Exception as e:
-                        news_adjustment = 0
-                        news_summary = "No news"
-                
-                # Coin Ranking Check
-                coin_rank_adjustment = 0
-                if coin_ranker:
-                    try:
-                        should_trade = coin_ranker.should_trade_coin(symbol)
-                        if not should_trade['trade']:
-                            print(f"❌ {symbol:12} | SKIP: {should_trade['reason']}")
-                            continue
-                        coin_rank_adjustment = should_trade.get('confidence_adjustment', 0) or 0
-                    except Exception as e:
-                        coin_rank_adjustment = 0
-                
-                # Anomaly Detection
-                if anomaly_detector:
-                    try:
-                        anomaly_result = anomaly_detector.detect_anomalies(symbol, analysis)
-                        if not anomaly_result['safe_to_trade']:
-                            print(f"🚨 {symbol:12} | ANOMALY: {anomaly_result['severity']} - SKIP")
-                            continue
-                    except Exception as e:
-                        pass
-                
-                # Pattern Recognition
-                pattern_adjustment = 0
-                if pattern_recognizer:
-                    try:
-                        pattern_analysis = pattern_recognizer.analyze_entry_pattern(
-                            symbol, analysis, mtf, price_drop
-                        )
-                        if pattern_analysis:
-                            if pattern_analysis.get('recommendation') == 'AVOID':
-                                print(f"⚠️ {symbol:12} | PATTERN: {pattern_analysis['recommendation']} - SKIP")
-                                continue
-                            pattern_adjustment = pattern_analysis.get('confidence_adjustment', 0) or 0
-                    except Exception as e:
-                        pattern_adjustment = 0
-                
-                # AI Decision
-                if ai_brain:
-                    decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop)
+                sell_result = execute_sell(exchange, symbol, result['amount'], result['reason'])
+                if sell_result['success']:
+                    sell_value = calculate_sell_value(result['amount'], result['price'])
+                    send_sell_notification(symbol, result['amount'], result['price'], sell_value, result['profit'], result['reason'])
                     
-                    # Apply all adjustments (including news) - with None protection
-                    try:
-                        # Ensure all adjustments are numbers
-                        mtf_boost = 0 if mtf_boost is None else mtf_boost
-                        coin_rank_adjustment = 0 if coin_rank_adjustment is None else coin_rank_adjustment
-                        pattern_adjustment = 0 if pattern_adjustment is None else pattern_adjustment
-                        news_adjustment = 0 if news_adjustment is None else news_adjustment
-                        
-                        total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment + news_adjustment
-                        if total_adjustment != 0:
-                            decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
-                    except Exception as e:
-                        print(f"⚠️ Adjustment error {symbol}: {e}")
-                        total_adjustment = 0
-                    
-                    if decision['action'] == 'BUY':
-                        # Risk Manager - Calculate optimal amount
-                        if risk_manager:
+                    # AI Learning
+                    position = result['position']
+                    if ai_brain:
+                        try:
+                            safe_profit = float(result['profit']) if result['profit'] is not None else 0
+                            hours_held = 24
                             try:
-                                optimal_amount = risk_manager.get_position_size(
-                                    symbol, 
-                                    decision['confidence'], 
-                                    available + invested,
-                                    MAX_POSITIONS
-                                )
-                                amount_usd = optimal_amount
+                                buy_time_str = position.get('buy_time')
+                                if buy_time_str:
+                                    buy_time = datetime.fromisoformat(buy_time_str)
+                                    hours_held = (datetime.now() - buy_time).total_seconds() / 3600
                             except:
-                                amount_usd = decision['amount']
-                        else:
-                            amount_usd = decision['amount']
-                        
-                        news_display = f" | {news_summary}" if news_adjustment != 0 else ""
-                        print(f"{Fore.GREEN}🟢 BUY {symbol} 🧠 | AI Confidence:{decision['confidence']}/120 | ${amount_usd}{news_display}{Style.RESET_ALL}")
-                        
-                        result = execute_buy(exchange, symbol, amount_usd, current_price, decision['confidence'])
-                        if result['success']:
-                            send_buy_notification(symbol, result['amount'], current_price, amount_usd, decision['confidence'])
+                                pass
                             
-                            symbol_data['position'] = {
-                                'buy_price': result['price'],
-                                'amount': result['amount'],
-                                'highest_price': result['price'],
-                                'buy_time': datetime.now().isoformat(),
-                                'tp_target': decision.get('tp_target', 1.0),
-                                'sl_target': decision.get('sl_target', 2.0),
-                                'max_wait_hours': decision.get('max_wait_hours', 48),
-                                'ai_data': {
-                                    'confidence': decision['confidence'],
-                                    'rsi': analysis['rsi'],
-                                    'volume': analysis['volume'],
-                                    'macd_diff': analysis['macd_diff']
-                                }
+                            trade_result = {
+                                'symbol': symbol,
+                                'action': 'SELL',
+                                'profit_percent': safe_profit,
+                                'sell_reason': result['reason'],
+                                'tp_target': position.get('tp_target', 1.0),
+                                'sl_target': position.get('sl_target', 2.0),
+                                'max_wait_hours': position.get('max_wait_hours', 48),
+                                'hours_held': hours_held
                             }
-                            active_count += 1
-                            available -= amount_usd
-                            storage.save_positions(SYMBOLS_DATA)
-                    else:
-                        # عرض التفاصيل حتى لو فشل AI
-                        rsi = analysis.get('rsi', 0)
-                        volume = analysis.get('volume_ratio', 0)
-                        macd = analysis.get('macd_diff', 0)
-                        
-                        vol_status = "🟢" if volume > 0.8 else "🔴"
-                        news_display = f" | {news_summary}" if NEWS_ENABLED else ""
-                        print(f"📊 {symbol:12} ${current_price:>8.2f} | RSI:{rsi:>5.1f} | Vol:{vol_status} {volume:.1f}x | MACD:{macd:>+6.1f} | Conf:{decision['confidence']}/120{news_display} | {decision['reason']}")
+                            
+                            if 'ai_data' in position:
+                                trade_result.update(position['ai_data'])
+                            
+                            ai_brain.learn_from_trade(trade_result)
+                        except Exception as e:
+                            pass
+                    
+                    # Exit Strategy Learning
+                    if exit_strategy:
+                        try:
+                            safe_profit = float(result['profit']) if result['profit'] is not None else 0
+                            hours_held = 24
+                            try:
+                                buy_time_str = position.get('buy_time')
+                                if buy_time_str:
+                                    buy_time = datetime.fromisoformat(buy_time_str)
+                                    hours_held = (datetime.now() - buy_time).total_seconds() / 3600
+                            except:
+                                pass
+                            
+                            exit_strategy.learn_from_exit(symbol, {
+                                'profit_percent': safe_profit,
+                                'sell_reason': result['reason'],
+                                'hours_held': hours_held
+                            })
+                        except Exception as e:
+                            pass
+                    
+                    # Pattern Recognition Learning
+                    if pattern_recognizer:
+                        try:
+                            safe_profit = float(result['profit']) if result['profit'] is not None else 0
+                            pattern_recognizer.learn_pattern({
+                                'symbol': symbol,
+                                'profit_percent': safe_profit,
+                                'features': position.get('ai_data', {})
+                            })
+                        except Exception as e:
+                            pass
+                    
+                    with symbols_data_lock:
+                        SYMBOLS_DATA[symbol]['position'] = None
+                    storage.save_positions(SYMBOLS_DATA)
+                continue
+            
+            # Execute Buy
+            if action == 'BUY':
+                news_display = f" | {result['news_summary']}" if result.get('news_summary') else ""
+                
+                if 'decision' in result:
+                    print(f"{Fore.GREEN}🟢 BUY {symbol} 🧠 | AI Confidence:{result['confidence']}/120 | ${result['amount']}{news_display}{Style.RESET_ALL}")
                 else:
-                    # Manual mode
-                    if confidence >= MIN_CONFIDENCE:
-                        amount_usd = BASE_AMOUNT
-                        print(f"{Fore.GREEN}🟢 BUY {symbol} | Confidence:{confidence}/120 | ${amount_usd}{Style.RESET_ALL}")
-                        
-                        result = execute_buy(exchange, symbol, amount_usd, current_price, confidence)
-                        if result['success']:
-                            send_buy_notification(symbol, result['amount'], current_price, amount_usd, confidence)
-                            
-                            symbol_data['position'] = {
-                                'buy_price': result['price'],
-                                'amount': result['amount'],
-                                'highest_price': result['price'],
-                                'buy_time': datetime.now().isoformat()
+                    print(f"{Fore.GREEN}🟢 BUY {symbol} | Confidence:{result['confidence']}/120 | ${result['amount']}{Style.RESET_ALL}")
+                
+                buy_result = execute_buy(exchange, symbol, result['amount'], result['price'], result['confidence'])
+                if buy_result['success']:
+                    send_buy_notification(symbol, buy_result['amount'], result['price'], result['amount'], result['confidence'])
+                    
+                    position_data = {
+                        'buy_price': buy_result['price'],
+                        'amount': buy_result['amount'],
+                        'highest_price': buy_result['price'],
+                        'buy_time': datetime.now().isoformat()
+                    }
+                    
+                    if 'decision' in result:
+                        decision = result['decision']
+                        position_data.update({
+                            'tp_target': decision.get('tp_target', 1.0),
+                            'sl_target': decision.get('sl_target', 2.0),
+                            'max_wait_hours': decision.get('max_wait_hours', 48),
+                            'ai_data': {
+                                'confidence': result['confidence'],
+                                'rsi': result['analysis']['rsi'],
+                                'volume': result['analysis']['volume'],
+                                'macd_diff': result['analysis']['macd_diff']
                             }
-                            active_count += 1
-                            available -= amount_usd
-                            storage.save_positions(SYMBOLS_DATA)
-                    else:
-                        # عرض التحليل للعملات بدون مراكز
-                        rsi = analysis.get('rsi', 0)
-                        volume = analysis.get('volume_ratio', 0)
-                        macd = analysis.get('macd_diff', 0)
-                        
-                        vol_status = "🟢" if volume > 0.8 else "🔴"
-                        print(f"📊 {symbol:12} ${current_price:>8.2f} | RSI:{rsi:>5.1f} | Vol:{vol_status} {volume:.1f}x | MACD:{macd:>+6.1f} | Conf:{confidence}/120")
+                        })
+                    
+                    with symbols_data_lock:
+                        SYMBOLS_DATA[symbol]['position'] = position_data
+                    active_count += 1
+                    with balance_lock:
+                        available -= result['amount']
+                    storage.save_positions(SYMBOLS_DATA)
+                continue
+            
+            # Display only
+            if action == 'DISPLAY':
+                vol_status = "🟢" if result['volume'] > 0.8 else "🔴"
+                news_display = f" | {result['news_summary']}" if result.get('news_summary') else ""
+                print(f"📊 {symbol:12} ${result['price']:>8.2f} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {result['volume']:.1f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']}/120{news_display} | {result.get('reason', '')}")
+                continue
         
         # Report
         if should_send_report(last_report_time, REPORT_INTERVAL):
