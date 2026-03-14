@@ -295,11 +295,8 @@ def get_dynamic_symbols():
     top_coins = coin_scanner.get_top_coins()
     dynamic_symbols = [coin for coin, score in top_coins]
     
-    print(f"\n🔍 DEBUG: Scanner returned {len(dynamic_symbols)} coins")
-    
     # Filter: Verify coins exist in exchange before adding
     verified_symbols = []
-    skipped_symbols = []
     
     for symbol in dynamic_symbols:
         try:
@@ -307,12 +304,7 @@ def get_dynamic_symbols():
             exchange.fetch_ticker(symbol)
             verified_symbols.append(symbol)
         except:
-            skipped_symbols.append(symbol)
-    
-    if skipped_symbols:
-        print(f"⚠️ Skipped {len(skipped_symbols)} unavailable coins: {', '.join(skipped_symbols[:10])}...")
-    
-    print(f"✅ Verified {len(verified_symbols)} available coins")
+            continue
     
     # تنظيف SYMBOLS_DATA أولاً - حذف كل العملات القديمة
     with symbols_data_lock:
@@ -336,27 +328,17 @@ def get_dynamic_symbols():
     open_positions = list(open_positions_data.keys())
     all_symbols = list(set(verified_symbols + open_positions))
     
-    print(f"📂 Open positions: {len(open_positions)} - {', '.join(open_positions) if open_positions else 'None'}")
-    print(f"✅ SYMBOLS_DATA rebuilt: {len(SYMBOLS_DATA)} coins")
-    print(f"🎯 Final symbols to analyze: {len(all_symbols)}\n")
-    
     return all_symbols
 
 SYMBOLS_DATA = init_symbols()
 loaded = storage.load_positions()
 
-print(f"\n📥 Loading positions from database...")
-print(f"📊 Found {len(loaded)} positions in database")
-
 for symbol, pos in loaded.items():
-    print(f"  📂 Loading: {symbol} - ${pos['buy_price']:.2f}")
     if symbol in SYMBOLS_DATA:
         SYMBOLS_DATA[symbol]['position'] = pos
     else:
         # إضافة الصفقة المفتوحة للقائمة
         SYMBOLS_DATA[symbol] = {'position': pos}
-
-print(f"✅ SYMBOLS_DATA initialized with {len(SYMBOLS_DATA)} coins\n")
 
 print(f"\n🤖 Bot started!")
 if ai_brain:
