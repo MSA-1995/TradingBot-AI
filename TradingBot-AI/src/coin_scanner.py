@@ -17,9 +17,9 @@ class CoinScanner:
         # قائمة العملات المشهورة (20 عملة)
         self.popular_coins = [
             'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT',
-            'MATIC/USDT', 'AVAX/USDT', 'LINK/USDT', 'DOT/USDT', 'UNI/USDT',
+            'POL/USDT', 'AVAX/USDT', 'LINK/USDT', 'DOT/USDT', 'UNI/USDT',
             'ATOM/USDT', 'ALGO/USDT', 'XRP/USDT', 'LTC/USDT', 'BCH/USDT',
-            'ETC/USDT', 'FIL/USDT', 'AAVE/USDT', 'SUSHI/USDT', 'COMP/USDT'
+            'ETC/USDT', 'FIL/USDT', 'AAVE/USDT', 'DOGE/USDT', 'TRX/USDT'
         ]
         
         # تحليل فوري عند التهيئة
