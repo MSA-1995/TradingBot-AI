@@ -727,6 +727,10 @@ try:
         # الحصول على القائمة الديناميكية
         current_symbols = get_dynamic_symbols()
         
+        print(f"🔍 DEBUG: current_symbols returned from get_dynamic_symbols():")
+        print(f"   {', '.join(sorted(current_symbols)[:20])}...")
+        print(f"   Total: {len(current_symbols)} coins\n")
+        
         print(f"🎯 About to analyze these {len(current_symbols)} symbols:")
         print(f"   {', '.join(sorted(current_symbols))}\n")
         
