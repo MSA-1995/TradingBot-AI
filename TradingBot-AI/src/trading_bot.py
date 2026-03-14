@@ -218,18 +218,19 @@ try:
         print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
         
         # Update coin rankings (صامت)
-        if coin_ranker and loop_count % 10 == 1:
+        if coin_ranker and loop_count % 60 == 1:
             try:
                 rankings = coin_ranker.rank_all_coins(SYMBOLS)
             except Exception as e:
                 pass
         
-        # Balance
-        try:
-            balance = exchange.fetch_balance()
-            available = balance['USDT']['free']
-        except:
-            available = 0
+        # Balance (cached - update every 10 seconds)
+        if loop_count == 1 or loop_count % 10 == 0:
+            try:
+                balance = exchange.fetch_balance()
+                available = balance['USDT']['free']
+            except:
+                available = 0
         
         active_count = get_active_positions_count(SYMBOLS_DATA)
         invested = get_total_invested(SYMBOLS_DATA)
