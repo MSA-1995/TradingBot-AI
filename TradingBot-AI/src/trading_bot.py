@@ -79,17 +79,21 @@ except Exception as e:
     MODELS_ENABLED = False
 
 # News Analyzer
+NEWS_ENABLED = False
+news_analyzer = None
 try:
-    import sys
+    import importlib.util
     import os
-    # Add src to path if not already there
-    src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
-    if src_path not in sys.path:
-        sys.path.insert(0, src_path)
     
-    from news_analyzer import NewsAnalyzer
-    news_analyzer = NewsAnalyzer()
+    # Load news_analyzer.py directly
+    news_path = os.path.join(os.path.dirname(__file__), 'news_analyzer.py')
+    spec = importlib.util.spec_from_file_location("news_analyzer", news_path)
+    news_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(news_module)
+    
+    news_analyzer = news_module.NewsAnalyzer()
     NEWS_ENABLED = news_analyzer.enabled
+    print("✅ News Analyzer loaded successfully")
 except Exception as e:
     print(f"⚠️ News Analyzer not loaded: {e}")
     news_analyzer = None
