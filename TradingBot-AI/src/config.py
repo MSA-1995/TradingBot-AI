@@ -5,7 +5,7 @@ All bot settings and constants
 
 # Trading Parameters
 MIN_CONFIDENCE = 55  # Changed from 60 - more aggressive
-MAX_POSITIONS = 999  # لا محدود - رأس المال هو الحد الفعلي
+MAX_POSITIONS = 20  # لا محدود - رأس المال هو الحد الفعلي
 
 # Capital Management
 MAX_CAPITAL = 300  # الحد الأقصى لرأس المال المستخدم ($200-$300)
