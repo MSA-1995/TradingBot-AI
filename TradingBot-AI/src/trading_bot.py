@@ -725,6 +725,9 @@ try:
         # الحصول على القائمة الديناميكية
         current_symbols = get_dynamic_symbols()
         
+        print(f"🎯 About to analyze these {len(current_symbols)} symbols:")
+        print(f"   {', '.join(sorted(current_symbols))}\n")
+        
         # ========== PARALLEL PROCESSING ==========
         # Process symbols in parallel (5 threads at a time)
         results = []
