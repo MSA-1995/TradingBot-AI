@@ -10,6 +10,7 @@ import time
 import gc
 from datetime import datetime
 from colorama import Fore, Style
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class CoinScanner:
     def __init__(self, exchange, ai_brain=None, mtf_analyzer=None, risk_manager=None):
@@ -142,9 +143,7 @@ class CoinScanner:
                 except:
                     continue
             
-            # تحليل بـBatch مع 20 threads للتسريع
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-            
+            # تحليل متوازي مع 20 threads للتسريع
             all_scores = {}
             
             # استخدام ThreadPoolExecutor مع 20 threads
