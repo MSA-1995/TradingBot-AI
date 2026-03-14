@@ -298,32 +298,30 @@ def get_dynamic_symbols():
     print(f"\n🔍 DEBUG: Scanner returned {len(dynamic_symbols)} coins")
     print(f"📋 Scanner coins: {', '.join(dynamic_symbols[:10])}...")
     
-    # إضافة الصفقات المفتوحة (مهم!)
-    open_positions = [symbol for symbol, data in SYMBOLS_DATA.items() if data.get('position')]
-    
-    print(f"📂 Open positions: {len(open_positions)} - {', '.join(open_positions) if open_positions else 'None'}")
-    print(f"📊 SYMBOLS_DATA before cleanup: {len(SYMBOLS_DATA)} coins")
-    
-    # دمج القوائم (بدون تكرار)
-    all_symbols = list(set(dynamic_symbols + open_positions))
-    
-    # تحديث SYMBOLS_DATA - حذف العملات القديمة
+    # تنظيف SYMBOLS_DATA أولاً - حذف كل العملات القديمة
     with symbols_data_lock:
-        # حذف العملات اللي مو موجودة بالقائمة الجديدة ومو فيها صفقات مفتوحة
-        symbols_to_remove = [s for s in SYMBOLS_DATA.keys() if s not in all_symbols]
+        # حفظ الصفقات المفتوحة فقط
+        open_positions_data = {symbol: data for symbol, data in SYMBOLS_DATA.items() if data.get('position')}
         
-        if symbols_to_remove:
-            print(f"🗑️ Removing {len(symbols_to_remove)} old coins: {', '.join(symbols_to_remove[:10])}...")
+        # مسح SYMBOLS_DATA بالكامل
+        SYMBOLS_DATA.clear()
         
-        for symbol in symbols_to_remove:
-            del SYMBOLS_DATA[symbol]
+        # إعادة بناء SYMBOLS_DATA من الصفر
+        # 1. إضافة الصفقات المفتوحة
+        for symbol, data in open_positions_data.items():
+            SYMBOLS_DATA[symbol] = data
         
-        # إضافة العملات الجديدة من السكانر
+        # 2. إضافة العملات من السكانر
         for symbol in dynamic_symbols:
             if symbol not in SYMBOLS_DATA:
                 SYMBOLS_DATA[symbol] = {'position': None}
     
-    print(f"✅ SYMBOLS_DATA after cleanup: {len(SYMBOLS_DATA)} coins")
+    # الحصول على القائمة النهائية
+    open_positions = list(open_positions_data.keys())
+    all_symbols = list(set(dynamic_symbols + open_positions))
+    
+    print(f"📂 Open positions: {len(open_positions)} - {', '.join(open_positions) if open_positions else 'None'}")
+    print(f"✅ SYMBOLS_DATA rebuilt: {len(SYMBOLS_DATA)} coins")
     print(f"🎯 Final symbols to analyze: {len(all_symbols)}\n")
     
     return all_symbols
