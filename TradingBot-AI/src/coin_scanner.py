@@ -1,16 +1,12 @@
 """
-🔍 Dynamic Coin Scanner - 3 Levels System
-Level 1: Quick Scanner (every 1 minute) - Hot opportunities
-Level 2: Deep Scanner (every 30 minutes) - Full analysis
-Level 3: Main Loop (every 10 seconds) - Trading
+🔍 Simple Coin Scanner - Top 20 Popular Coins
+Fast and reliable analysis of 20 most popular cryptocurrencies
 """
 
-import threading
 import time
 import gc
 from datetime import datetime
 from colorama import Fore, Style
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class CoinScanner:
     def __init__(self, exchange, ai_brain=None, mtf_analyzer=None, risk_manager=None):
@@ -18,213 +14,68 @@ class CoinScanner:
         self.ai_brain = ai_brain
         self.mtf_analyzer = mtf_analyzer
         self.risk_manager = risk_manager
-        self.top_coins = []  # القائمة الديناميكية
-        self.hot_opportunities = []  # الفرص السريعة
-        self.coins_lock = threading.Lock()
-        self.last_deep_scan = None
-        self.last_quick_scan = None
         
-        # تهيئة صامتة للماسح الضوئي
-    
-    def start(self):
-        """تشغيل الـThreads"""
-        # Thread 1: Quick Scanner
-        quick_thread = threading.Thread(target=self._quick_scanner_loop, daemon=True)
-        quick_thread.start()
+        # قائمة العملات المشهورة (20 عملة)
+        self.popular_coins = [
+            'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT',
+            'MATIC/USDT', 'AVAX/USDT', 'LINK/USDT', 'DOT/USDT', 'UNI/USDT',
+            'ATOM/USDT', 'ALGO/USDT', 'XRP/USDT', 'LTC/USDT', 'BCH/USDT',
+            'ETC/USDT', 'FIL/USDT', 'AAVE/USDT', 'SUSHI/USDT', 'COMP/USDT'
+        ]
         
-        # Thread 2: Deep Scanner
-        deep_thread = threading.Thread(target=self._deep_scanner_loop, daemon=True)
-        deep_thread.start()
+        self.top_coins = []  # النتائج
+        self.last_scan = None
+    
+    def scan_coins(self):
+        """فحص العملات المشهورة (20 عملة)"""
+        start_time = time.time()
         
-        # تشغيل صامت للـThreads
-    
-    def _quick_scanner_loop(self):
-        """Quick Scanner - كل دقيقة"""
-        while True:
-            try:
-                self._quick_scan()
-                time.sleep(60)  # دقيقة واحدة
-            except Exception as e:
-                print(f"⚠️ Quick scanner error: {e}")
-                time.sleep(60)
-    
-    def _deep_scanner_loop(self):
-        """Deep Scanner - كل 30 دقيقة"""
-        # فحص أولي فوري
         try:
-            self._deep_scan()
-        except Exception as e:
-            print(f"⚠️ Initial deep scan error: {e}")
-        
-        while True:
-            try:
-                time.sleep(1800)  # 30 دقيقة
-                self._deep_scan()
-            except Exception as e:
-                print(f"⚠️ Deep scanner error: {e}")
-                time.sleep(1800)
-    
-    def _quick_scan(self):
-        """فحص سريع للفرص الساخنة"""
-        try:
-            # جلب tickers (طلب واحد فقط - خفيف جداً!)
-            tickers = self.exchange.fetch_tickers()
+            print(f"🔍 Scanning 20 popular coins...")
             
-            hot_coins = []
+            all_scores = {}
             
-            for symbol, ticker in tickers.items():
-                # فقط USDT pairs
-                if not symbol.endswith('/USDT'):
-                    continue
-                
-                # تجاهل Stablecoins
-                if any(stable in symbol for stable in ['USDT/', 'USDC/', 'BUSD/', 'DAI/']):
-                    continue
-                
+            # تحليل كل عملة من القائمة المشهورة
+            for i, symbol in enumerate(self.popular_coins, 1):
                 try:
-                    volume_24h = ticker.get('quoteVolume', 0) or 0
-                    price_change = ticker.get('percentage', 0) or 0
-                    last_price = ticker.get('last', 0) or 0
-                    
-                    # شروط الفرصة الساخنة (مخففة لـTestnet):
-                    # 1. Volume عالي (> $500K)
-                    # 2. انخفاض قوي (-2% إلى -8%)
-                    # 3. سعر معقول (> $0.001)
-                    if volume_24h > 500_000:  # كان $5M
-                        if -8 < price_change < -2:
-                            if last_price > 0.001:  # كان $0.01
-                                hot_coins.append({
-                                    'symbol': symbol,
-                                    'volume': volume_24h,
-                                    'change': price_change,
-                                    'price': last_price,
-                                    'score': self._calculate_hot_score(volume_24h, price_change)
-                                })
-                except:
+                    print(f"   Active: {i}/20 - {symbol}", end="\r")
+                    score = self._analyze_coin_quick(symbol)
+                    if score > 0:
+                        all_scores[symbol] = score
+                except Exception as e:
                     continue
             
             # ترتيب حسب Score
-            hot_coins.sort(key=lambda x: x['score'], reverse=True)
-            
-            # حفظ أفضل 5 فرص
-            with self.coins_lock:
-                self.hot_opportunities = hot_coins[:5]
-                self.last_quick_scan = datetime.now()
-            
-            # فحص صامت للفرص الساخنة
-        
-        except Exception as e:
-            print(f"⚠️ Quick scan error: {e}")
-    
-    def _deep_scan(self):
-        """فحص عميق شامل"""
-        # فحص عميق صامت
-        
-        try:
-            # فلترة سريعة
-            tickers = self.exchange.fetch_tickers()
-            
-            filtered_coins = []
-            for symbol, ticker in tickers.items():
-                if not symbol.endswith('/USDT'):
-                    continue
-                
-                if any(stable in symbol for stable in ['USDT/', 'USDC/', 'BUSD/', 'DAI/']):
-                    continue
-                
-                try:
-                    volume_24h = ticker.get('quoteVolume', 0) or 0
-                    last_price = ticker.get('last', 0) or 0
-                    
-                    # فلترة أولية (مخففة لـTestnet)
-                    if volume_24h > 100_000:  # Volume > $100K (كان $1M)
-                        if last_price > 0.001:  # Price > $0.001 (كان $0.01)
-                            filtered_coins.append(symbol)
-                except:
-                    continue
-            
-            # تحليل متوازي مع 20 threads للتسريع
-            all_scores = {}
-            
-            # استخدام ThreadPoolExecutor مع 20 threads
-            with ThreadPoolExecutor(max_workers=20) as executor:
-                # إرسال جميع المهام
-                future_to_symbol = {executor.submit(self._analyze_coin_quick, symbol): symbol 
-                                  for symbol in filtered_coins}
-                
-                # جمع النتائج
-                for future in as_completed(future_to_symbol):
-                    symbol = future_to_symbol[future]
-                    try:
-                        score = future.result()
-                        if score > 0:
-                            all_scores[symbol] = score
-                    except Exception as e:
-                        continue
-            
-            # تنظيف الذاكرة
-            gc.collect()
-            
-            # اختيار أفضل 30 للتحليل الذكي
             sorted_coins = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
-            top_30 = sorted_coins[:30]
             
-            # تحليل ذكي للـ30 الأفضل (صامت)
+            # تحليل ذكي للأفضل (إذا متوفر AI)
             if self.ai_brain or self.mtf_analyzer:
                 ai_scores = {}
-                for idx, (symbol, base_score) in enumerate(top_30, 1):
+                for symbol, base_score in sorted_coins:
                     try:
                         ai_score = self._analyze_coin_with_ai(symbol, base_score)
                         if ai_score > 0:
                             ai_scores[symbol] = ai_score
-                    except Exception as e:
-                        # إذا فشل AI، استخدم الـScore الأساسي
+                    except:
                         ai_scores[symbol] = base_score
-                    
-                    # تنظيف
-                    gc.collect()
                 
                 # ترتيب حسب AI Score
                 sorted_ai = sorted(ai_scores.items(), key=lambda x: x[1], reverse=True)
-                top_20 = sorted_ai[:20]
+                self.top_coins = sorted_ai
             else:
-                # بدون AI، استخدم أفضل 20 من الـ30
-                top_20 = top_30[:20]
+                self.top_coins = sorted_coins
             
-            # تحديث القائمة (أفضل 10 بدل 20) صامت
-            with self.coins_lock:
-                self.top_coins = top_20[:10]  # أخذ أفضل 10 فقط
-                self.last_deep_scan = datetime.now()
-        
+            self.last_scan = datetime.now()
+            
+            elapsed = time.time() - start_time
+            print(f"\n✅ Scan completed in {elapsed:.1f}s - Found {len(self.top_coins)} coins")
+            
+            # تنظيف الذاكرة
+            gc.collect()
+            
         except Exception as e:
-            print(f"❌ Deep scan error: {e}")
-    
-    def _calculate_hot_score(self, volume, price_change):
-        """حساب score للفرص الساخنة"""
-        score = 0
-        
-        # Volume score (0-50)
-        if volume > 50_000_000:
-            score += 50
-        elif volume > 20_000_000:
-            score += 40
-        elif volume > 10_000_000:
-            score += 30
-        elif volume > 5_000_000:
-            score += 20
-        
-        # Price change score (0-50)
-        abs_change = abs(price_change)
-        if abs_change > 5:
-            score += 50
-        elif abs_change > 4:
-            score += 40
-        elif abs_change > 3:
-            score += 30
-        elif abs_change > 2:
-            score += 20
-        
-        return score
+            print(f"❌ Scan error: {e}")
+
     
     def _analyze_coin_quick(self, symbol):
         """تحليل سريع للعملة"""
@@ -416,20 +267,11 @@ class CoinScanner:
     
     def get_top_coins(self):
         """الحصول على القائمة الحالية"""
-        with self.coins_lock:
-            return self.top_coins.copy()
-    
-    def get_hot_opportunities(self):
-        """الحصول على الفرص الساخنة"""
-        with self.coins_lock:
-            return self.hot_opportunities.copy()
+        return self.top_coins.copy()
     
     def get_scan_status(self):
         """حالة الفحص"""
-        with self.coins_lock:
-            return {
-                'last_deep_scan': self.last_deep_scan,
-                'last_quick_scan': self.last_quick_scan,
-                'top_coins_count': len(self.top_coins),
-                'hot_opportunities_count': len(self.hot_opportunities)
-            }
+        return {
+            'last_scan': self.last_scan,
+            'top_coins_count': len(self.top_coins)
+        }
