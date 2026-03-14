@@ -298,6 +298,9 @@ def get_dynamic_symbols():
     print(f"\n🔍 DEBUG: Scanner returned {len(dynamic_symbols)} coins")
     print(f"📋 Scanner coins: {', '.join(dynamic_symbols[:10])}...")
     
+    print(f"🔍 DEBUG: SYMBOLS_DATA before cleanup has {len(SYMBOLS_DATA)} coins:")
+    print(f"   {', '.join(sorted(list(SYMBOLS_DATA.keys())[:20]))}...")
+    
     # تنظيف SYMBOLS_DATA أولاً - حذف كل العملات القديمة
     with symbols_data_lock:
         # حفظ الصفقات المفتوحة فقط
@@ -322,6 +325,7 @@ def get_dynamic_symbols():
     
     print(f"📂 Open positions: {len(open_positions)} - {', '.join(open_positions) if open_positions else 'None'}")
     print(f"✅ SYMBOLS_DATA rebuilt: {len(SYMBOLS_DATA)} coins")
+    print(f"   Rebuilt with: {', '.join(sorted(list(SYMBOLS_DATA.keys())[:20]))}...")
     print(f"🎯 Final symbols to analyze: {len(all_symbols)}\n")
     
     return all_symbols
