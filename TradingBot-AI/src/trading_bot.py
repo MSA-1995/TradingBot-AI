@@ -289,22 +289,45 @@ print("=" * 60)
 
 # ========== LOAD POSITIONS ==========
 # استخدام قائمة ديناميكية بدل SYMBOLS الثابتة
+# Cache for verified symbols (refresh every 10 minutes)
+verified_symbols_cache = {'symbols': [], 'last_update': None}
+CACHE_DURATION_MINUTES = 10
+
 def get_dynamic_symbols():
     """الحصول على القائمة الديناميكية + الصفقات المفتوحة"""
+    global verified_symbols_cache
+    
     # القائمة الديناميكية من Scanner
     top_coins = coin_scanner.get_top_coins()
     dynamic_symbols = [coin for coin, score in top_coins]
     
-    # Filter: Verify coins exist in Testnet before adding
-    verified_symbols = []
+    # Check if we need to refresh the cache
+    now = datetime.now()
+    cache_expired = (
+        verified_symbols_cache['last_update'] is None or 
+        (now - verified_symbols_cache['last_update']).total_seconds() > CACHE_DURATION_MINUTES * 60
+    )
     
-    for symbol in dynamic_symbols:
-        try:
-            # Quick check if symbol exists in Testnet
-            exchange.fetch_ticker(symbol)
-            verified_symbols.append(symbol)
-        except:
-            continue
+    # Filter: Verify coins exist in Testnet (use cache if available)
+    if cache_expired:
+        def verify_symbol(symbol):
+            try:
+                exchange.fetch_ticker(symbol)
+                return symbol
+            except:
+                return None
+        
+        verified_symbols = []
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            results = executor.map(verify_symbol, dynamic_symbols)
+            verified_symbols = [s for s in results if s is not None]
+        
+        # Update cache
+        verified_symbols_cache['symbols'] = verified_symbols
+        verified_symbols_cache['last_update'] = now
+    else:
+        # Use cached verified symbols
+        verified_symbols = verified_symbols_cache['symbols']
     
     # تنظيف SYMBOLS_DATA أولاً - حذف كل العملات القديمة
     with symbols_data_lock:
@@ -339,7 +362,7 @@ for symbol, pos in loaded.items():
     else:
         # إضافة الصفقة المفتوحة للقائمة
         SYMBOLS_DATA[symbol] = {'position': pos}
-        print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f} (not in top 20)")
+        print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f}")
 
 print(f"\n🤖 Bot started!")
 if ai_brain:
