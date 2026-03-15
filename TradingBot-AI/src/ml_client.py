@@ -143,26 +143,12 @@ class MLClient:
                 if isinstance(predictions, str):
                     predictions = json.loads(predictions)
                 
-                # Check if it's the new ensemble format
-                if 'models' in predictions:
-                    models = predictions['models']
-                    return {
-                        'model_type': 'Ensemble (RF + LSTM)',
-                        'accuracy': result.get('model_accuracy', 0),
-                        'rf_accuracy': models.get('random_forest', {}).get('accuracy', 0),
-                        'lstm_accuracy': models.get('lstm', {}).get('accuracy', 0),
-                        'ensemble_accuracy': models.get('ensemble', {}).get('accuracy', 0),
-                        'trained_at': predictions.get('trained_at', 'Unknown'),
-                        'status': predictions.get('status', 'Unknown')
-                    }
-                else:
-                    # Old format (Random Forest only)
-                    return {
-                        'model_type': predictions.get('model_type', 'Unknown'),
-                        'accuracy': result.get('model_accuracy', 0),
-                        'trained_at': predictions.get('trained_at', 'Unknown'),
-                        'status': predictions.get('status', 'Unknown')
-                    }
+                return {
+                    'model_type': predictions.get('model_type', 'Unknown'),
+                    'accuracy': result.get('model_accuracy', 0),
+                    'trained_at': predictions.get('trained_at', 'Unknown'),
+                    'status': predictions.get('status', 'Unknown')
+                }
             return None
         
         except Exception as e:
