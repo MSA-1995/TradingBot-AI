@@ -499,12 +499,12 @@ class AIBrain:
             'wait_hours': int(wait_hours)
         }
     
-    def should_sell(self, symbol, position, current_price, analysis, mtf):
-        """القرار الذكي: هل نبيع؟"""
+    def should_sell(self, symbol, position, current_price, analysis, mtf, exit_strategy=None):
+        """القرار الذكي: هل نبيع؟ (الملك يقرر)"""
         buy_price = position['buy_price']
         profit_percent = ((current_price - buy_price) / buy_price) * 100
         
-        # الأهداف الذكية من وقت الشراء
+        # الأهداف الذكية من وقت الشراء (الحد الأدنى)
         tp_target = position.get('tp_target', 1.0)
         sl_target = position.get('sl_target', 2.0)
         max_wait_hours = position.get('max_wait_hours', 48)
@@ -519,9 +519,55 @@ class AIBrain:
         except Exception as e:
             hours_held = 24  # fallback
         
-        # 1. TP الذكي - الحد الأدنى للبيع بالربح
+        # 1. Stop Loss الذكي (الأولوية للحماية)
+        if profit_percent <= -2.0:
+            # الحد الأقصى للخسارة - بيع إجباري
+            return {
+                'action': 'SELL',
+                'reason': 'STOP LOSS -2%',
+                'profit': profit_percent
+            }
+        
+        elif profit_percent < 0:
+            # خسارة لكن أقل من -2%
+            rsi = analysis.get('rsi', 50) if analysis else 50
+            macd_diff = analysis.get('macd_diff', 0) if analysis else 0
+            trend = mtf.get('trend', 'neutral') if mtf else 'neutral'
+            
+            # السوق نازل قوي - بيع مبكر (حماية)
+            market_falling_hard = (
+                trend in ['bearish', 'strong_bearish'] and
+                macd_diff < -5 and
+                rsi > 60
+            )
+            
+            if market_falling_hard:
+                return {
+                    'action': 'SELL',
+                    'reason': 'EARLY STOP (Market falling hard)',
+                    'profit': profit_percent
+                }
+            
+            # السوق عادي - ننتظر (يمكن يرتد)
+            return {'action': 'HOLD', 'reason': 'Loss but market may recover'}
+        
+        # 2. TP الذكي - الحد الأدنى للبيع بالربح
         if profit_percent >= tp_target:
-            # إذا السوق صاعد - انتظر ربح أكثر
+            # استشارة Smart TP (Exit Strategy) للتحسين
+            if exit_strategy:
+                try:
+                    smart_tp_decision = exit_strategy._check_smart_tp(
+                        symbol, profit_percent, position, analysis, mtf,
+                        exit_strategy._get_coin_exit_history(symbol)
+                    )
+                    
+                    # لو Smart TP قال بيع أو hold، نسمع له
+                    if smart_tp_decision.get('action') in ['SELL', 'HOLD']:
+                        return smart_tp_decision
+                except:
+                    pass  # لو فيه خطأ، نكمل بالمنطق العادي
+            
+            # المنطق العادي (بدون Smart TP)
             rsi = analysis.get('rsi', 50) if analysis else 50
             macd_diff = analysis.get('macd_diff', 0) if analysis else 0
             trend = mtf.get('trend', 'neutral') if mtf else 'neutral'
@@ -533,41 +579,24 @@ class AIBrain:
             )
             
             if market_rising:
-                return {'action': 'HOLD', 'reason': f'TP {tp_target}% reached but market rising - waiting for more'}
+                return {'action': 'HOLD', 'reason': f'TP {tp_target}% reached but market rising'}
             
             # السوق ميت أو نازل - بيع
             return {
                 'action': 'SELL',
-                'reason': f'SMART TP {tp_target}%',
+                'reason': f'AI TP {tp_target}%',
                 'profit': profit_percent
             }
         
-        # 2. Bearish Exit
-        if mtf['trend'] == 'bearish' and mtf['total'] >= 2:
-            return {
-                'action': 'SELL',
-                'reason': 'BEARISH TREND',
-                'profit': profit_percent
-            }
-        
-        # 3. Stop Loss الذكي
-        highest_price = position.get('highest_price', buy_price)
-        trailing_stop = highest_price * (1 - sl_target / 100)
-        
-        if current_price <= trailing_stop:
-            # فحص ذكي قبل البيع
-            rsi = analysis.get('rsi', 50)
-            macd_diff = analysis.get('macd_diff', 0)
-            
-            # لو السوق قوي - لا تبيع
-            if profit_percent > 0 and rsi > 50 and macd_diff > 0:
-                return {'action': 'HOLD', 'reason': 'Market still strong'}
-            
-            return {
-                'action': 'SELL',
-                'reason': f'SMART SL {sl_target}%',
-                'profit': profit_percent
-            }
+        # 3. Bearish Exit
+        if mtf.get('trend') == 'bearish' and mtf.get('total', 0) >= 2:
+            # لو فيه ربح موجب - بيع
+            if profit_percent > 0.1:
+                return {
+                    'action': 'SELL',
+                    'reason': 'BEARISH TREND',
+                    'profit': profit_percent
+                }
         
         # 4. انتهى وقت الانتظار
         if hours_held >= max_wait_hours and profit_percent < 0:
