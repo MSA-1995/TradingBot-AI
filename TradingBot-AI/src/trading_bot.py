@@ -727,7 +727,7 @@ try:
         print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
         
         # Update coin rankings (صامت) - استخدام العملات الديناميكية
-        if coin_ranker and loop_count % 60 == 1:
+        if coin_ranker and loop_count % 120 == 1:
             try:
                 current_symbols = get_dynamic_symbols()
                 rankings = coin_ranker.rank_all_coins(current_symbols)
@@ -762,9 +762,9 @@ try:
         current_symbols = get_dynamic_symbols()
         
         # ========== PARALLEL PROCESSING ==========
-        # Process symbols in parallel (30 threads at a time)
+        # Process symbols in parallel (15 threads at a time)
         results = []
-        with ThreadPoolExecutor(max_workers=30) as executor:
+        with ThreadPoolExecutor(max_workers=15) as executor:
             # Submit all symbols for analysis
             future_to_symbol = {
                 executor.submit(analyze_single_symbol, symbol, exchange, active_count, available, invested): symbol
