@@ -53,8 +53,6 @@ class AIBrain:
         القرار الذكي: هل نشتري؟
         models_scores: dict with scores from all models (optional)
         """
-        يحلل، يتذكر، يقرر (ضمن الحدود)
-        """
         from learning.safety_validator import SafetyValidator
         from learning.pattern_detector import PatternDetector
         
