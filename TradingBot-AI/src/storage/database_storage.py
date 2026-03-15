@@ -23,21 +23,38 @@ class DatabaseStorage:
         # استخراج المعلومات من URL
         parsed = urlparse(database_url)
         
-        self.conn = psycopg2.connect(
-            host=parsed.hostname,
-            port=parsed.port,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=unquote(parsed.password)
-        )
+        self._db_params = {
+            'host': parsed.hostname,
+            'port': parsed.port,
+            'database': parsed.path[1:],
+            'user': parsed.username,
+            'password': unquote(parsed.password)
+        }
+        self.conn = psycopg2.connect(**self._db_params)
         self.json = json_module
         self.RealDictCursor = RealDictCursor
+        self._psycopg2 = psycopg2
         self._create_tables()
+
+    def _get_conn(self):
+        """إرجاع connection صالح - يعيد الاتصال إذا انقطع"""
+        try:
+            if self.conn.closed:
+                raise Exception("closed")
+            # اختبار الاتصال
+            self.conn.cursor().execute("SELECT 1")
+        except Exception:
+            try:
+                self.conn = self._psycopg2.connect(**self._db_params)
+            except Exception as e:
+                print(f"❌ DB reconnect error: {e}")
+        return self.conn
     
     def _create_tables(self):
         """إنشاء الجداول إذا لم تكن موجودة"""
         try:
-            cursor = self.conn.cursor()
+            conn = self._get_conn()
+            cursor = conn.cursor()
             
             # Positions table (نفس البوت القديم)
             cursor.execute("""
@@ -103,25 +120,24 @@ class DatabaseStorage:
                 )
             """)
             
-            self.conn.commit()
+            conn.commit()
             cursor.close()
         except Exception as e:
             print(f"⚠️ Table creation error: {e}")
-            self.conn.rollback()
+            self._get_conn().rollback()
     
     # ========== Trades ==========
     def save_trade(self, trade_data):
         try:
-            # تحويل numpy types إلى Python types
             def convert_value(val):
                 if val is None:
                     return None
-                # تحويل numpy types
                 if hasattr(val, 'item'):
                     return val.item()
                 return val
             
-            cursor = self.conn.cursor()
+            conn = self._get_conn()
+            cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO trades_history (symbol, action, profit_percent, sell_reason, tp_target, sl_target, hours_held, data)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -135,17 +151,18 @@ class DatabaseStorage:
                 convert_value(trade_data.get('hours_held')),
                 self.json.dumps(trade_data, default=str)
             ))
-            self.conn.commit()
+            conn.commit()
             cursor.close()
             return True
         except Exception as e:
             print(f"❌ DB save trade error: {e}")
-            self.conn.rollback()
+            self._get_conn().rollback()
             return False
     
     def load_trades(self, limit=None):
         try:
-            cursor = self.conn.cursor(cursor_factory=self.RealDictCursor)
+            conn = self._get_conn()
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
             if limit:
                 cursor.execute("SELECT * FROM trades_history ORDER BY timestamp DESC LIMIT %s", (limit,))
             else:
@@ -159,7 +176,8 @@ class DatabaseStorage:
     # ========== Patterns ==========
     def save_pattern(self, pattern_data):
         try:
-            cursor = self.conn.cursor()
+            conn = self._get_conn()
+            cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO learned_patterns (pattern_type, data, success_rate)
                 VALUES (%s, %s, %s)
@@ -168,17 +186,18 @@ class DatabaseStorage:
                 self.json.dumps(pattern_data),
                 pattern_data.get('success_rate', 0.0)
             ))
-            self.conn.commit()
+            conn.commit()
             cursor.close()
             return True
         except Exception as e:
             print(f"❌ DB save pattern error: {e}")
-            self.conn.rollback()
+            self._get_conn().rollback()
             return False
     
     def load_patterns(self):
         try:
-            cursor = self.conn.cursor(cursor_factory=self.RealDictCursor)
+            conn = self._get_conn()
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
             cursor.execute("SELECT * FROM learned_patterns ORDER BY last_updated DESC")
             result = cursor.fetchall()
             cursor.close()
@@ -189,7 +208,8 @@ class DatabaseStorage:
     # ========== AI Decisions ==========
     def save_ai_decision(self, decision_data):
         try:
-            cursor = self.conn.cursor()
+            conn = self._get_conn()
+            cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO ai_decisions (symbol, decision, confidence, data)
                 VALUES (%s, %s, %s, %s)
@@ -199,17 +219,18 @@ class DatabaseStorage:
                 decision_data.get('confidence'),
                 self.json.dumps(decision_data)
             ))
-            self.conn.commit()
+            conn.commit()
             cursor.close()
             return True
         except Exception as e:
             print(f"❌ DB save decision error: {e}")
-            self.conn.rollback()
+            self._get_conn().rollback()
             return False
     
     def load_ai_decisions(self, limit=10):
         try:
-            cursor = self.conn.cursor(cursor_factory=self.RealDictCursor)
+            conn = self._get_conn()
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
             cursor.execute("SELECT * FROM ai_decisions ORDER BY timestamp DESC LIMIT %s", (limit,))
             result = cursor.fetchall()
             cursor.close()
@@ -238,37 +259,22 @@ class DatabaseStorage:
     def cleanup_old_data(self):
         """حذف البيانات القديمة تلقائياً"""
         try:
-            cursor = self.conn.cursor()
+            conn = self._get_conn()
+            cursor = conn.cursor()
             
-            # حذف trades_history الأقدم من 30 يوم
-            cursor.execute("""
-                DELETE FROM trades_history 
-                WHERE timestamp < NOW() - INTERVAL '30 days'
-            """)
+            cursor.execute("DELETE FROM trades_history WHERE timestamp < NOW() - INTERVAL '30 days'")
             trades_deleted = cursor.rowcount
             
-            # حذف learned_patterns الأقدم من 30 يوم
-            cursor.execute("""
-                DELETE FROM learned_patterns 
-                WHERE last_updated < NOW() - INTERVAL '30 days'
-            """)
+            cursor.execute("DELETE FROM learned_patterns WHERE last_updated < NOW() - INTERVAL '30 days'")
             patterns_deleted = cursor.rowcount
             
-            # حذف ai_decisions الأقدم من 90 يوم (للتعلم)
-            cursor.execute("""
-                DELETE FROM ai_decisions 
-                WHERE timestamp < NOW() - INTERVAL '90 days'
-            """)
+            cursor.execute("DELETE FROM ai_decisions WHERE timestamp < NOW() - INTERVAL '90 days'")
             decisions_deleted = cursor.rowcount
             
-            # حذف trap_memory الأقدم من 90 يوم
-            cursor.execute("""
-                DELETE FROM trap_memory 
-                WHERE timestamp < NOW() - INTERVAL '90 days'
-            """)
+            cursor.execute("DELETE FROM trap_memory WHERE timestamp < NOW() - INTERVAL '90 days'")
             traps_deleted = cursor.rowcount
             
-            self.conn.commit()
+            conn.commit()
             cursor.close()
             
             total_deleted = trades_deleted + patterns_deleted + decisions_deleted + traps_deleted
@@ -278,13 +284,14 @@ class DatabaseStorage:
             return True
         except Exception as e:
             print(f"⚠️ Cleanup error: {e}")
-            self.conn.rollback()
+            self._get_conn().rollback()
             return False
     
     # ========== Traps ==========
     def save_trap(self, trap_data):
         try:
-            cursor = self.conn.cursor()
+            conn = self._get_conn()
+            cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO trap_memory (symbol, data)
                 VALUES (%s, %s)
@@ -292,17 +299,18 @@ class DatabaseStorage:
                 trap_data.get('symbol'),
                 self.json.dumps(trap_data)
             ))
-            self.conn.commit()
+            conn.commit()
             cursor.close()
             return True
         except Exception as e:
             print(f"❌ DB save trap error: {e}")
-            self.conn.rollback()
+            self._get_conn().rollback()
             return False
     
     def load_traps(self):
         try:
-            cursor = self.conn.cursor(cursor_factory=self.RealDictCursor)
+            conn = self._get_conn()
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
             cursor.execute("SELECT * FROM trap_memory ORDER BY timestamp DESC")
             result = cursor.fetchall()
             cursor.close()
@@ -314,17 +322,15 @@ class DatabaseStorage:
     # ========== Positions ==========
     def save_positions(self, positions):
         try:
-            self.conn.rollback()
-            cursor = self.conn.cursor()
+            conn = self._get_conn()
+            conn.rollback()
+            cursor = conn.cursor()
             
-            # حذف المراكز القديمة
             cursor.execute("DELETE FROM positions")
             
-            # إضافة المراكز الجديدة
             for symbol, config in positions.items():
                 if config.get('position'):
                     pos = config['position']
-                    # حساب invested من buy_price * amount
                     invested = float(pos['buy_price']) * float(pos['amount'])
                     
                     cursor.execute("""
@@ -343,18 +349,19 @@ class DatabaseStorage:
                         self.json.dumps(pos)
                     ))
             
-            self.conn.commit()
+            conn.commit()
             cursor.close()
             return True
         except Exception as e:
             print(f"❌ DB save positions error: {e}")
-            self.conn.rollback()
+            self._get_conn().rollback()
             return False
     
     def load_positions(self):
         try:
-            self.conn.rollback()
-            cursor = self.conn.cursor(cursor_factory=self.RealDictCursor)
+            conn = self._get_conn()
+            conn.rollback()
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
             cursor.execute("SELECT * FROM positions")
             rows = cursor.fetchall()
             cursor.close()
@@ -374,7 +381,7 @@ class DatabaseStorage:
             return data
         except Exception as e:
             print(f"❌ DB load positions error: {e}")
-            self.conn.rollback()
+            self._get_conn().rollback()
             return {}
     
     # ========== Performance ==========
