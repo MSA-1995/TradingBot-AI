@@ -5,6 +5,23 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 
+# تحميل متغيرات البيئة من ملف .env
+try:
+    from dotenv import load_dotenv
+    import pathlib
+    # البحث عن .env في عدة مسارات
+    for env_path in [
+        pathlib.Path('/home/container/TradingBot/.env'),
+        pathlib.Path('/home/container/.env'),
+        pathlib.Path(__file__).parent / '.env',
+        pathlib.Path(__file__).parent.parent / '.env',
+    ]:
+        if env_path.exists():
+            load_dotenv(env_path)
+            break
+except:
+    pass
+
 # المفاتيح المشفرة (آمنة!)
 ENCRYPTED_API_KEY = "gAAAAABpqNT5S7vbJXLley0iN7H-kBtbmUZofnkpdadW0a3ygU6JyPxGCpCDUCzeXq9Vwv85JM4Tf9X-1Oe-oJrTFCpZ0gfthS_T6whxOtj8K60gCnG-hd8GRi0rsunWJEq1D2dZsJc6QEXGwrxhD9NOWeiHHYxY3GthbjH7alHNhu_7VY7BXiU="
 ENCRYPTED_SECRET_KEY = "gAAAAABpqNT51kkfLH9UbjItW_Gp-g93Fs6QT5h4g_rOhIK4n3cs3_K7ZMDBEEw_yrh-JJbbVSJS3-PzH9cZ7ta86_T_Em9N3Yra8QbSiIojOW3yzGBA5lL3mgISOYj6bpbpW6Dt4zLunlpz62lsXGyba_SmsvdFTnf2YzNy2BQfzc__jULwvPM="
