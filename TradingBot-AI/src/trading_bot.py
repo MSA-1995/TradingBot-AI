@@ -105,7 +105,7 @@ class NewsAnalyzer:
         self.database_url = os.getenv("DATABASE_URL")
         self.enabled = bool(self.database_url)
         self.cache = {}
-        self.cache_duration = 30
+        self.cache_duration = 300  # 5 minutes - faster performance
         
         if self.enabled:
             print("📰 News Analyzer: ACTIVE")
@@ -797,9 +797,9 @@ try:
         current_symbols = get_dynamic_symbols()
         
         # ========== PARALLEL PROCESSING ==========
-        # Process symbols in parallel (10 threads at a time)
+        # Process symbols in parallel (15 threads at a time)
         results = []
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=15) as executor:
             # Submit all symbols for analysis
             future_to_symbol = {
                 executor.submit(analyze_single_symbol, symbol, exchange, active_count, available, invested): symbol
