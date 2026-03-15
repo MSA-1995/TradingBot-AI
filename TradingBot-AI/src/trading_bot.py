@@ -105,7 +105,7 @@ class NewsAnalyzer:
         self.database_url = os.getenv("DATABASE_URL")
         self.enabled = bool(self.database_url)
         self.cache = {}
-        self.cache_duration = 300  # 5 minutes - faster performance
+        self.cache_duration = 120  # دقيقتين - تحسين السرعة مع الحفاظ على الدقة
         
         if self.enabled:
             print("📰 News Analyzer: ACTIVE")
@@ -560,7 +560,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                 return None
             
             # Get MTF and calculate confidence
-            mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
+            mtf = analysis.get('mtf') or get_multi_timeframe_analysis(exchange_instance, symbol)
             
             # Advanced MTF Analysis
             mtf_boost = 0
