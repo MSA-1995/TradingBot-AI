@@ -4,17 +4,17 @@ All bot settings and constants
 """
 
 # Trading Parameters
-MIN_CONFIDENCE = 55  # Changed from 60 - more aggressive
-MAX_POSITIONS = 20  # الحد الأقصى للمراكز المفتوحة
-TOTAL_COINS_TO_SCAN = 50  # إجمالي العملات للفحص (يعرض النشطة فقط)
+MIN_CONFIDENCE = 55
+MAX_POSITIONS = 10  # الحد الأقصى للمراكز (أفضل 10 من 50)
+TOTAL_COINS_TO_SCAN = 50
 
 # Capital Management
-MAX_CAPITAL = 300  # الحد الأقصى لرأس المال المستخدم ($200-$300)
-PROFIT_RESERVE = True  # حفظ الأرباح (لا يتداول فيها)
+MAX_CAPITAL = 300
+PROFIT_RESERVE = True
 
 # Trade Amount Limits
-MIN_TRADE_AMOUNT = 12  # Minimum trade size (safe for Binance $10 limit)
-MAX_TRADE_AMOUNT = 30  # Maximum trade size
+MIN_TRADE_AMOUNT = 12
+MAX_TRADE_AMOUNT = 30
 
 # Legacy (kept for compatibility)
 BASE_AMOUNT = 12
@@ -38,22 +38,33 @@ MACD_SIGNAL = 9
 MIN_VOLUME_RATIO = 1.0
 
 # Timing
-LOOP_SLEEP = 1  # seconds - أسرع
-REPORT_INTERVAL = 30  # minutes
+LOOP_SLEEP = 1
+REPORT_INTERVAL = 30
 
-# Supported Coins (Legacy - for fallback only)
-# النظام الجديد يستخدم Dynamic Scanner (995 عملة)
-# هذي القائمة تُستخدم فقط كـfallback إذا Scanner فشل
+# قائمة العملات الثابتة (50 عملة مشهورة)
 SYMBOLS = [
-    'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT',
-    'ADA/USDT', 'AVAX/USDT', 'LINK/USDT',
-    'DOT/USDT', 'UNI/USDT', 'ATOM/USDT', 'LTC/USDT',
-    'XRP/USDT', 'DOGE/USDT', 'SHIB/USDT', 'TRX/USDT',
-    'APT/USDT', 'ARB/USDT', 'OP/USDT', 'FIL/USDT', 'NEAR/USDT'
+    # كبار العملات
+    'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT',
+    'ADA/USDT', 'AVAX/USDT', 'DOGE/USDT', 'TRX/USDT', 'DOT/USDT',
+    # DeFi
+    'LINK/USDT', 'UNI/USDT', 'AAVE/USDT', 'MKR/USDT', 'CRV/USDT',
+    'SUSHI/USDT', 'COMP/USDT', 'SNX/USDT', 'BAL/USDT', '1INCH/USDT',
+    # Layer 2
+    'ARB/USDT', 'OP/USDT', 'MATIC/USDT', 'IMX/USDT', 'LRC/USDT',
+    # Layer 1
+    'ATOM/USDT', 'NEAR/USDT', 'APT/USDT', 'SUI/USDT', 'SEI/USDT',
+    'INJ/USDT', 'TIA/USDT', 'FTM/USDT', 'ALGO/USDT', 'EGLD/USDT',
+    # Meme & Others
+    'SHIB/USDT', 'PEPE/USDT', 'FLOKI/USDT', 'WIF/USDT', 'BONK/USDT',
+    # Exchange & Infra
+    'LTC/USDT', 'BCH/USDT', 'FIL/USDT', 'ICP/USDT', 'RENDER/USDT',
+    # Gaming & NFT
+    'AXS/USDT', 'SAND/USDT', 'MANA/USDT', 'ENJ/USDT', 'GALA/USDT',
 ]
 
-# Initialize symbol data structure
+# عدد العملات النشطة للتداول (الأقوى من القائمة)
+TOP_COINS_TO_TRADE = 10
+
 def init_symbols():
-    """Initialize symbols dictionary (dynamic)"""
-    # البداية بقائمة فارغة - سيتم ملؤها ديناميكياً
-    return {}
+    """Initialize symbols dictionary"""
+    return {symbol: {'position': None} for symbol in SYMBOLS}
