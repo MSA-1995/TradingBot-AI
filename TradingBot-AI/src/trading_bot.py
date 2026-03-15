@@ -645,7 +645,17 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             
             # AI Decision
             if ai_brain:
-                decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop)
+                # Collect all models scores
+                models_scores = {
+                    'mtf': mtf_boost,
+                    'risk': 0,  # Will be calculated below
+                    'anomaly': 0,  # Already checked above
+                    'exit': 0,
+                    'pattern': pattern_adjustment,
+                    'ranking': coin_rank_adjustment
+                }
+                
+                decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop, models_scores)
                 
                 # Apply all adjustments
                 try:
