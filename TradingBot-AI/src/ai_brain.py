@@ -502,11 +502,11 @@ class AIBrain:
     def should_sell(self, symbol, position, current_price, analysis, mtf, exit_strategy=None):
         """القرار الذكي: هل نبيع؟ (الملك يقرر)"""
         buy_price = position['buy_price']
+        highest_price = position.get('highest_price', buy_price)
         profit_percent = ((current_price - buy_price) / buy_price) * 100
         
         # الأهداف الذكية من وقت الشراء (الحد الأدنى)
         tp_target = position.get('tp_target', 1.0)
-        sl_target = position.get('sl_target', 2.0)
         max_wait_hours = position.get('max_wait_hours', 48)
         
         # حساب المدة - حماية من None
@@ -519,17 +519,19 @@ class AIBrain:
         except Exception as e:
             hours_held = 24  # fallback
         
-        # 1. Stop Loss الذكي (الأولوية للحماية)
-        if profit_percent <= -2.0:
-            # الحد الأقصى للخسارة - بيع إجباري
+        # 1. Trailing Stop Loss (من أعلى سعر - الحد الأقصى -2%)
+        drop_from_high = ((highest_price - current_price) / highest_price) * 100
+        
+        if drop_from_high >= 2.0:
+            # نزل 2% من أعلى سعر - بيع
             return {
                 'action': 'SELL',
-                'reason': 'STOP LOSS -2%',
+                'reason': 'TRAILING STOP -2%',
                 'profit': profit_percent
             }
         
-        elif profit_percent < 0:
-            # خسارة لكن أقل من -2%
+        # 2. فحص الخسارة مع تحليل السوق
+        if profit_percent < 0:
             rsi = analysis.get('rsi', 50) if analysis else 50
             macd_diff = analysis.get('macd_diff', 0) if analysis else 0
             trend = mtf.get('trend', 'neutral') if mtf else 'neutral'
@@ -551,7 +553,7 @@ class AIBrain:
             # السوق عادي - ننتظر (يمكن يرتد)
             return {'action': 'HOLD', 'reason': 'Loss but market may recover'}
         
-        # 2. TP الذكي - الحد الأدنى للبيع بالربح
+        # 3. TP الذكي - الحد الأدنى للبيع بالربح
         if profit_percent >= tp_target:
             # استشارة Smart TP (Exit Strategy) للتحسين
             if exit_strategy:
@@ -588,7 +590,7 @@ class AIBrain:
                 'profit': profit_percent
             }
         
-        # 3. Bearish Exit
+        # 4. Bearish Exit
         if mtf.get('trend') == 'bearish' and mtf.get('total', 0) >= 2:
             # لو فيه ربح موجب - بيع
             if profit_percent > 0.1:
@@ -598,7 +600,7 @@ class AIBrain:
                     'profit': profit_percent
                 }
         
-        # 4. انتهى وقت الانتظار
+        # 5. انتهى وقت الانتظار
         if hours_held >= max_wait_hours and profit_percent < 0:
             return {
                 'action': 'SELL',
@@ -606,5 +608,5 @@ class AIBrain:
                 'profit': profit_percent
             }
         
-        # 5. Hold
+        # 6. Hold
         return {'action': 'HOLD', 'reason': 'Waiting for target'}
