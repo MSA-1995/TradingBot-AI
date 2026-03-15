@@ -112,50 +112,8 @@ class ExitStrategyModel:
             return {'action': 'HOLD'}
     
     def _check_smart_trailing(self, symbol, current_price, position, analysis, history):
-        """فحص Trailing Stop الذكي"""
-        try:
-            buy_price = position['buy_price']
-            highest_price = position.get('highest_price', buy_price)
-            
-            # حساب الربح من أعلى سعر
-            drop_from_high = ((highest_price - current_price) / highest_price) * 100
-            
-            # Trailing Stop الافتراضي
-            trailing_percent = position.get('sl_target', 2.0)
-            
-            # تعديل Trailing حسب الربح الحالي
-            profit_percent = ((current_price - buy_price) / buy_price) * 100
-            
-            if profit_percent > 2:
-                # لو الربح عالي، نشدد الـ Trailing
-                trailing_percent = 1.5
-            elif profit_percent > 1:
-                trailing_percent = 1.8
-            
-            # فحص الانخفاض
-            if drop_from_high >= trailing_percent:
-                # فحص إذا فيه ارتداد قوي
-                rsi = analysis.get('rsi', 50)
-                macd_diff = analysis.get('macd_diff', 0)
-                
-                # لو فيه إشارات ارتداد قوية
-                if rsi < 35 and macd_diff > 0 and profit_percent > 0:
-                    return {
-                        'action': 'HOLD',
-                        'reason': 'Trailing triggered but bounce signals detected'
-                    }
-                
-                return {
-                    'action': 'SELL',
-                    'reason': f'SMART TRAILING {trailing_percent}%',
-                    'profit': profit_percent,
-                    'confidence': 90
-                }
-            
-            return {'action': 'HOLD'}
-            
-        except:
-            return {'action': 'HOLD'}
+        """فحص Trailing Stop الذكي - محذوف (مدمج في AI Brain)"""
+        return {'action': 'HOLD'}
     
     def _check_smart_bearish(self, symbol, profit_percent, mtf, analysis, history):
         """فحص Bearish Exit الذكي"""
