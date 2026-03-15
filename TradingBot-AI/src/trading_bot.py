@@ -42,7 +42,7 @@ from capital_manager import CapitalManager  # إدارة رأس المال
 
 # AI Brain
 AI_BOUNDARIES = {
-    'min_confidence': 55,  # Very low for testing only!
+    'min_confidence': 30,  # Very low for testing only!
     'max_confidence': 75,
     'min_volume': 0.8,
     'max_volume': 3.0,
@@ -972,16 +972,80 @@ try:
                     
                     if 'decision' in result:
                         decision = result['decision']
+                        
+                        # Collect all advisor scores
+                        advisor_scores = {
+                            'confidence': result['confidence'],
+                            'rsi': result['analysis']['rsi'],
+                            'volume': result['analysis']['volume'],
+                            'macd_diff': result['analysis']['macd_diff'],
+                            'mtf_score': 0,
+                            'risk_score': 0,
+                            'anomaly_score': 0,
+                            'exit_score': 0,
+                            'pattern_score': 0,
+                            'ranking_score': 0
+                        }
+                        
+                        # Get MTF score
+                        if mtf_analyzer:
+                            try:
+                                mtf_analysis = mtf_analyzer.analyze(symbol)
+                                if mtf_analysis:
+                                    advisor_scores['mtf_score'] = mtf_analysis.get('confidence_boost', 0) or 0
+                            except:
+                                pass
+                        
+                        # Get Risk score
+                        if risk_manager:
+                            try:
+                                risk_assessment = risk_manager.assess_risk(symbol, result['analysis'])
+                                if risk_assessment:
+                                    advisor_scores['risk_score'] = risk_assessment.get('risk_score', 0) or 0
+                            except:
+                                pass
+                        
+                        # Get Anomaly score
+                        if anomaly_detector:
+                            try:
+                                anomaly_result = anomaly_detector.detect_anomalies(symbol, result['analysis'])
+                                if anomaly_result:
+                                    advisor_scores['anomaly_score'] = anomaly_result.get('anomaly_score', 0) or 0
+                            except:
+                                pass
+                        
+                        # Get Exit score
+                        if exit_strategy:
+                            try:
+                                exit_score = exit_strategy.get_entry_score(symbol, result['analysis'])
+                                if exit_score:
+                                    advisor_scores['exit_score'] = exit_score or 0
+                            except:
+                                pass
+                        
+                        # Get Pattern score
+                        if pattern_recognizer:
+                            try:
+                                pattern_analysis = pattern_recognizer.analyze_entry_pattern(symbol, result['analysis'], None, {})
+                                if pattern_analysis:
+                                    advisor_scores['pattern_score'] = pattern_analysis.get('confidence_adjustment', 0) or 0
+                            except:
+                                pass
+                        
+                        # Get Ranking score
+                        if coin_ranker:
+                            try:
+                                should_trade = coin_ranker.should_trade_coin(symbol)
+                                if should_trade:
+                                    advisor_scores['ranking_score'] = should_trade.get('confidence_adjustment', 0) or 0
+                            except:
+                                pass
+                        
                         position_data.update({
                             'tp_target': decision.get('tp_target', 1.0),
                             'sl_target': decision.get('sl_target', 2.0),
                             'max_wait_hours': decision.get('max_wait_hours', 48),
-                            'ai_data': {
-                                'confidence': result['confidence'],
-                                'rsi': result['analysis']['rsi'],
-                                'volume': result['analysis']['volume'],
-                                'macd_diff': result['analysis']['macd_diff']
-                            }
+                            'ai_data': advisor_scores
                         })
                     
                     with symbols_data_lock:
