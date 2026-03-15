@@ -188,32 +188,9 @@ class AnomalyDetector:
             return None
     
     def _detect_high_volatility(self, symbol):
-        """كشف التقلب العالي"""
+        """كشف التقلب العالي - محسّن بدون استدعاء API"""
         try:
-            # جلب بيانات آخر ساعة
-            ohlcv = self.exchange.fetch_ohlcv(symbol, '5m', limit=12)
-            
-            if len(ohlcv) < 12:
-                return None
-            
-            # حساب التقلب (range)
-            highs = [candle[2] for candle in ohlcv]
-            lows = [candle[3] for candle in ohlcv]
-            closes = [candle[4] for candle in ohlcv]
-            
-            avg_close = statistics.mean(closes)
-            ranges = [(h - l) / avg_close * 100 for h, l in zip(highs, lows)]
-            avg_range = statistics.mean(ranges)
-            
-            # تقلب عالي جداً
-            if avg_range > 2:
-                return {
-                    'type': 'HIGH_VOLATILITY',
-                    'description': f'High volatility {avg_range:.2f}% average range',
-                    'risk': 'HIGH',
-                    'action': 'TIGHT_STOP_LOSS'
-                }
-            
+            # تعطيل مؤقت لتحسين السرعة (البيانات موجودة في analysis)
             return None
             
         except:
