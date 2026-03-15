@@ -86,11 +86,17 @@ class ExitStrategyModel:
                 macd_diff = analysis.get('macd_diff', 0)
                 trend = mtf.get('trend', 'neutral')
                 
-                # لو السوق قوي جداً، ننتظر شوي
-                if rsi < 65 and macd_diff > 5 and trend == 'bullish' and profit_percent < tp_target + 0.5:
+                # لو السوق قوي، ننتظر (شروط أوسع)
+                market_strong = (
+                    (rsi < 70 and macd_diff > 0) or  # RSI معقول و MACD إيجابي
+                    (trend in ['bullish', 'strong_bullish']) or  # الاتجاه صاعد
+                    (profit_percent < tp_target + 0.3)  # قريب من الحد الأدنى
+                )
+                
+                if market_strong:
                     return {
                         'action': 'HOLD',
-                        'reason': f'TP reached but market still strong'
+                        'reason': f'TP {tp_target}% reached but market strong'
                     }
                 
                 return {
