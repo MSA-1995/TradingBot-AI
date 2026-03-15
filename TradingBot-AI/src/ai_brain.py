@@ -48,9 +48,11 @@ class AIBrain:
             self.learned_patterns = []
             self.trap_memory = []
     
-    def should_buy(self, symbol, analysis, mtf, price_drop):
+    def should_buy(self, symbol, analysis, mtf, price_drop, models_scores=None):
         """
         القرار الذكي: هل نشتري؟
+        models_scores: dict with scores from all models (optional)
+        """
         يحلل، يتذكر، يقرر (ضمن الحدود)
         """
         from learning.safety_validator import SafetyValidator
@@ -122,7 +124,20 @@ class AIBrain:
                 'sl_target': smart_targets['sl'],
                 'max_wait_hours': smart_targets['wait_hours'],
                 'reason': f'AI optimized from {base_confidence} to {optimized_confidence}',
-                'success_probability': self._estimate_success_probability(similar_success)
+                'success_probability': self._estimate_success_probability(similar_success),
+                'ai_data': {
+                    'rsi': analysis.get('rsi', 50),
+                    'macd': analysis.get('macd_diff', 0),
+                    'volume_ratio': analysis.get('volume_ratio', 1),
+                    'price_momentum': analysis.get('price_momentum', 0),
+                    'confidence': optimized_confidence,
+                    'mtf_score': models_scores.get('mtf', 0) if models_scores else 0,
+                    'risk_score': models_scores.get('risk', 0) if models_scores else 0,
+                    'anomaly_score': models_scores.get('anomaly', 0) if models_scores else 0,
+                    'exit_score': models_scores.get('exit', 0) if models_scores else 0,
+                    'pattern_score': models_scores.get('pattern', 0) if models_scores else 0,
+                    'ranking_score': models_scores.get('ranking', 0) if models_scores else 0
+                }
             }
             
             self.storage.save_ai_decision({
