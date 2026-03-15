@@ -55,7 +55,8 @@ AI_BOUNDARIES = {
 try:
     from ai_brain import AIBrain
     AI_ENABLED = True
-except:
+except Exception as e:
+    print(f"⚠️ AI Brain not loaded: {e}")
     AI_ENABLED = False
 
 # Advanced Models
