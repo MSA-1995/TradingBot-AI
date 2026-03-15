@@ -78,6 +78,26 @@ except Exception as e:
     print(f"⚠️ Advanced models not loaded: {e}")
     MODELS_ENABLED = False
 
+# ML Predictor
+try:
+    from ml_predictor.ml_client import MLClient
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        ml_client = MLClient(database_url)
+        ML_ENABLED = ml_client.is_model_available()
+        if ML_ENABLED:
+            print("🤖 ML Predictor: ACTIVE")
+        else:
+            print("⚠️ ML Predictor: Model not trained yet")
+            ml_client = None
+    else:
+        ml_client = None
+        ML_ENABLED = False
+except Exception as e:
+    print(f"⚠️ ML Predictor not loaded: {e}")
+    ml_client = None
+    ML_ENABLED = False
+
 # News Analyzer - Inline to avoid import issues
 class NewsAnalyzer:
     def __init__(self):
@@ -634,7 +654,22 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     pattern_adjustment = 0 if pattern_adjustment is None else pattern_adjustment
                     news_adjustment = 0 if news_adjustment is None else news_adjustment
                     
-                    total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment + news_adjustment
+                    # ML Predictor adjustment
+                    ml_adjustment = 0
+                    if ml_client and ML_ENABLED:
+                        try:
+                            ml_adj = ml_client.get_confidence_adjustment(
+                                analysis.get('rsi', 50),
+                                analysis.get('macd_diff', 0),
+                                analysis.get('volume_ratio', 1),
+                                analysis.get('price_momentum', 0),
+                                decision['confidence']
+                            )
+                            ml_adjustment = ml_adj if ml_adj is not None else 0
+                        except:
+                            ml_adjustment = 0
+                    
+                    total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment + news_adjustment + ml_adjustment
                     if total_adjustment != 0:
                         decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
                 except Exception as e:
