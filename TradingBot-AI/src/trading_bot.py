@@ -421,6 +421,9 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             sell_decision = None
             sell_reason = None
             
+            # Get MTF from analysis (cache) - تحسين السرعة
+            mtf = analysis.get('mtf') if analysis else None
+            
             # AI Brain (الملك) - المسؤول الوحيد عن البيع
             if ai_brain:
                 if mtf is None:
@@ -741,9 +744,9 @@ try:
         current_symbols = get_dynamic_symbols()
         
         # ========== PARALLEL PROCESSING ==========
-        # Process symbols in parallel (10 threads at a time - تحسين السرعة)
+        # Process symbols in parallel (20 threads - تحسين السرعة لـ 20 ثانية)
         results = []
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=20) as executor:
             # Submit all symbols for analysis
             future_to_symbol = {
                 executor.submit(analyze_single_symbol, symbol, exchange, active_count, available, invested): symbol
