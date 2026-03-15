@@ -10,13 +10,12 @@ from datetime import datetime
 class MultiTimeframeAnalyzer:
     def __init__(self, exchange):
         self.exchange = exchange
+        # تحسين السرعة: تقليل الأطر الزمنية من 4 إلى 2 (5m, 15m فقط)
         self.timeframes = {
-            '1m': {'weight': 0.15, 'limit': 50},
-            '5m': {'weight': 0.25, 'limit': 50},
-            '15m': {'weight': 0.30, 'limit': 50},
-            '1h': {'weight': 0.30, 'limit': 50}
+            '5m': {'weight': 0.40, 'limit': 50},
+            '15m': {'weight': 0.60, 'limit': 50}
         }
-        print("📊 Multi-Timeframe Analyzer initialized")
+        print("📊 Multi-Timeframe Analyzer initialized (Optimized: 2 timeframes)")
     
     def analyze(self, symbol):
         """تحليل شامل لجميع الأطر الزمنية"""
@@ -170,13 +169,14 @@ class MultiTimeframeAnalyzer:
         bullish = sum(1 for r in results.values() if r['trend'] == 'bullish')
         bearish = sum(1 for r in results.values() if r['trend'] == 'bearish')
         
-        if bullish >= 3:
+        # تحسين: 2 أطر زمنية فقط
+        if bullish >= 2:
             return 'strong_bullish'
-        elif bullish >= 2:
+        elif bullish >= 1:
             return 'bullish'
-        elif bearish >= 3:
-            return 'strong_bearish'
         elif bearish >= 2:
+            return 'strong_bearish'
+        elif bearish >= 1:
             return 'bearish'
         else:
             return 'neutral'
