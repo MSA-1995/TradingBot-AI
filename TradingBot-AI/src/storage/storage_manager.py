@@ -9,6 +9,11 @@ class StorageManager:
     def __init__(self):
         self.mode = self.detect_environment()
         
+        # كاش للصفقات (تحسين السرعة)
+        self.trades_cache = None
+        self.trades_cache_time = None
+        self.cache_duration = 60  # ثانية
+        
         if self.mode == 'cloud':
             from .database_storage import DatabaseStorage
             self.storage = DatabaseStorage()
@@ -81,9 +86,20 @@ class StorageManager:
     
     # ========== Advanced Queries ==========
     def get_all_trades(self):
-        """جلب جميع الصفقات (للتحليل)"""
+        """جلب جميع الصفقات (للتحليل) - مع كاش"""
         try:
-            return self.storage.load_trades(limit=1000)
+            # استخدام الكاش إذا كان حديث
+            now = datetime.now()
+            if self.trades_cache and self.trades_cache_time:
+                elapsed = (now - self.trades_cache_time).total_seconds()
+                if elapsed < self.cache_duration:
+                    return self.trades_cache
+            
+            # تحديث الكاش
+            trades = self.storage.load_trades(limit=1000)
+            self.trades_cache = trades
+            self.trades_cache_time = now
+            return trades
         except:
             return []
     
