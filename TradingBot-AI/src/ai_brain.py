@@ -457,18 +457,18 @@ class AIBrain:
         wait_hours = 48
         
         # تعديل حسب Confidence
-        if confidence >= 70:
-            tp = 1.5  # هدف أعلى
-            sl = 2.5  # صبر أكثر
-            wait_hours = 72  # انتظار أطول
-        elif confidence >= 65:
+        if confidence >= 80:
+            tp = 3.0
+            sl = 2.5
+            wait_hours = 72
+        elif confidence >= 70:
             tp = 2.0
             sl = 2.0
             wait_hours = 60
-        else:  # 60-64
-            tp = 1.0  # هدف سريع
-            sl = 1.5  # حماية سريعة
-            wait_hours = 36  # انتظار أقل
+        else:  # 60-69
+            tp = 1.0
+            sl = 1.5
+            wait_hours = 36
         
         # تعديل حسب RSI (Oversold)
         rsi = analysis.get('rsi', 50)
@@ -519,8 +519,23 @@ class AIBrain:
         except Exception as e:
             hours_held = 24  # fallback
         
-        # 1. TP الذكي
+        # 1. TP الذكي - الحد الأدنى للبيع بالربح
         if profit_percent >= tp_target:
+            # إذا السوق صاعد - انتظر ربح أكثر
+            rsi = analysis.get('rsi', 50) if analysis else 50
+            macd_diff = analysis.get('macd_diff', 0) if analysis else 0
+            trend = mtf.get('trend', 'neutral') if mtf else 'neutral'
+            
+            market_rising = (
+                trend == 'bullish' and
+                macd_diff > 0 and
+                rsi < 70  # مو overbought
+            )
+            
+            if market_rising:
+                return {'action': 'HOLD', 'reason': f'TP {tp_target}% reached but market rising - waiting for more'}
+            
+            # السوق ميت أو نازل - بيع
             return {
                 'action': 'SELL',
                 'reason': f'SMART TP {tp_target}%',
