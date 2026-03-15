@@ -1026,7 +1026,12 @@ try:
                         # Get Pattern score
                         if pattern_recognizer:
                             try:
-                                pattern_analysis = pattern_recognizer.analyze_entry_pattern(symbol, result['analysis'], None, {})
+                                # استخدام قيم افتراضية آمنة بدلاً من None
+                                safe_mtf = {'trend': 'neutral', 'total': 0}
+                                safe_price_drop = {'drop_percent': 0, 'confirmed': False}
+                                pattern_analysis = pattern_recognizer.analyze_entry_pattern(
+                                    symbol, result['analysis'], safe_mtf, safe_price_drop
+                                )
                                 if pattern_analysis:
                                     advisor_scores['pattern_score'] = pattern_analysis.get('confidence_adjustment', 0) or 0
                             except:
