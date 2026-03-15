@@ -122,7 +122,7 @@ class NewsAnalyzer:
         self.database_url = os.getenv("DATABASE_URL")
         self.enabled = bool(self.database_url)
         self.cache = {}
-        self.cache_duration = 120  # دقيقتين - تحسين السرعة مع الحفاظ على الدقة
+        self.cache_duration = 300  # 5 دقائق - تحسين السرعة
         
         if self.enabled:
             print("📰 News Analyzer: ACTIVE")
@@ -706,15 +706,15 @@ try:
         print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
         
         # Update coin rankings (صامت) - استخدام العملات الديناميكية
-        if coin_ranker and loop_count % 120 == 1:
+        if coin_ranker and loop_count % 300 == 1:  # تحسين السرعة: من 120 إلى 300 (كل 5 دقائق)
             try:
                 current_symbols = get_dynamic_symbols()
                 rankings = coin_ranker.rank_all_coins(current_symbols)
             except Exception as e:
                 pass
         
-        # Balance (cached - update every 10 seconds)
-        if loop_count == 1 or loop_count % 10 == 0:
+        # Balance (cached - update every 30 seconds - تحسين السرعة)
+        if loop_count == 1 or loop_count % 30 == 0:
             try:
                 balance = exchange.fetch_balance()
                 available = balance['USDT']['free']
@@ -741,9 +741,9 @@ try:
         current_symbols = get_dynamic_symbols()
         
         # ========== PARALLEL PROCESSING ==========
-        # Process symbols in parallel (15 threads at a time)
+        # Process symbols in parallel (10 threads at a time - تحسين السرعة)
         results = []
-        with ThreadPoolExecutor(max_workers=15) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             # Submit all symbols for analysis
             future_to_symbol = {
                 executor.submit(analyze_single_symbol, symbol, exchange, active_count, available, invested): symbol
