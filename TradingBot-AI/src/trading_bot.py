@@ -80,7 +80,7 @@ except Exception as e:
 
 # ML Predictor
 try:
-    from ml_predictor.ml_client import MLClient
+    from ml_client import MLClient
     database_url = os.getenv("DATABASE_URL")
     if database_url:
         ml_client = MLClient(database_url)
