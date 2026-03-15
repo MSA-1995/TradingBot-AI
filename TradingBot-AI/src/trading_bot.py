@@ -122,7 +122,7 @@ class NewsAnalyzer:
         self.database_url = os.getenv("DATABASE_URL")
         self.enabled = bool(self.database_url)
         self.cache = {}
-        self.cache_duration = 300  # 5 دقائق - تحسين السرعة
+        self.cache_duration = 600  # 10 دقائق - تحسين السرعة
         
         if self.enabled:
             print("📰 News Analyzer: ACTIVE")
@@ -709,15 +709,15 @@ try:
         print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
         
         # Update coin rankings (صامت) - استخدام العملات الديناميكية
-        if coin_ranker and loop_count % 300 == 1:  # تحسين السرعة: من 120 إلى 300 (كل 5 دقائق)
+        if coin_ranker and loop_count % 600 == 1:  # تحسين السرعة: من 300 إلى 600 (كل 10 دقائق)
             try:
                 current_symbols = get_dynamic_symbols()
                 rankings = coin_ranker.rank_all_coins(current_symbols)
             except Exception as e:
                 pass
         
-        # Balance (cached - update every 30 seconds - تحسين السرعة)
-        if loop_count == 1 or loop_count % 30 == 0:
+        # Balance (cached - update every 60 seconds - تحسين السرعة)
+        if loop_count == 1 or loop_count % 60 == 0:
             try:
                 balance = exchange.fetch_balance()
                 available = balance['USDT']['free']
