@@ -16,7 +16,7 @@ class MLClient:
         self.conn = self._connect_db()
         self.cache = None
         self.cache_time = None
-        self.cache_duration = 300  # 5 minutes
+        self.cache_duration = 120  # دقيقتين - تحسين السرعة
     
     def _connect_db(self):
         """Connect to PostgreSQL"""
