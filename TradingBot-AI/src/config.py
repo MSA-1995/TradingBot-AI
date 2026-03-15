@@ -38,7 +38,7 @@ MACD_SIGNAL = 9
 MIN_VOLUME_RATIO = 1.0
 
 # Timing
-LOOP_SLEEP = 5  # تحسين السرعة: من 1 إلى 5 ثواني
+LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
 REPORT_INTERVAL = 30
 
 # قائمة العملات الثابتة (50 عملة مشهورة)
