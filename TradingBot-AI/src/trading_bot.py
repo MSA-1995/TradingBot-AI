@@ -744,9 +744,9 @@ try:
         current_symbols = get_dynamic_symbols()
         
         # ========== PARALLEL PROCESSING ==========
-        # Process symbols in parallel (20 threads - تحسين السرعة لـ 20 ثانية)
+        # Process symbols in parallel (25 threads - تحسين السرعة)
         results = []
-        with ThreadPoolExecutor(max_workers=20) as executor:
+        with ThreadPoolExecutor(max_workers=25) as executor:
             # Submit all symbols for analysis
             future_to_symbol = {
                 executor.submit(analyze_single_symbol, symbol, exchange, active_count, available, invested): symbol
