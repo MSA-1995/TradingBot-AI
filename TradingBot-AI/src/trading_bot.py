@@ -3,6 +3,24 @@
 Lightweight main loop that imports from organized modules
 """
 
+# ========== LOAD ENV FILE ==========
+import os
+for _env_file in [
+    '/home/container/TradingBot-AI/.env',
+    '/home/container/TradingBot/.env',
+    '/home/container/.env',
+]:
+    try:
+        with open(_env_file) as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith('#') and '=' in _line:
+                    _k, _v = _line.split('=', 1)
+                    os.environ.setdefault(_k.strip(), _v.strip())
+        break
+    except:
+        pass
+
 # ========== AUTO-INSTALL ==========
 def install_dependencies():
     import sys
@@ -37,7 +55,6 @@ from trading import execute_buy, execute_sell, calculate_sell_value, should_sell
 from notifications import send_buy_notification, send_sell_notification, send_positions_report, send_startup_notification
 from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent, format_price
 from storage import StorageManager
-from coin_scanner import CoinScanner  # نظام الفحص الديناميكي
 from capital_manager import CapitalManager  # إدارة رأس المال
 
 # AI Brain
@@ -283,10 +300,6 @@ else:
     exit_strategy = None
     pattern_recognizer = None
 
-# Dynamic Coin Scanner (20 عملة مشهورة ثابتة)
-coin_scanner = CoinScanner(exchange, ai_brain, mtf_analyzer, risk_manager)
-# لا نحتاج start() - النظام الجديد بسيط
-
 # ========== BANNER ==========
 print("=" * 60)
 print("\n  ███╗   ███╗███████╗ █████╗ ")
@@ -303,70 +316,25 @@ print("        🧠 Multi-Timeframe + Risk Manager")
 print("        🏆 Coin Ranking + Anomaly Detection")
 print("        🎯 Exit Strategy + Pattern Recognition")
 print("        📰 News Sentiment Analysis")
-print("        🔍 Dynamic Coin Scanner (Top 20)")
-print("        ✅ Version 9.0 - Dynamic 20 Coins 🚀")
+print("        🔍 Top 10 from 50 Fixed Coins")
+print("        ✅ Version 9.0 - Smart 50 Coins 🚀")
 print("  ✦•······················•✦•······················•✦\n")
 print("=" * 60)
 
 # ========== LOAD POSITIONS ==========
-# استخدام قائمة ديناميكية بدل SYMBOLS الثابتة
-# Cache for filtered symbols - only refresh when scanner updates
-last_scanner_coins = []
-filtered_symbols_cache = []
 
 def get_dynamic_symbols():
-    """الحصول على القائمة الديناميكية + الصفقات المفتوحة"""
-    global last_scanner_coins, filtered_symbols_cache
-    
-    # القائمة الديناميكية من Scanner
-    top_coins = coin_scanner.get_top_coins()
-    dynamic_symbols = [coin for coin, score in top_coins]
-    
-    # Check if scanner updated the list
-    scanner_changed = (dynamic_symbols != last_scanner_coins)
-    
-    # Filter only if scanner changed or cache is empty (first run)
-    if scanner_changed or not filtered_symbols_cache:
-        if scanner_changed:
-            print("🔄 Scanner updated coins - Running filter...")
-        
-        verified_symbols = []
-        for symbol in dynamic_symbols:
-            try:
-                exchange.fetch_ticker(symbol)
-                verified_symbols.append(symbol)
-            except:
-                pass
-        
-        # Update cache
-        last_scanner_coins = dynamic_symbols.copy()
-        filtered_symbols_cache = verified_symbols.copy()
-    else:
-        # Use cached filtered symbols
-        verified_symbols = filtered_symbols_cache
-    
-    # تنظيف SYMBOLS_DATA أولاً - حذف كل العملات القديمة
+    """الحصول على قائمة العملات + الصفقات المفتوحة"""
+    # الصفقات المفتوحة دائماً تُضاف
     with symbols_data_lock:
-        # حفظ الصفقات المفتوحة فقط
-        open_positions_data = {symbol: data for symbol, data in SYMBOLS_DATA.items() if data.get('position')}
-        
-        # مسح SYMBOLS_DATA بالكامل
-        SYMBOLS_DATA.clear()
-        
-        # إعادة بناء SYMBOLS_DATA من الصفر
-        # 1. إضافة الصفقات المفتوحة
-        for symbol, data in open_positions_data.items():
-            SYMBOLS_DATA[symbol] = data
-        
-        # 2. إضافة العملات المفحوصة من السكانر
-        for symbol in verified_symbols:
+        open_positions = [s for s, d in SYMBOLS_DATA.items() if d.get('position')]
+        # تحديث SYMBOLS_DATA بالعملات الثابتة
+        for symbol in SYMBOLS:
             if symbol not in SYMBOLS_DATA:
                 SYMBOLS_DATA[symbol] = {'position': None}
-    
-    # الحصول على القائمة النهائية
-    open_positions = list(open_positions_data.keys())
-    all_symbols = list(set(verified_symbols + open_positions))
-    
+
+    # دمج العملات الثابتة + الصفقات المفتوحة
+    all_symbols = list(set(SYMBOLS + open_positions))
     return all_symbols
 
 SYMBOLS_DATA = init_symbols()
@@ -790,9 +758,6 @@ try:
             print(f"  ✅ Tradable: ${tradable_balance:.2f} | Max Capital: ${MAX_CAPITAL}")
         print(f"{'█' * 60}{Style.RESET_ALL}\n")
         
-        # عرض العملات (صامت)
-        top_coins = coin_scanner.get_top_coins()
-        
         # الحصول على القائمة الديناميكية
         current_symbols = get_dynamic_symbols()
         
@@ -817,6 +782,22 @@ try:
                     print(f"⚠️ {symbol}: Thread error - {e}")
         
         # ========== PROCESS RESULTS ==========
+        # اختيار أفضل 10 عملات للتداول (الأعلى confidence)
+        display_results = [r for r in results if r and r.get('action') == 'DISPLAY']
+        buy_results = [r for r in results if r and r.get('action') == 'BUY']
+        position_results = [r for r in results if r and r.get('action') in ['HOLD', 'SELL', 'SELL_WAIT']]
+
+        # ترتيب عملات الشراء حسب الـ confidence
+        buy_results.sort(key=lambda x: x.get('confidence', 0), reverse=True)
+        display_results.sort(key=lambda x: x.get('confidence', 0), reverse=True)
+
+        # الأفضل 10 فقط للتداول (مع الصفقات المفتوحة دائماً)
+        top_buy = buy_results[:TOP_COINS_TO_TRADE]
+        top_display = display_results[:TOP_COINS_TO_TRADE]
+
+        # دمج النتائج
+        results = position_results + top_buy + top_display
+
         # Filter: Show only active coins and open positions
         active_results = []
         for result in results:
