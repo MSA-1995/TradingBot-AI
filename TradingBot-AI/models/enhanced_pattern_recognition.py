@@ -80,6 +80,10 @@ class EnhancedPatternRecognition:
         
         features = {}
         
+        # التأكد من وجود البيانات
+        if not analysis or not isinstance(analysis, dict):
+            analysis = {}
+        
         # RSI features
         rsi = analysis.get('rsi', 50)
         if not pd.isna(rsi):
@@ -105,12 +109,20 @@ class EnhancedPatternRecognition:
             features['momentum_direction'] = 'up' if momentum > 0 else 'down'
         
         # Trend features
-        features['trend'] = mtf.get('trend', 'neutral')
-        features['trend_strength'] = mtf.get('total', 0)
+        if mtf and isinstance(mtf, dict):
+            features['trend'] = mtf.get('trend', 'neutral')
+            features['trend_strength'] = mtf.get('total', 0)
+        else:
+            features['trend'] = 'neutral'
+            features['trend_strength'] = 0
         
         # Price drop features
-        features['price_drop'] = price_drop.get('drop_percent', 0)
-        features['drop_confirmed'] = price_drop.get('confirmed', False)
+        if price_drop and isinstance(price_drop, dict):
+            features['price_drop'] = price_drop.get('drop_percent', 0)
+            features['drop_confirmed'] = price_drop.get('confirmed', False)
+        else:
+            features['price_drop'] = 0
+            features['drop_confirmed'] = False
         
         return features
     
