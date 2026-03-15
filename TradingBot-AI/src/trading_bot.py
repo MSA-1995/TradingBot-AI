@@ -419,28 +419,18 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             
             # Check sell conditions
             sell_decision = None
+            sell_reason = None
             
-            # Exit Strategy Model (أولوية)
-            mtf = None
-            if exit_strategy:
-                try:
-                    mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
-                    exit_decision = exit_strategy.should_exit(
-                        symbol, position, current_price, analysis, mtf
-                    )
-                    if exit_decision and exit_decision.get('action') == 'SELL':
-                        sell_decision = exit_decision
-                        sell_reason = exit_decision.get('reason', 'Exit Strategy')
-                        profit_percent = exit_decision.get('profit', profit_percent)
-                except Exception as e:
-                    pass
-            
-            # AI Smart Sell (إذا Exit Strategy ما قرر)
-            if not sell_decision and ai_brain:
+            # AI Brain (الملك) - المسؤول الوحيد عن البيع
+            if ai_brain:
                 if mtf is None:
                     mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
                 
-                sell_decision = ai_brain.should_sell(symbol, position, current_price, analysis, mtf)
+                # الملك يقرر (مع استشارة Smart TP)
+                sell_decision = ai_brain.should_sell(
+                    symbol, position, current_price, analysis, mtf, 
+                    exit_strategy=exit_strategy  # Smart TP كمستشار
+                )
                 
                 if sell_decision and sell_decision.get('action') == 'SELL':
                     sell_reason = sell_decision.get('reason', 'AI Sell')
@@ -456,27 +446,16 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'reason': sell_decision.get('reason', 'Hold')
                     }
             else:
-                # Manual sell logic
-                sell_reason = None
+                # Fallback: لو AI Brain مو موجود (نادر)
+                if mtf is None:
+                    mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
                 
-                # 1. Fast TP
-                should_sell, profit = should_sell_fast_tp(current_price, buy_price, position.get('partial_sold', False), TAKE_PROFIT_PERCENT)
-                if should_sell:
-                    sell_reason = f"FAST TP"
-                
-                # 2. Bearish trend
-                if not sell_reason:
-                    if mtf is None:
-                        mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
-                    should_sell, profit = should_sell_bearish(mtf, current_price, buy_price)
-                    if should_sell:
-                        sell_reason = "BEARISH TREND"
-                
-                # 3. Stop loss
-                if not sell_reason:
-                    should_sell, profit, reason = should_sell_stop_loss(current_price, highest_price, buy_price, STOP_LOSS_PERCENT)
-                    if should_sell:
-                        sell_reason = reason
+                # Stop Loss إجباري
+                if profit_percent <= -2.0:
+                    sell_reason = "STOP LOSS -2%"
+                # Bearish Exit
+                elif mtf.get('trend') == 'bearish' and profit_percent > 0:
+                    sell_reason = "BEARISH TREND"
                 
                 if not sell_reason:
                     return {
