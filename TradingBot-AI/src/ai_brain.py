@@ -99,21 +99,42 @@ class AIBrain:
             similar_success
         )
         
-        # 4.5. Deep Learning Boost (إذا متوفر)
+        # 4.5. Deep Learning Boost (المستشارين + الملك)
         if self.dl_client:
             try:
-                dl_boost = self.dl_client.get_dl_boost({
+                # استشارة المستشارين + الملك
+                dl_decision = self.dl_client.get_buy_decision(symbol, {
                     'rsi': analysis.get('rsi', 50),
-                    'macd': analysis.get('macd_diff', 0),
+                    'macd_diff': analysis.get('macd_diff', 0),
                     'volume_ratio': analysis.get('volume_ratio', 1),
                     'price_momentum': analysis.get('price_momentum', 0),
                     'confidence': optimized_confidence
                 })
-                if dl_boost > 0:
+                
+                if dl_decision['action'] == 'SKIP':
+                    # الملك أو المستشارين رفضوا
+                    decision = {
+                        'action': 'SKIP',
+                        'reason': dl_decision['reason'],
+                        'confidence': optimized_confidence
+                    }
+                    self.storage.save_ai_decision({
+                        'symbol': symbol,
+                        'decision': 'SKIP',
+                        'reason': dl_decision['reason'],
+                        'confidence': optimized_confidence
+                    })
+                    return decision
+                
+                # الملك وافق - نضيف التعديل
+                dl_boost = dl_decision.get('confidence_adjustment', 0)
+                brain_boost = dl_decision.get('brain_boost', 0)
+                
+                if dl_boost > 0 or brain_boost > 0:
                     optimized_confidence += dl_boost
-                    print(f"🧠 DL Boost: +{dl_boost} → {optimized_confidence}")
+                    print(f"👑 AI Brain + Consultants Boost: +{dl_boost} (Brain: +{brain_boost}) → {optimized_confidence}")
             except Exception as e:
-                print(f"⚠️ DL boost error: {e}")
+                print(f"⚠️ DL decision error: {e}")
         
         # 5. التحقق من الحدود الآمنة
         validator = SafetyValidator(self.boundaries)
