@@ -122,6 +122,21 @@ class DatabaseStorage:
                 )
             """)
             
+            # Consultant votes table (نتائج التصويت)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS consultant_votes (
+                    id SERIAL PRIMARY KEY,
+                    symbol VARCHAR(20),
+                    consultant_name VARCHAR(50),
+                    vote_type VARCHAR(20),
+                    vote_value FLOAT,
+                    actual_result FLOAT,
+                    is_correct BOOLEAN,
+                    profit_percent FLOAT,
+                    timestamp TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            
             conn.commit()
             cursor.close()
         except Exception as e:
@@ -267,6 +282,56 @@ class DatabaseStorage:
             return result.data
         except:
             return []
+    
+    # ========== Consultant Votes ==========
+    def save_consultant_vote(self, vote_data):
+        """حفظ نتيجة تصويت مستشار"""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO consultant_votes 
+                (symbol, consultant_name, vote_type, vote_value, actual_result, is_correct, profit_percent)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                vote_data.get('symbol'),
+                vote_data.get('consultant_name'),
+                vote_data.get('vote_type'),
+                vote_data.get('vote_value'),
+                vote_data.get('actual_result'),
+                vote_data.get('is_correct'),
+                vote_data.get('profit_percent')
+            ))
+            conn.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"❌ DB save vote error: {e}")
+            self._get_conn().rollback()
+            return False
+    
+    def load_consultant_votes(self, consultant_name=None, limit=1000):
+        """قراءة نتائج التصويت"""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
+            if consultant_name:
+                cursor.execute("""
+                    SELECT * FROM consultant_votes 
+                    WHERE consultant_name = %s 
+                    ORDER BY timestamp DESC LIMIT %s
+                """, (consultant_name, limit))
+            else:
+                cursor.execute("""
+                    SELECT * FROM consultant_votes 
+                    ORDER BY timestamp DESC LIMIT %s
+                """, (limit,))
+            result = cursor.fetchall()
+            cursor.close()
+            return [dict(row) for row in result]
+        except:
+            return []
+
     
     # ========== Auto Cleanup ==========
     def cleanup_old_data(self):
