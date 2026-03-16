@@ -36,18 +36,18 @@ class AIBrain:
         
         # Deep Learning Client (optional)
         try:
-            from dl_client import DeepLearningClient
+            from dl_client_v2 import DeepLearningClientV2
             database_url = os.getenv('DATABASE_URL')
             if database_url:
-                self.dl_client = DeepLearningClient(database_url)
+                self.dl_client = DeepLearningClientV2(database_url)
                 if self.dl_client.is_available():
-                    print("🧠 Deep Learning connected!")
+                    print("🧠 AI Brain: Deep Learning connected!")
                 else:
                     self.dl_client = None
             else:
                 self.dl_client = None
         except Exception as e:
-            print(f"⚠️ Deep Learning not available: {e}")
+            print(f"⚠️ AI Brain: Deep Learning not available: {e}")
             self.dl_client = None
         
         print("🧠 AI Brain initialized")
@@ -532,7 +532,7 @@ class AIBrain:
         }
     
     def should_sell(self, symbol, position, current_price, analysis, mtf, exit_strategy=None):
-        """القرار الذكي: هل نبيع؟ (الملك يقرر)"""
+        """القرار الذكي: هل نبيع؟ (الملك يقرر مع استشارة DL)"""
         buy_price = position['buy_price']
         highest_price = position.get('highest_price', buy_price)
         profit_percent = ((current_price - buy_price) / buy_price) * 100
@@ -585,7 +585,16 @@ class AIBrain:
             
             # السوق عادي - AI يقرر بحرية (يكمل للشروط التالية)
         
-        # 3. TP الذكي - الحد الأدنى للبيع بالربح
+        # 3. استشارة Deep Learning للبيع
+        if self.dl_client:
+            try:
+                dl_decision = self.dl_client.get_sell_decision(symbol, position, current_price, analysis)
+                if dl_decision['action'] == 'SELL':
+                    return dl_decision
+            except Exception as e:
+                pass  # لو فيه خطأ، نكمل بالمنطق العادي
+        
+        # 4. TP الذكي - الحد الأدنى للبيع بالربح
         if profit_percent >= tp_target:
             # استشارة Smart TP (Exit Strategy) للتحسين
             if exit_strategy:
@@ -622,7 +631,7 @@ class AIBrain:
                 'profit': profit_percent
             }
         
-        # 4. Bearish Exit
+        # 5. Bearish Exit
         if mtf.get('trend') == 'bearish' and mtf.get('total', 0) >= 2:
             # لو فيه ربح موجب - بيع
             if profit_percent > 0.1:
@@ -632,7 +641,7 @@ class AIBrain:
                     'profit': profit_percent
                 }
         
-        # 5. انتهى وقت الانتظار
+        # 6. انتهى وقت الانتظار
         if hours_held >= max_wait_hours and profit_percent < 0:
             return {
                 'action': 'SELL',
@@ -640,5 +649,5 @@ class AIBrain:
                 'profit': profit_percent
             }
         
-        # 6. Hold
+        # 7. Hold
         return {'action': 'HOLD', 'reason': 'Waiting for target'}
