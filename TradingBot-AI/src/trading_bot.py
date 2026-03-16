@@ -609,7 +609,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     'ranking': coin_rank_adjustment
                 }
                 
-                decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop, models_scores)
+                decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop, models_scores, risk_manager)
                 
                 # Apply all adjustments
                 try:
@@ -640,20 +640,8 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     total_adjustment = 0
                 
                 if decision['action'] == 'BUY':
-                    # Risk Manager - Calculate optimal amount
-                    if risk_manager:
-                        try:
-                            optimal_amount = risk_manager.get_position_size(
-                                symbol, 
-                                decision['confidence'], 
-                                available + invested,
-                                MAX_POSITIONS
-                            )
-                            amount_usd = optimal_amount
-                        except:
-                            amount_usd = decision['amount']
-                    else:
-                        amount_usd = decision['amount']
+                    # Amount already calculated by AI Brain with Risk Manager voting
+                    amount_usd = decision['amount']
                     
                     return {
                         'symbol': symbol,
