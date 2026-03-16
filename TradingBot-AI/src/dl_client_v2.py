@@ -376,6 +376,7 @@ class DeepLearningClientV2:
             
             return {
                 'action': 'BUY' if total_adjustment > 0 else 'SKIP',
+                'reason': 'Consultants approved' if total_adjustment > 0 else 'Low confidence',
                 'confidence_adjustment': total_adjustment,
                 'mtf_boost': mtf_boost,
                 'risk_level': risk_result['risk_level'],
