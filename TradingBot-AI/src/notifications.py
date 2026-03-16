@@ -10,8 +10,8 @@ from config_encrypted import get_discord_webhook
 
 DISCORD_WEBHOOK = get_discord_webhook()
 
-def send_discord(message, color='blue'):
-    """Send message to Discord"""
+def send_discord_embed(title, fields, color='blue', thumbnail_url=None):
+    """Send embed message to Discord"""
     if not DISCORD_WEBHOOK:
         return
     
@@ -24,12 +24,20 @@ def send_discord(message, color='blue'):
     }
     
     try:
-        data = {
-            "embeds": [{
-                "description": message,
-                "color": colors.get(color, 0x0000ff)
-            }]
+        embed = {
+            "title": title,
+            "color": colors.get(color, 0x0000ff),
+            "fields": fields,
+            "footer": {
+                "text": "MSA Trading Bot • AI Powered"
+            },
+            "timestamp": datetime.utcnow().isoformat()
         }
+        
+        if thumbnail_url:
+            embed["thumbnail"] = {"url": thumbnail_url}
+        
+        data = {"embeds": [embed]}
         requests.post(DISCORD_WEBHOOK, json=data, timeout=5)
     except:
         pass
@@ -61,89 +69,87 @@ def log_trade(action, symbol, amount, price, value, profit_percent=None, reason=
 def send_buy_notification(symbol, amount, price, value, confidence):
     """Send buy notification"""
     # Discord - احترافي
-    message = (
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🟢 **BUY SIGNAL**\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📊 **Pair:** {symbol}\n"
-        f"💰 **Amount:** {amount:.6f}\n"
-        f"💵 **Price:** ${price:.4f}\n"
-        f"💎 **Value:** ${value:.2f}\n"
-        f"🎯 **Confidence:** {confidence}/120\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    )
-    send_discord(message, 'green')
+    fields = [
+        {"name": "Pair", "value": symbol, "inline": True},
+        {"name": "Amount", "value": f"{amount:.6f}", "inline": True},
+        {"name": "Price", "value": f"${price:.4f}", "inline": True},
+        {"name": "Value", "value": f"${value:.2f}", "inline": True},
+        {"name": "Confidence", "value": f"{confidence}/120", "inline": True}
+    ]
+    
+    send_discord_embed("BUY SIGNAL", fields, 'green')
     
     # Log
     log_trade('BUY', symbol, amount, price, value)
 
 def send_sell_notification(symbol, amount, price, value, profit_percent, reason):
     """Send sell notification"""
-    # تحديد الإيموجي والنوع حسب السبب
+    # تحديد النوع والون حسب السبب
     if "TP" in reason or "FAST" in reason:
-        emoji = "⚡"
         signal_type = "TAKE PROFIT"
         color = 'green'
     elif "BEARISH" in reason:
-        emoji = "📉"
         signal_type = "BEARISH EXIT"
         color = 'yellow'
     elif "STOP" in reason or "LOSS" in reason:
-        emoji = "🛑"
         signal_type = "STOP LOSS"
         color = 'red'
     else:
-        emoji = "🔴"
         signal_type = "SELL SIGNAL"
         color = 'red'
     
-    # تحديد لون الربح
-    profit_emoji = "📈" if profit_percent > 0 else "📉"
+    # تحديد علامة الربح
     profit_sign = "+" if profit_percent > 0 else ""
     
     # Discord - احترافي
-    message = (
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"{emoji} **{signal_type}**\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📊 **Pair:** {symbol}\n"
-        f"💰 **Amount:** {amount:.6f}\n"
-        f"💵 **Price:** ${price:.4f}\n"
-        f"💎 **Value:** ${value:.2f}\n"
-        f"{profit_emoji} **Profit:** {profit_sign}{profit_percent:.2f}%\n"
-        f"📝 **Reason:** {reason}\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    )
-    send_discord(message, color)
+    fields = [
+        {"name": "Pair", "value": symbol, "inline": True},
+        {"name": "Amount", "value": f"{amount:.6f}", "inline": True},
+        {"name": "Price", "value": f"${price:.4f}", "inline": True},
+        {"name": "Value", "value": f"${value:.2f}", "inline": True},
+        {"name": "Profit", "value": f"{profit_sign}{profit_percent:.2f}%", "inline": True},
+        {"name": "Reason", "value": reason, "inline": False}
+    ]
+    
+    send_discord_embed(signal_type, fields, color)
     
     # Log
     log_trade('SELL', symbol, amount, price, value, profit_percent, reason)
 
-def send_positions_report(balance, invested, active_count, max_positions):
-    """Send positions report"""
-    message = (
-        f"══════════════════════════════\n"
-        f"💼 **PORTFOLIO REPORT**\n"
-        f"══════════════════════════════\n"
-        f"💰 **Balance:** ${balance:.2f}\n"
-        f"📊 **Invested:** ${invested:.2f}\n"
-        f"🎯 **Active Positions:** {active_count}/{max_positions}\n"
-        f"📈 **Available Slots:** {max_positions - active_count}\n"
-        f"══════════════════════════════"
-    )
-    send_discord(message, 'blue')
+def send_positions_report(balance, invested, active_count, max_positions, open_positions=None):
+    """Send positions report with open positions details"""
+    fields = [
+        {"name": "Balance", "value": f"${balance:.2f}", "inline": True},
+        {"name": "Invested", "value": f"${invested:.2f}", "inline": True},
+        {"name": "Active Positions", "value": f"{active_count}/{max_positions}", "inline": True},
+        {"name": "Available Slots", "value": f"{max_positions - active_count}", "inline": True}
+    ]
+    
+    # إضافة تفاصيل الصفقات المفتوحة
+    if open_positions and len(open_positions) > 0:
+        positions_text = ""
+        for symbol, pos_data in open_positions.items():
+            buy_price = pos_data.get('buy_price', 0)
+            current_price = pos_data.get('current_price', buy_price)
+            profit_percent = ((current_price - buy_price) / buy_price * 100) if buy_price > 0 else 0
+            profit_sign = "+" if profit_percent >= 0 else ""
+            
+            positions_text += f"**{symbol}**\n"
+            positions_text += f"Buy: ${buy_price:.4f} | Now: ${current_price:.4f}\n"
+            positions_text += f"P/L: {profit_sign}{profit_percent:.2f}%\n\n"
+        
+        fields.append({"name": "Open Positions", "value": positions_text.strip(), "inline": False})
+    
+    send_discord_embed("PORTFOLIO REPORT", fields, 'blue')
 
 def send_startup_notification():
     """Send bot startup notification"""
-    message = (
-        f"╔══════════════════════════════╗\n"
-        f"║   🤖 BOT STARTED             ║\n"
-        f"╚══════════════════════════════╝\n"
-        f"🧠 **AI Brain:** ACTIVE\n"
-        f"💰 **Boost:** $10-$20\n"
-        f"🎯 **TP:** 1% | **SL:** 2%\n"
-        f"🛡️ **Confidence Range:** 60-75/120\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"✅ Ready to trade!"
-    )
-    send_discord(message, 'blue')
+    fields = [
+        {"name": "AI Brain", "value": "ACTIVE", "inline": True},
+        {"name": "Boost", "value": "$10-$20", "inline": True},
+        {"name": "TP / SL", "value": "1% / 2%", "inline": True},
+        {"name": "Confidence Range", "value": "60-75/120", "inline": True},
+        {"name": "Status", "value": "Ready to trade!", "inline": False}
+    ]
+    
+    send_discord_embed("BOT STARTED", fields, 'blue')
