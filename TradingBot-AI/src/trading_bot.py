@@ -1033,7 +1033,26 @@ try:
         
         # Report
         if should_send_report(last_report_time, REPORT_INTERVAL):
-            send_positions_report(available, invested, active_count, MAX_POSITIONS)
+            # جمع الصفقات المفتوحة مع الأسعار الحالية
+            open_positions_data = {}
+            with symbols_data_lock:
+                for symbol, data in SYMBOLS_DATA.items():
+                    position = data.get('position')
+                    if position:
+                        # محاولة الحصول على السعر الحالي
+                        try:
+                            ticker = exchange.fetch_ticker(symbol)
+                            current_price = ticker['last']
+                        except:
+                            current_price = position['buy_price']
+                        
+                        open_positions_data[symbol] = {
+                            'buy_price': position['buy_price'],
+                            'current_price': current_price,
+                            'amount': position['amount']
+                        }
+            
+            send_positions_report(available, invested, active_count, MAX_POSITIONS, open_positions_data)
             
             # Auto-cleanup old data (every report)
             try:
