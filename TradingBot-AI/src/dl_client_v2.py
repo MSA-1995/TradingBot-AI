@@ -1,6 +1,6 @@
 """
-🧠 Deep Learning Client V2 - للبوت الرئيسي
-يقرأ توقعات الموديلات الستة من قاعدة البيانات
+🧠 Deep Learning Client V3 - للبوت الرئيسي
+يقرأ توقعات 8 موديلات (7 LSTM + 1 CNN) من قاعدة البيانات
 """
 import os
 import json
@@ -14,7 +14,7 @@ class DeepLearningClientV2:
         self.conn = None
         self._db_params = None
         self._connect_db()
-        print("🧠 Deep Learning Client V2 initialized (6 Models)")
+        print("🧠 Deep Learning Client V3 initialized (8 Models: 7 LSTM + 1 CNN)")
     
     def _connect_db(self):
         """Connect to PostgreSQL"""
@@ -223,9 +223,89 @@ class DeepLearningClientV2:
         else:
             return {'rank_score': 50, 'should_trade': True, 'confidence_adjustment': 0}
     
+    def get_chart_cnn_prediction(self, rsi, macd, volume_ratio, price_momentum):
+        """
+        Chart Pattern Analyzer (CNN): تحليل أنماط الشارت
+        Returns: pattern_detected, confidence_adjustment
+        """
+        accuracy = self.get_model_accuracy('chart_cnn')
+        
+        if accuracy < 0.55:
+            return {'pattern_detected': 'neutral', 'confidence_adjustment': 0}
+        
+        # تحليل النمط البصري
+        pattern_score = 0
+        
+        # نمط صاعد
+        if rsi < 35 and macd > 0 and volume_ratio > 1.3:
+            pattern_score += 3
+        
+        # نمط هابط
+        if rsi > 65 and macd < 0:
+            pattern_score -= 2
+        
+        # حساب التعديل بناءً على الدقة
+        if accuracy >= 0.80:
+            boost_multiplier = 1.5
+        elif accuracy >= 0.70:
+            boost_multiplier = 1.2
+        else:
+            boost_multiplier = 1.0
+        
+        if pattern_score >= 2:
+            adjustment = int(5 * boost_multiplier)
+            return {'pattern_detected': 'bullish', 'confidence_adjustment': adjustment}
+        elif pattern_score <= -2:
+            adjustment = int(-8 * boost_multiplier)
+            return {'pattern_detected': 'bearish', 'confidence_adjustment': adjustment}
+        else:
+            return {'pattern_detected': 'neutral', 'confidence_adjustment': 0}
+    
+    def get_ai_brain_prediction(self, rsi, macd, volume_ratio, price_momentum, confidence, 
+                                mtf_score=0, risk_score=0, anomaly_score=0, 
+                                exit_score=0, pattern_score=0, ranking_score=0, cnn_score=0):
+        """
+        👑 AI Brain: القرار النهائي (يستشير 7 مستشارين)
+        Returns: should_buy (bool), confidence_boost
+        """
+        accuracy = self.get_model_accuracy('ai_brain')
+        
+        if accuracy < 0.55:
+            return {'should_buy': True, 'confidence_boost': 0}  # neutral
+        
+        # الملك يحلل كل شي
+        brain_score = 0
+        
+        # تحليل المؤشرات الأساسية
+        if rsi < 30 and macd > 0:
+            brain_score += 3
+        if volume_ratio > 1.5:
+            brain_score += 2
+        if confidence >= 70:
+            brain_score += 2
+        
+        # تحليل المستشارين
+        if mtf_score > 5:
+            brain_score += 2
+        if risk_score < 0:  # مخاطر عالية
+            brain_score -= 3
+        if anomaly_score > 0:  # شذوذ
+            brain_score -= 2
+        if pattern_score > 0:
+            brain_score += 2
+        
+        # القرار النهائي
+        if brain_score >= 5:
+            boost = int(10 * (accuracy - 0.5))  # كلما زادت الدقة، زاد التأثير
+            return {'should_buy': True, 'confidence_boost': boost}
+        elif brain_score <= -3:
+            return {'should_buy': False, 'confidence_boost': -10}
+        else:
+            return {'should_buy': True, 'confidence_boost': 0}
+    
     def get_buy_decision(self, symbol, analysis):
         """
-        قرار الشراء الشامل من كل الموديلات
+        قرار الشراء الشامل من كل الموديلات (المستشارين + الملك)
         """
         try:
             rsi = analysis.get('rsi', 50)
@@ -234,19 +314,21 @@ class DeepLearningClientV2:
             price_momentum = analysis.get('price_momentum', 0)
             confidence = analysis.get('confidence', 60)
             
-            # جمع توقعات كل الموديلات
+            # جمع توقعات المستشارين (7 مستشارين)
             mtf_boost = self.get_mtf_prediction(rsi, macd, volume_ratio, price_momentum)
             risk_result = self.get_risk_prediction(rsi, volume_ratio, confidence, price_momentum)
             anomaly_result = self.get_anomaly_prediction(rsi, macd, volume_ratio, price_momentum)
             pattern_result = self.get_pattern_prediction(rsi, macd, volume_ratio, price_momentum, confidence)
             ranking_result = self.get_ranking_prediction(symbol)
+            cnn_result = self.get_chart_cnn_prediction(rsi, macd, volume_ratio, price_momentum)
             
-            # حساب التعديل الكلي
-            total_adjustment = (
+            # حساب التعديل من المستشارين
+            consultants_adjustment = (
                 mtf_boost +
                 risk_result['confidence_adjustment'] +
                 pattern_result['confidence_adjustment'] +
-                ranking_result['confidence_adjustment']
+                ranking_result['confidence_adjustment'] +
+                cnn_result['confidence_adjustment']
             )
             
             # فحص الشذوذ
@@ -267,7 +349,30 @@ class DeepLearningClientV2:
             
             # فحص المخاطر
             if risk_result['risk_level'] == 'high':
-                total_adjustment -= 5
+                consultants_adjustment -= 5
+            
+            # 👑 استشارة الملك (القرار النهائي)
+            brain_result = self.get_ai_brain_prediction(
+                rsi, macd, volume_ratio, price_momentum, confidence,
+                mtf_score=mtf_boost,
+                risk_score=risk_result['confidence_adjustment'],
+                anomaly_score=1 if anomaly_result['is_anomaly'] else 0,
+                exit_score=0,
+                pattern_score=pattern_result['confidence_adjustment'],
+                ranking_score=ranking_result['confidence_adjustment'],
+                cnn_score=cnn_result['confidence_adjustment']
+            )
+            
+            # الملك يقرر
+            if not brain_result['should_buy']:
+                return {
+                    'action': 'SKIP',
+                    'reason': 'AI Brain rejected',
+                    'confidence_adjustment': brain_result['confidence_boost']
+                }
+            
+            # حساب التعديل النهائي (المستشارين + الملك)
+            total_adjustment = consultants_adjustment + brain_result['confidence_boost']
             
             return {
                 'action': 'BUY' if total_adjustment > 0 else 'SKIP',
@@ -275,7 +380,9 @@ class DeepLearningClientV2:
                 'mtf_boost': mtf_boost,
                 'risk_level': risk_result['risk_level'],
                 'pattern_type': pattern_result['pattern_type'],
-                'rank_score': ranking_result['rank_score']
+                'rank_score': ranking_result['rank_score'],
+                'cnn_pattern': cnn_result['pattern_detected'],
+                'brain_boost': brain_result['confidence_boost']
             }
         
         except Exception as e:
