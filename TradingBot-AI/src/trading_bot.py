@@ -281,6 +281,19 @@ exchange.set_sandbox_mode(True)
 # Storage
 storage = StorageManager()
 
+# Test database connection
+try:
+    test_conn = storage.storage._get_conn()
+    if test_conn and not test_conn.closed:
+        cursor = test_conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.close()
+        print("✅ Database: Connected (Supabase)")
+    else:
+        print("❌ Database: Connection failed")
+except Exception as e:
+    print(f"❌ Database: Connection error - {e}")
+
 # Capital Manager
 capital_manager = CapitalManager(max_capital=MAX_CAPITAL, profit_reserve=PROFIT_RESERVE)
 
