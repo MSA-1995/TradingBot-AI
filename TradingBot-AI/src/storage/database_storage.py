@@ -28,7 +28,9 @@ class DatabaseStorage:
             'port': parsed.port,
             'database': parsed.path[1:],
             'user': parsed.username,
-            'password': unquote(parsed.password)
+            'password': unquote(parsed.password),
+            'sslmode': 'require',
+            'connect_timeout': 10
         }
         self.conn = psycopg2.connect(**self._db_params)
         self.json = json_module
@@ -207,25 +209,36 @@ class DatabaseStorage:
     
     # ========== AI Decisions ==========
     def save_ai_decision(self, decision_data):
-        try:
-            conn = self._get_conn()
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO ai_decisions (symbol, decision, confidence, data)
-                VALUES (%s, %s, %s, %s)
-            """, (
-                decision_data.get('symbol'),
-                decision_data.get('decision'),
-                decision_data.get('confidence'),
-                self.json.dumps(decision_data)
-            ))
-            conn.commit()
-            cursor.close()
-            return True
-        except Exception as e:
-            print(f"❌ DB save decision error: {e}")
-            self._get_conn().rollback()
-            return False
+        for attempt in range(3):
+            try:
+                conn = self._get_conn()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO ai_decisions (symbol, decision, confidence, data)
+                    VALUES (%s, %s, %s, %s)
+                """, (
+                    decision_data.get('symbol'),
+                    decision_data.get('decision'),
+                    decision_data.get('confidence'),
+                    self.json.dumps(decision_data)
+                ))
+                conn.commit()
+                cursor.close()
+                return True
+            except Exception as e:
+                print(f"❌ DB save decision error (attempt {attempt+1}/3): {e}")
+                try:
+                    self._get_conn().rollback()
+                except:
+                    pass
+                
+                if attempt < 2:
+                    import time
+                    time.sleep(1)
+                else:
+                    return False
+        
+        return False
     
     def load_ai_decisions(self, limit=10):
         try:
