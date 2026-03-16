@@ -5,7 +5,7 @@ All bot settings and constants
 
 # Trading Parameters
 MIN_CONFIDENCE = 55
-MAX_POSITIONS = 10  # الحد الأقصى للمراكز (أفضل 10 من 50)
+MAX_POSITIONS = 50  # الحد الأقصى للمراكز (أفضل 10 من 50)
 TOTAL_COINS_TO_SCAN = 50
 
 # Capital Management
