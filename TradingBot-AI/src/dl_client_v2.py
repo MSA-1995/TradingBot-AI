@@ -269,53 +269,28 @@ class DeepLearningClientV2:
         votes = {}
         
         # Exit Strategy vote (0.5% - 10%)
-        exit_acc = self.get_model_accuracy('exit')
-        if exit_acc >= 0.75:
-            votes['exit'] = min(max(2.0 + (confidence - 60) * 0.1, 0.5), 10.0)
-        else:
-            votes['exit'] = 1.5
+        votes['exit'] = min(max(2.0 + (confidence - 60) * 0.1, 0.5), 10.0)
         
         # MTF vote
-        mtf_acc = self.get_model_accuracy('mtf')
-        if mtf_acc >= 0.60 and macd > 0:
+        if macd > 0:
             votes['mtf'] = min(max(3.0 + (volume_ratio - 1) * 2, 0.5), 10.0)
         else:
             votes['mtf'] = 2.0
         
         # Risk vote (conservative)
-        risk_acc = self.get_model_accuracy('risk')
-        if risk_acc >= 0.80:
-            votes['risk'] = min(max(1.5 if rsi > 70 else 2.5, 0.5), 10.0)
-        else:
-            votes['risk'] = 1.8
+        votes['risk'] = min(max(1.5 if rsi > 70 else 2.5, 0.5), 10.0)
         
         # Pattern vote
-        pattern_acc = self.get_model_accuracy('pattern')
-        if pattern_acc >= 0.75:
-            votes['pattern'] = min(max(2.5 + (confidence - 65) * 0.08, 0.5), 10.0)
-        else:
-            votes['pattern'] = 2.2
+        votes['pattern'] = min(max(2.5 + (confidence - 65) * 0.08, 0.5), 10.0)
         
         # CNN vote
-        cnn_acc = self.get_model_accuracy('chart_cnn')
-        if cnn_acc >= 0.75:
-            votes['cnn'] = min(max(2.0 + abs(macd) * 0.2, 0.5), 10.0)
-        else:
-            votes['cnn'] = 2.0
+        votes['cnn'] = min(max(2.0 + abs(macd) * 0.2, 0.5), 10.0)
         
         # Anomaly vote (conservative if anomaly detected)
-        anomaly_acc = self.get_model_accuracy('anomaly')
-        if anomaly_acc >= 0.85:
-            votes['anomaly'] = min(max(1.8 if rsi > 75 else 2.3, 0.5), 10.0)
-        else:
-            votes['anomaly'] = 2.0
+        votes['anomaly'] = min(max(1.8 if rsi > 75 else 2.3, 0.5), 10.0)
         
         # Ranking vote
-        ranking_acc = self.get_model_accuracy('ranking')
-        if ranking_acc >= 0.60:
-            votes['ranking'] = min(max(2.8, 0.5), 10.0)
-        else:
-            votes['ranking'] = 2.5
+        votes['ranking'] = min(max(2.8, 0.5), 10.0)
         
         return votes
     
@@ -327,38 +302,28 @@ class DeepLearningClientV2:
         votes = {}
         
         # Exit Strategy vote
-        exit_acc = self.get_model_accuracy('exit')
-        votes['exit'] = 15.0 if exit_acc >= 0.75 else 14.0
+        votes['exit'] = 15.0
         
         # MTF vote (aggressive if strong trend)
-        mtf_acc = self.get_model_accuracy('mtf')
-        if mtf_acc >= 0.60 and macd > 5:
+        if macd > 5:
             votes['mtf'] = min(18.0, 20.0)
         else:
             votes['mtf'] = 14.0
         
         # Risk vote (conservative)
-        risk_acc = self.get_model_accuracy('risk')
-        if risk_acc >= 0.80:
-            votes['risk'] = 13.0 if rsi > 70 else 16.0
-        else:
-            votes['risk'] = 14.0
+        votes['risk'] = 13.0 if rsi > 70 else 16.0
         
         # Pattern vote
-        pattern_acc = self.get_model_accuracy('pattern')
-        votes['pattern'] = 16.0 if pattern_acc >= 0.75 else 14.5
+        votes['pattern'] = 16.0
         
         # CNN vote
-        cnn_acc = self.get_model_accuracy('chart_cnn')
-        votes['cnn'] = 15.0 if cnn_acc >= 0.75 else 14.0
+        votes['cnn'] = 15.0
         
         # Anomaly vote
-        anomaly_acc = self.get_model_accuracy('anomaly')
-        votes['anomaly'] = 13.5 if anomaly_acc >= 0.85 else 14.0
+        votes['anomaly'] = 13.5
         
         # Ranking vote
-        ranking_acc = self.get_model_accuracy('ranking')
-        votes['ranking'] = 17.0 if ranking_acc >= 0.60 else 15.0
+        votes['ranking'] = 17.0
         
         # Risk Manager vote (مستشار ثامن - Kelly Criterion)
         if risk_vote is not None:
@@ -378,38 +343,28 @@ class DeepLearningClientV2:
         votes = {}
         
         # Exit Strategy vote
-        exit_acc = self.get_model_accuracy('exit')
-        votes['exit'] = -1.5 if exit_acc >= 0.75 else -1.2
+        votes['exit'] = -1.5
         
         # MTF vote (patient if strong trend)
-        mtf_acc = self.get_model_accuracy('mtf')
-        if mtf_acc >= 0.60 and macd > 0:
+        if macd > 0:
             votes['mtf'] = -2.0  # patient
         else:
             votes['mtf'] = -1.3
         
         # Risk vote (strict)
-        risk_acc = self.get_model_accuracy('risk')
-        if risk_acc >= 0.80:
-            votes['risk'] = -0.8 if rsi > 70 else -1.5
-        else:
-            votes['risk'] = -1.2
+        votes['risk'] = -0.8 if rsi > 70 else -1.5
         
         # Pattern vote
-        pattern_acc = self.get_model_accuracy('pattern')
-        votes['pattern'] = -1.8 if pattern_acc >= 0.75 else -1.4
+        votes['pattern'] = -1.8
         
         # CNN vote
-        cnn_acc = self.get_model_accuracy('chart_cnn')
-        votes['cnn'] = -1.6 if cnn_acc >= 0.75 else -1.3
+        votes['cnn'] = -1.6
         
         # Anomaly vote (strict if anomaly)
-        anomaly_acc = self.get_model_accuracy('anomaly')
-        votes['anomaly'] = -1.0 if anomaly_acc >= 0.85 else -1.2
+        votes['anomaly'] = -1.0
         
         # Ranking vote
-        ranking_acc = self.get_model_accuracy('ranking')
-        votes['ranking'] = -1.7 if ranking_acc >= 0.60 else -1.4
+        votes['ranking'] = -1.7
         
         # Risk Manager vote (مستشار ثامن)
         if risk_vote is not None:
@@ -643,59 +598,31 @@ class DeepLearningClientV2:
         votes = {}
         
         # Exit Strategy vote
-        exit_acc = self.get_model_accuracy('exit')
-        if exit_acc >= 0.75:
-            # بيع لو ربح > 1.5% أو خسارة < -1.5%
-            votes['exit'] = 1 if (profit_percent > 1.5 or profit_percent < -1.5) else 0
-        else:
-            votes['exit'] = 1 if profit_percent > 2.0 else 0
+        # بيع لو ربح > 1.5% أو خسارة < -1.5%
+        votes['exit'] = 1 if (profit_percent > 1.5 or profit_percent < -1.5) else 0
         
         # MTF vote (يراقب الترند)
-        mtf_acc = self.get_model_accuracy('mtf')
-        if mtf_acc >= 0.60:
-            # بيع لو bearish + ربح موجب
-            votes['mtf'] = 1 if (trend == 'bearish' and profit_percent > 0.5) else 0
-        else:
-            votes['mtf'] = 0
+        # بيع لو bearish + ربح موجب
+        votes['mtf'] = 1 if (trend == 'bearish' and profit_percent > 0.5) else 0
         
         # Risk vote (محافظ - يبيع بسرعة)
-        risk_acc = self.get_model_accuracy('risk')
-        if risk_acc >= 0.80:
-            # بيع لو RSI > 70 أو خسارة
-            votes['risk'] = 1 if (rsi > 70 or profit_percent < -0.5) else 0
-        else:
-            votes['risk'] = 1 if profit_percent < -1.0 else 0
+        # بيع لو RSI > 70 أو خسارة
+        votes['risk'] = 1 if (rsi > 70 or profit_percent < -0.5) else 0
         
         # Pattern vote
-        pattern_acc = self.get_model_accuracy('pattern')
-        if pattern_acc >= 0.75:
-            # بيع لو ربح جيد + MACD سالب
-            votes['pattern'] = 1 if (profit_percent > 1.0 and macd < 0) else 0
-        else:
-            votes['pattern'] = 0
+        # بيع لو ربح جيد + MACD سالب
+        votes['pattern'] = 1 if (profit_percent > 1.0 and macd < 0) else 0
         
         # CNN vote
-        cnn_acc = self.get_model_accuracy('chart_cnn')
-        if cnn_acc >= 0.75:
-            # بيع لو ربح > 1.2%
-            votes['cnn'] = 1 if profit_percent > 1.2 else 0
-        else:
-            votes['cnn'] = 0
+        # بيع لو ربح > 1.2%
+        votes['cnn'] = 1 if profit_percent > 1.2 else 0
         
         # Anomaly vote (يبيع لو شاف شذوذ)
-        anomaly_acc = self.get_model_accuracy('anomaly')
-        if anomaly_acc >= 0.85:
-            # بيع لو RSI شاذ أو volume شاذ
-            votes['anomaly'] = 1 if (rsi > 80 or rsi < 20 or volume_ratio > 3.0) else 0
-        else:
-            votes['anomaly'] = 0
+        # بيع لو RSI شاذ أو volume شاذ
+        votes['anomaly'] = 1 if (rsi > 80 or rsi < 20 or volume_ratio > 3.0) else 0
         
         # Ranking vote
-        ranking_acc = self.get_model_accuracy('ranking')
-        if ranking_acc >= 0.60:
-            # بيع لو ربح > 1.5%
-            votes['ranking'] = 1 if profit_percent > 1.5 else 0
-        else:
-            votes['ranking'] = 0
+        # بيع لو ربح > 1.5%
+        votes['ranking'] = 1 if profit_percent > 1.5 else 0
         
         return votes
