@@ -368,8 +368,8 @@ if MODELS_ENABLED:
 if NEWS_ENABLED:
     print(f"📰 News Sentiment Analyzer: ACTIVE")
 
-print(f"💰 Boost: ${BASE_AMOUNT}-${BOOST_AMOUNT}")
-print(f"🎯 TP: {TAKE_PROFIT_PERCENT}% | SL: {STOP_LOSS_PERCENT}%")
+print(f"💰 Amount: $12-$23 (Dynamic Voting)")
+print(f"🎯 TP: 0.5%-11% | SL: -0.1% to -2.3% (Dynamic Voting)")
 print(f"🎯 Min Confidence: {MIN_CONFIDENCE}/120")
 print(f"🔺 Max Confidence: {AI_BOUNDARIES['max_confidence']}/120\n")
 
