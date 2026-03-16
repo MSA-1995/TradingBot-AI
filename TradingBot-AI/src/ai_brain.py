@@ -453,6 +453,10 @@ class AIBrain:
         # حفظ الصفقة
         self.storage.save_trade(trade_result)
         
+        # حفظ نتائج التصويت (إذا كانت موجودة)
+        if 'voting_results' in trade_result:
+            self._save_voting_results(trade_result)
+        
         # استخراج النمط
         detector = PatternDetector()
         pattern = detector.extract_pattern(trade_result)
@@ -471,6 +475,28 @@ class AIBrain:
                 print(f"🚫 Learned trap pattern: {pattern.get('summary', '')}")
         
         return pattern
+    
+    def _save_voting_results(self, trade_result):
+        """حفظ نتائج تصويت المستشارين"""
+        try:
+            symbol = trade_result.get('symbol')
+            profit_percent = trade_result.get('profit_percent', 0)
+            voting_results = trade_result.get('voting_results', {})
+            
+            # حفظ نتيجة كل مستشار
+            for consultant_name, vote_data in voting_results.items():
+                vote_record = {
+                    'symbol': symbol,
+                    'consultant_name': consultant_name,
+                    'vote_type': vote_data.get('vote_type'),
+                    'vote_value': vote_data.get('vote_value'),
+                    'actual_result': vote_data.get('actual_result'),
+                    'is_correct': vote_data.get('is_correct'),
+                    'profit_percent': profit_percent
+                }
+                self.storage.save_consultant_vote(vote_record)
+        except Exception as e:
+            print(f"⚠️ Error saving voting results: {e}")
 
     
     def _calculate_smart_targets(self, symbol, confidence, analysis, similar_patterns, risk_manager=None):
