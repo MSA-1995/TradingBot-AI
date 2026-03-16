@@ -34,6 +34,22 @@ class AIBrain:
         except:
             self.mtf_analyzer = None
         
+        # Deep Learning Client (optional)
+        try:
+            from dl_client import DeepLearningClient
+            database_url = os.getenv('DATABASE_URL')
+            if database_url:
+                self.dl_client = DeepLearningClient(database_url)
+                if self.dl_client.is_available():
+                    print("🧠 Deep Learning connected!")
+                else:
+                    self.dl_client = None
+            else:
+                self.dl_client = None
+        except Exception as e:
+            print(f"⚠️ Deep Learning not available: {e}")
+            self.dl_client = None
+        
         print("🧠 AI Brain initialized")
         print(f"📊 Loaded {len(self.learned_patterns)} patterns")
         print(f"🚫 Loaded {len(self.trap_memory)} traps")
@@ -82,6 +98,22 @@ class AIBrain:
             base_confidence, 
             similar_success
         )
+        
+        # 4.5. Deep Learning Boost (إذا متوفر)
+        if self.dl_client:
+            try:
+                dl_boost = self.dl_client.get_dl_boost({
+                    'rsi': analysis.get('rsi', 50),
+                    'macd': analysis.get('macd_diff', 0),
+                    'volume_ratio': analysis.get('volume_ratio', 1),
+                    'price_momentum': analysis.get('price_momentum', 0),
+                    'confidence': optimized_confidence
+                })
+                if dl_boost > 0:
+                    optimized_confidence += dl_boost
+                    print(f"🧠 DL Boost: +{dl_boost} → {optimized_confidence}")
+            except Exception as e:
+                print(f"⚠️ DL boost error: {e}")
         
         # 5. التحقق من الحدود الآمنة
         validator = SafetyValidator(self.boundaries)
