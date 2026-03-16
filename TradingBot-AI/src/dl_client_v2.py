@@ -261,6 +261,158 @@ class DeepLearningClientV2:
         else:
             return {'pattern_detected': 'neutral', 'confidence_adjustment': 0}
     
+    def vote_tp_target(self, rsi, macd, volume_ratio, price_momentum, confidence):
+        """
+        المستشارين يصوتون على TP (Take Profit)
+        Returns: tp_votes (dict with each consultant's vote)
+        """
+        votes = {}
+        
+        # Exit Strategy vote (0.5% - 10%)
+        exit_acc = self.get_model_accuracy('exit')
+        if exit_acc >= 0.75:
+            votes['exit'] = min(max(2.0 + (confidence - 60) * 0.1, 0.5), 10.0)
+        else:
+            votes['exit'] = 1.5
+        
+        # MTF vote
+        mtf_acc = self.get_model_accuracy('mtf')
+        if mtf_acc >= 0.60 and macd > 0:
+            votes['mtf'] = min(max(3.0 + (volume_ratio - 1) * 2, 0.5), 10.0)
+        else:
+            votes['mtf'] = 2.0
+        
+        # Risk vote (conservative)
+        risk_acc = self.get_model_accuracy('risk')
+        if risk_acc >= 0.80:
+            votes['risk'] = min(max(1.5 if rsi > 70 else 2.5, 0.5), 10.0)
+        else:
+            votes['risk'] = 1.8
+        
+        # Pattern vote
+        pattern_acc = self.get_model_accuracy('pattern')
+        if pattern_acc >= 0.75:
+            votes['pattern'] = min(max(2.5 + (confidence - 65) * 0.08, 0.5), 10.0)
+        else:
+            votes['pattern'] = 2.2
+        
+        # CNN vote
+        cnn_acc = self.get_model_accuracy('chart_cnn')
+        if cnn_acc >= 0.75:
+            votes['cnn'] = min(max(2.0 + abs(macd) * 0.2, 0.5), 10.0)
+        else:
+            votes['cnn'] = 2.0
+        
+        # Anomaly vote (conservative if anomaly detected)
+        anomaly_acc = self.get_model_accuracy('anomaly')
+        if anomaly_acc >= 0.85:
+            votes['anomaly'] = min(max(1.8 if rsi > 75 else 2.3, 0.5), 10.0)
+        else:
+            votes['anomaly'] = 2.0
+        
+        # Ranking vote
+        ranking_acc = self.get_model_accuracy('ranking')
+        if ranking_acc >= 0.60:
+            votes['ranking'] = min(max(2.8, 0.5), 10.0)
+        else:
+            votes['ranking'] = 2.5
+        
+        return votes
+    
+    def vote_amount(self, rsi, macd, volume_ratio, confidence):
+        """
+        المستشارين يصوتون على المبلغ ($12 - $20)
+        Returns: amount_votes (dict with each consultant's vote)
+        """
+        votes = {}
+        
+        # Exit Strategy vote
+        exit_acc = self.get_model_accuracy('exit')
+        votes['exit'] = 15.0 if exit_acc >= 0.75 else 14.0
+        
+        # MTF vote (aggressive if strong trend)
+        mtf_acc = self.get_model_accuracy('mtf')
+        if mtf_acc >= 0.60 and macd > 5:
+            votes['mtf'] = min(18.0, 20.0)
+        else:
+            votes['mtf'] = 14.0
+        
+        # Risk vote (conservative)
+        risk_acc = self.get_model_accuracy('risk')
+        if risk_acc >= 0.80:
+            votes['risk'] = 13.0 if rsi > 70 else 16.0
+        else:
+            votes['risk'] = 14.0
+        
+        # Pattern vote
+        pattern_acc = self.get_model_accuracy('pattern')
+        votes['pattern'] = 16.0 if pattern_acc >= 0.75 else 14.5
+        
+        # CNN vote
+        cnn_acc = self.get_model_accuracy('chart_cnn')
+        votes['cnn'] = 15.0 if cnn_acc >= 0.75 else 14.0
+        
+        # Anomaly vote
+        anomaly_acc = self.get_model_accuracy('anomaly')
+        votes['anomaly'] = 13.5 if anomaly_acc >= 0.85 else 14.0
+        
+        # Ranking vote
+        ranking_acc = self.get_model_accuracy('ranking')
+        votes['ranking'] = 17.0 if ranking_acc >= 0.60 else 15.0
+        
+        # Ensure all votes are within bounds ($12 - $20)
+        for key in votes:
+            votes[key] = max(12.0, min(20.0, votes[key]))
+        
+        return votes
+    
+    def vote_stop_loss(self, rsi, macd, volume_ratio, confidence):
+        """
+        المستشارين يصوتون على SL (Stop Loss: -0.1% to -2%)
+        Returns: sl_votes (dict with each consultant's vote)
+        """
+        votes = {}
+        
+        # Exit Strategy vote
+        exit_acc = self.get_model_accuracy('exit')
+        votes['exit'] = -1.5 if exit_acc >= 0.75 else -1.2
+        
+        # MTF vote (patient if strong trend)
+        mtf_acc = self.get_model_accuracy('mtf')
+        if mtf_acc >= 0.60 and macd > 0:
+            votes['mtf'] = -2.0  # patient
+        else:
+            votes['mtf'] = -1.3
+        
+        # Risk vote (strict)
+        risk_acc = self.get_model_accuracy('risk')
+        if risk_acc >= 0.80:
+            votes['risk'] = -0.8 if rsi > 70 else -1.5
+        else:
+            votes['risk'] = -1.2
+        
+        # Pattern vote
+        pattern_acc = self.get_model_accuracy('pattern')
+        votes['pattern'] = -1.8 if pattern_acc >= 0.75 else -1.4
+        
+        # CNN vote
+        cnn_acc = self.get_model_accuracy('chart_cnn')
+        votes['cnn'] = -1.6 if cnn_acc >= 0.75 else -1.3
+        
+        # Anomaly vote (strict if anomaly)
+        anomaly_acc = self.get_model_accuracy('anomaly')
+        votes['anomaly'] = -1.0 if anomaly_acc >= 0.85 else -1.2
+        
+        # Ranking vote
+        ranking_acc = self.get_model_accuracy('ranking')
+        votes['ranking'] = -1.7 if ranking_acc >= 0.60 else -1.4
+        
+        # Ensure all votes are within bounds (-0.1% to -2%)
+        for key in votes:
+            votes[key] = max(-2.0, min(-0.1, votes[key]))
+        
+        return votes
+    
     def get_ai_brain_prediction(self, rsi, macd, volume_ratio, price_momentum, confidence, 
                                 mtf_score=0, risk_score=0, anomaly_score=0, 
                                 exit_score=0, pattern_score=0, ranking_score=0, cnn_score=0):
