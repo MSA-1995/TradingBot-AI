@@ -319,9 +319,9 @@ class DeepLearningClientV2:
         
         return votes
     
-    def vote_amount(self, rsi, macd, volume_ratio, confidence):
+    def vote_amount(self, rsi, macd, volume_ratio, confidence, risk_vote=None):
         """
-        المستشارين يصوتون على المبلغ ($12 - $20)
+        المستشارين + Risk Manager يصوتون على المبلغ ($12 - $20)
         Returns: amount_votes (dict with each consultant's vote)
         """
         votes = {}
@@ -360,15 +360,19 @@ class DeepLearningClientV2:
         ranking_acc = self.get_model_accuracy('ranking')
         votes['ranking'] = 17.0 if ranking_acc >= 0.60 else 15.0
         
+        # Risk Manager vote (مستشار ثامن - Kelly Criterion)
+        if risk_vote is not None:
+            votes['risk_manager'] = max(12.0, min(20.0, risk_vote))
+        
         # Ensure all votes are within bounds ($12 - $20)
         for key in votes:
             votes[key] = max(12.0, min(20.0, votes[key]))
         
         return votes
     
-    def vote_stop_loss(self, rsi, macd, volume_ratio, confidence):
+    def vote_stop_loss(self, rsi, macd, volume_ratio, confidence, risk_vote=None):
         """
-        المستشارين يصوتون على SL (Stop Loss: -0.1% to -2%)
+        المستشارين + Risk Manager يصوتون على SL (Stop Loss: -0.1% to -2%)
         Returns: sl_votes (dict with each consultant's vote)
         """
         votes = {}
@@ -406,6 +410,10 @@ class DeepLearningClientV2:
         # Ranking vote
         ranking_acc = self.get_model_accuracy('ranking')
         votes['ranking'] = -1.7 if ranking_acc >= 0.60 else -1.4
+        
+        # Risk Manager vote (مستشار ثامن)
+        if risk_vote is not None:
+            votes['risk_manager'] = max(-2.0, min(-0.1, risk_vote))
         
         # Ensure all votes are within bounds (-0.1% to -2%)
         for key in votes:
@@ -626,3 +634,68 @@ class DeepLearningClientV2:
         
         except Exception as e:
             return {}
+
+    def vote_sell_now(self, symbol, profit_percent, rsi, macd, volume_ratio, trend, hours_held):
+        """
+        المستشارين يصوتون: هل نبيع الحين؟ (SELL/HOLD)
+        Returns: sell_votes (dict with each consultant's vote: 1=SELL, 0=HOLD)
+        """
+        votes = {}
+        
+        # Exit Strategy vote
+        exit_acc = self.get_model_accuracy('exit')
+        if exit_acc >= 0.75:
+            # بيع لو ربح > 1.5% أو خسارة < -1.5%
+            votes['exit'] = 1 if (profit_percent > 1.5 or profit_percent < -1.5) else 0
+        else:
+            votes['exit'] = 1 if profit_percent > 2.0 else 0
+        
+        # MTF vote (يراقب الترند)
+        mtf_acc = self.get_model_accuracy('mtf')
+        if mtf_acc >= 0.60:
+            # بيع لو bearish + ربح موجب
+            votes['mtf'] = 1 if (trend == 'bearish' and profit_percent > 0.5) else 0
+        else:
+            votes['mtf'] = 0
+        
+        # Risk vote (محافظ - يبيع بسرعة)
+        risk_acc = self.get_model_accuracy('risk')
+        if risk_acc >= 0.80:
+            # بيع لو RSI > 70 أو خسارة
+            votes['risk'] = 1 if (rsi > 70 or profit_percent < -0.5) else 0
+        else:
+            votes['risk'] = 1 if profit_percent < -1.0 else 0
+        
+        # Pattern vote
+        pattern_acc = self.get_model_accuracy('pattern')
+        if pattern_acc >= 0.75:
+            # بيع لو ربح جيد + MACD سالب
+            votes['pattern'] = 1 if (profit_percent > 1.0 and macd < 0) else 0
+        else:
+            votes['pattern'] = 0
+        
+        # CNN vote
+        cnn_acc = self.get_model_accuracy('chart_cnn')
+        if cnn_acc >= 0.75:
+            # بيع لو ربح > 1.2%
+            votes['cnn'] = 1 if profit_percent > 1.2 else 0
+        else:
+            votes['cnn'] = 0
+        
+        # Anomaly vote (يبيع لو شاف شذوذ)
+        anomaly_acc = self.get_model_accuracy('anomaly')
+        if anomaly_acc >= 0.85:
+            # بيع لو RSI شاذ أو volume شاذ
+            votes['anomaly'] = 1 if (rsi > 80 or rsi < 20 or volume_ratio > 3.0) else 0
+        else:
+            votes['anomaly'] = 0
+        
+        # Ranking vote
+        ranking_acc = self.get_model_accuracy('ranking')
+        if ranking_acc >= 0.60:
+            # بيع لو ربح > 1.5%
+            votes['ranking'] = 1 if profit_percent > 1.5 else 0
+        else:
+            votes['ranking'] = 0
+        
+        return votes
