@@ -96,25 +96,28 @@ except Exception as e:
     print(f"⚠️ Advanced models not loaded: {e}")
     MODELS_ENABLED = False
 
-# ML Predictor
+# Deep Learning Predictor V2 (6 Models)
 try:
-    from ml_client import MLClient
+    from dl_client_v2 import DeepLearningClientV2
     database_url = os.getenv("DATABASE_URL")
     if database_url:
-        ml_client = MLClient(database_url)
-        ML_ENABLED = ml_client.is_model_available()
-        if ML_ENABLED:
-            print("🤖 ML Predictor: ACTIVE")
+        dl_client = DeepLearningClientV2(database_url)
+        DL_ENABLED = dl_client.is_available()
+        if DL_ENABLED:
+            print("🧠 Deep Learning: ACTIVE (6 Models)")
+            models_status = dl_client.get_models_status()
+            for model_name, status in models_status.items():
+                print(f"   {model_name}: {status['accuracy']*100:.1f}%")
         else:
-            print("⚠️ ML Predictor: Model not trained yet")
-            ml_client = None
+            print("⚠️ Deep Learning: Models not trained yet")
+            dl_client = None
     else:
-        ml_client = None
-        ML_ENABLED = False
+        dl_client = None
+        DL_ENABLED = False
 except Exception as e:
-    print(f"⚠️ ML Predictor not loaded: {e}")
-    ml_client = None
-    ML_ENABLED = False
+    print(f"⚠️ Deep Learning not loaded: {e}")
+    dl_client = None
+    DL_ENABLED = False
 
 # News Analyzer - Inline to avoid import issues
 class NewsAnalyzer:
@@ -311,13 +314,13 @@ print("  ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝\n")
 print("  ✦•······················•✦•······················•✦")
 print("        🚀 MSA Smart Trading Bot")
 print("        💰 Binance Testnet - AI Powered")
-print("        📊 6 Advanced Models Integrated")
-print("        🧠 Multi-Timeframe + Risk Manager")
+print("        🧠 6 Deep Learning LSTM Models")
+print("        📊 Multi-Timeframe + Risk Manager")
 print("        🏆 Coin Ranking + Anomaly Detection")
 print("        🎯 Exit Strategy + Pattern Recognition")
 print("        📰 News Sentiment Analysis")
 print("        🔍 Top 10 from 50 Fixed Coins")
-print("        ✅ Version 9.0 - Smart 50 Coins 🚀")
+print("        ✅ Version 10.0 - Deep Learning 🚀")
 print("  ✦•······················•✦•······················•✦\n")
 print("=" * 60)
 
@@ -615,22 +618,22 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     pattern_adjustment = 0 if pattern_adjustment is None else pattern_adjustment
                     news_adjustment = 0 if news_adjustment is None else news_adjustment
                     
-                    # ML Predictor adjustment
-                    ml_adjustment = 0
-                    if ml_client and ML_ENABLED:
+                    # Deep Learning adjustment (6 Models)
+                    dl_adjustment = 0
+                    if dl_client and DL_ENABLED:
                         try:
-                            ml_adj = ml_client.get_confidence_adjustment(
-                                analysis.get('rsi', 50),
-                                analysis.get('macd_diff', 0),
-                                analysis.get('volume_ratio', 1),
-                                analysis.get('price_momentum', 0),
-                                decision['confidence']
-                            )
-                            ml_adjustment = ml_adj if ml_adj is not None else 0
+                            dl_decision = dl_client.get_buy_decision(symbol, analysis)
+                            if dl_decision['action'] == 'SKIP':
+                                return {
+                                    'symbol': symbol,
+                                    'action': 'SKIP',
+                                    'reason': f"DL: {dl_decision['reason']}"
+                                }
+                            dl_adjustment = dl_decision.get('confidence_adjustment', 0)
                         except:
-                            ml_adjustment = 0
+                            dl_adjustment = 0
                     
-                    total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment + news_adjustment + ml_adjustment
+                    total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment + news_adjustment + dl_adjustment
                     if total_adjustment != 0:
                         decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
                 except Exception as e:
