@@ -132,7 +132,7 @@ class AIBrain:
                 
                 if dl_boost > 0 or brain_boost > 0:
                     optimized_confidence += dl_boost
-                    print(f"👑 AI Brain + Consultants Boost: +{dl_boost} (Brain: +{brain_boost}) → {optimized_confidence}")
+                    # رسالة محذوفة - التصويت يطبع تحت
             except Exception as e:
                 print(f"⚠️ DL decision error: {e}")
         
@@ -162,10 +162,10 @@ class AIBrain:
         # 6. القرار النهائي
         if optimized_confidence >= 55:  # استخدام 55 (أكثر عدوانية للتعلم على Testnet)
             # حساب المبلغ الذكي
-            amount = self._calculate_smart_amount(optimized_confidence, analysis)
+            amount = self._calculate_smart_amount(symbol, optimized_confidence, analysis)
             
             # حساب TP و SL الذكي
-            smart_targets = self._calculate_smart_targets(optimized_confidence, analysis, similar_success)
+            smart_targets = self._calculate_smart_targets(symbol, optimized_confidence, analysis, similar_success)
             
             decision = {
                 'action': 'BUY',
@@ -187,7 +187,10 @@ class AIBrain:
                     'anomaly_score': models_scores.get('anomaly', 0) if models_scores else 0,
                     'exit_score': models_scores.get('exit', 0) if models_scores else 0,
                     'pattern_score': models_scores.get('pattern', 0) if models_scores else 0,
-                    'ranking_score': models_scores.get('ranking', 0) if models_scores else 0
+                    'ranking_score': models_scores.get('ranking', 0) if models_scores else 0,
+                    'predicted_tp': smart_targets['tp'],
+                    'predicted_sl': smart_targets['sl'],
+                    'predicted_amount': amount
                 }
             }
             
@@ -391,77 +394,39 @@ class AIBrain:
         
         return optimized
     
-    def _calculate_smart_amount(self, confidence, analysis, win_rate=None):
-        """حساب المبلغ الذكي بين MIN و MAX من config"""
+    def _calculate_smart_amount(self, symbol, confidence, analysis, win_rate=None):
+        """حساب المبلغ الذكي بالتصويت من المستشارين"""
         import pandas as pd
         from config import MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT
         
-        # النطاق الكامل
-        min_amount = MIN_TRADE_AMOUNT
-        max_amount = MAX_TRADE_AMOUNT
-        range_size = max_amount - min_amount
-        
-        # حساب Boost Points من التحليل
-        boost_points = 0
-        
-        # 1. RSI boost
         rsi = analysis.get('rsi', 50)
-        if not pd.isna(rsi):
-            if rsi < 25:
-                boost_points += 3
-            elif rsi < 30:
-                boost_points += 2
-            elif rsi < 35:
-                boost_points += 1
-        
-        # 2. Volume boost
+        macd = analysis.get('macd_diff', 0)
         volume_ratio = analysis.get('volume_ratio', 1.0)
-        if not pd.isna(volume_ratio):
-            if volume_ratio > 2.5:
-                boost_points += 3
-            elif volume_ratio > 2.0:
-                boost_points += 2
-            elif volume_ratio > 1.5:
-                boost_points += 1
         
-        # 3. MACD boost
-        macd_diff = analysis.get('macd_diff', 0)
-        if not pd.isna(macd_diff):
-            if macd_diff > 10:
-                boost_points += 2
-            elif macd_diff > 5:
-                boost_points += 1
-        
-        # 4. Win Rate boost
-        if win_rate:
-            if win_rate > 75:
-                boost_points += 2
-            elif win_rate > 65:
-                boost_points += 1
-        
-        # حساب المبلغ النهائي بين MIN و MAX
-        # Confidence يؤثر على المبلغ الأساسي
-        if confidence >= 70:
-            base_amount = min_amount + (range_size * 0.5)  # وسط النطاق
-        else:  # 60-69
-            base_amount = min_amount + (range_size * 0.2)  # قريب من الحد الأدنى
-        
-        # Boost Points يضيف للمبلغ
-        if boost_points >= 8:
-            amount = max_amount
-        elif boost_points >= 6:
-            amount = base_amount + (range_size * 0.3)
-        elif boost_points >= 4:
-            amount = base_amount + (range_size * 0.2)
-        elif boost_points >= 2:
-            amount = base_amount + (range_size * 0.1)
+        # استشارة المستشارين للتصويت
+        if self.dl_client:
+            try:
+                # Amount Voting
+                amount_votes = self.dl_client.vote_amount(rsi, macd, volume_ratio, confidence)
+                avg_amount = sum(amount_votes.values()) / len(amount_votes)
+                
+                # الملك يعدل (±$3)
+                king_adjustment = min(max((confidence - 65) * 0.06, -3.0), 3.0)
+                final_amount = max(12.0, min(23.0, avg_amount + king_adjustment))
+                
+                amount = round(final_amount, 2)
+                
+                print(f"💰 {symbol}: ${avg_amount:.2f}→${amount}")
+                
+            except Exception as e:
+                print(f"⚠️ Amount voting error: {e}")
+                # Fallback
+                amount = MIN_TRADE_AMOUNT
         else:
-            amount = base_amount
+            # Fallback if DL not available
+            amount = MIN_TRADE_AMOUNT
         
-        # التأكد من البقاء ضمن الحدود
-        amount = max(min_amount, min(max_amount, amount))
-        
-        return round(amount, 2)
+        return amount
     
     def _estimate_success_probability(self, similar_patterns):
         """تقدير احتمال النجاح"""
@@ -500,55 +465,60 @@ class AIBrain:
         return pattern
 
     
-    def _calculate_smart_targets(self, confidence, analysis, similar_patterns):
-        """حساب TP و SL والانتظار بذكاء"""
+    def _calculate_smart_targets(self, symbol, confidence, analysis, similar_patterns):
+        """حساب TP و SL والانتظار بالتصويت من المستشارين"""
         import pandas as pd
         
-        # الافتراضي
-        tp = 1.0
-        sl = 2.0
-        wait_hours = 48
-        
-        # تعديل حسب Confidence
-        if confidence >= 80:
-            tp = 3.0
-            sl = 2.5
-            wait_hours = 72
-        elif confidence >= 70:
-            tp = 2.0
-            sl = 2.0
-            wait_hours = 60
-        else:  # 60-69
-            tp = 1.0
-            sl = 1.5
-            wait_hours = 36
-        
-        # تعديل حسب RSI (Oversold)
         rsi = analysis.get('rsi', 50)
-        if not pd.isna(rsi):
-            if rsi < 25:  # oversold جداً
-                tp += 0.3  # فرصة ارتداد قوي
-                wait_hours += 12
-            elif rsi < 30:
-                tp += 0.2
-                wait_hours += 6
-        
-        # تعديل حسب الأنماط المشابهة
-        if similar_patterns:
-            avg_profit = sum(p['pattern'].get('avg_profit', 1.0) for p in similar_patterns) / len(similar_patterns)
-            if avg_profit > 1.5:
-                tp = min(tp + 0.3, 2.0)  # لا يتجاوز 2%
-        
-        # تعديل حسب Volume
+        macd = analysis.get('macd_diff', 0)
         volume_ratio = analysis.get('volume_ratio', 1.0)
-        if not pd.isna(volume_ratio):
-            if volume_ratio > 2.0:  # حجم عالي جداً = خطر
-                sl = max(sl - 0.3, 1.2)  # حماية أسرع
-                wait_hours = max(wait_hours - 12, 24)
+        price_momentum = analysis.get('price_momentum', 0)
+        
+        # استشارة المستشارين للتصويت
+        if self.dl_client:
+            try:
+                # TP Voting
+                tp_votes = self.dl_client.vote_tp_target(rsi, macd, volume_ratio, price_momentum, confidence)
+                avg_tp = sum(tp_votes.values()) / len(tp_votes)
+                
+                # الملك يعدل (±1%)
+                king_adjustment_tp = min(max((confidence - 65) * 0.02, -1.0), 1.0)
+                final_tp = max(0.5, min(11.0, avg_tp + king_adjustment_tp))
+                
+                # SL Voting
+                sl_votes = self.dl_client.vote_stop_loss(rsi, macd, volume_ratio, confidence)
+                avg_sl = sum(sl_votes.values()) / len(sl_votes)
+                
+                # الملك يعدل (±0.3%)
+                king_adjustment_sl = min(max((confidence - 65) * 0.006, -0.3), 0.3)
+                final_sl = max(-2.3, min(-0.1, avg_sl + king_adjustment_sl))
+                
+                tp = round(final_tp, 1)
+                sl = round(abs(final_sl), 1)
+                
+                print(f"📊 {symbol}: TP={avg_tp:.1f}%→{tp}% | SL={avg_sl:.1f}%→{-sl}%")
+                
+            except Exception as e:
+                print(f"⚠️ Voting error: {e}")
+                # Fallback
+                tp = 2.0
+                sl = 1.5
+        else:
+            # Fallback if DL not available
+            tp = 2.0
+            sl = 1.5
+        
+        # Wait hours (based on TP)
+        if tp >= 5:
+            wait_hours = 72
+        elif tp >= 3:
+            wait_hours = 60
+        else:
+            wait_hours = 48
         
         return {
-            'tp': round(tp, 1),
-            'sl': round(sl, 1),
+            'tp': tp,
+            'sl': sl,
             'wait_hours': int(wait_hours)
         }
     
