@@ -64,7 +64,7 @@ class AIBrain:
             self.learned_patterns = []
             self.trap_memory = []
     
-    def should_buy(self, symbol, analysis, mtf, price_drop, models_scores=None):
+    def should_buy(self, symbol, analysis, mtf, price_drop, models_scores=None, risk_manager=None):
         """
         القرار الذكي: هل نشتري؟
         models_scores: dict with scores from all models (optional)
@@ -162,10 +162,10 @@ class AIBrain:
         # 6. القرار النهائي
         if optimized_confidence >= 55:  # استخدام 55 (أكثر عدوانية للتعلم على Testnet)
             # حساب المبلغ الذكي
-            amount = self._calculate_smart_amount(symbol, optimized_confidence, analysis)
+            amount = self._calculate_smart_amount(symbol, optimized_confidence, analysis, risk_manager=risk_manager)
             
             # حساب TP و SL الذكي
-            smart_targets = self._calculate_smart_targets(symbol, optimized_confidence, analysis, similar_success)
+            smart_targets = self._calculate_smart_targets(symbol, optimized_confidence, analysis, similar_success, risk_manager=risk_manager)
             
             decision = {
                 'action': 'BUY',
@@ -394,8 +394,8 @@ class AIBrain:
         
         return optimized
     
-    def _calculate_smart_amount(self, symbol, confidence, analysis, win_rate=None):
-        """حساب المبلغ الذكي بالتصويت من المستشارين"""
+    def _calculate_smart_amount(self, symbol, confidence, analysis, win_rate=None, risk_manager=None):
+        """حساب المبلغ الذكي بالتصويت من المستشارين + Risk Manager"""
         import pandas as pd
         from config import MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT
         
@@ -406,8 +406,16 @@ class AIBrain:
         # استشارة المستشارين للتصويت
         if self.dl_client:
             try:
-                # Amount Voting
-                amount_votes = self.dl_client.vote_amount(rsi, macd, volume_ratio, confidence)
+                # Risk Manager vote (Kelly Criterion)
+                risk_vote = None
+                if risk_manager:
+                    try:
+                        risk_vote = risk_manager.calculate_optimal_amount(symbol, confidence, 12, 20)
+                    except:
+                        pass
+                
+                # Amount Voting (7 مستشارين + Risk Manager)
+                amount_votes = self.dl_client.vote_amount(rsi, macd, volume_ratio, confidence, risk_vote)
                 avg_amount = sum(amount_votes.values()) / len(amount_votes)
                 
                 # الملك يعدل (±$3)
@@ -465,8 +473,8 @@ class AIBrain:
         return pattern
 
     
-    def _calculate_smart_targets(self, symbol, confidence, analysis, similar_patterns):
-        """حساب TP و SL والانتظار بالتصويت من المستشارين"""
+    def _calculate_smart_targets(self, symbol, confidence, analysis, similar_patterns, risk_manager=None):
+        """حساب TP و SL والانتظار بالتصويت من المستشارين + Risk Manager"""
         import pandas as pd
         
         rsi = analysis.get('rsi', 50)
@@ -485,8 +493,23 @@ class AIBrain:
                 king_adjustment_tp = min(max((confidence - 65) * 0.02, -1.0), 1.0)
                 final_tp = max(0.5, min(11.0, avg_tp + king_adjustment_tp))
                 
-                # SL Voting
-                sl_votes = self.dl_client.vote_stop_loss(rsi, macd, volume_ratio, confidence)
+                # Risk Manager vote for SL
+                risk_sl_vote = None
+                if risk_manager:
+                    try:
+                        # Risk Manager يصوت بناءً على المخاطر
+                        sharpe = risk_manager.calculate_sharpe_ratio(symbol, days=7)
+                        if sharpe > 1.0:
+                            risk_sl_vote = -1.8  # patient
+                        elif sharpe > 0.5:
+                            risk_sl_vote = -1.2
+                        else:
+                            risk_sl_vote = -0.8  # strict
+                    except:
+                        pass
+                
+                # SL Voting (7 مستشارين + Risk Manager)
+                sl_votes = self.dl_client.vote_stop_loss(rsi, macd, volume_ratio, confidence, risk_sl_vote)
                 avg_sl = sum(sl_votes.values()) / len(sl_votes)
                 
                 # الملك يعدل (±0.3%)
@@ -523,7 +546,7 @@ class AIBrain:
         }
     
     def should_sell(self, symbol, position, current_price, analysis, mtf, exit_strategy=None):
-        """القرار الذكي: هل نبيع؟ (الملك يقرر مع استشارة DL)"""
+        """القرار الذكي: هل نبيع؟ (الملك يقرر مع استشارة المستشارين)"""
         buy_price = position['buy_price']
         highest_price = position.get('highest_price', buy_price)
         profit_percent = ((current_price - buy_price) / buy_price) * 100
@@ -576,14 +599,39 @@ class AIBrain:
             
             # السوق عادي - AI يقرر بحرية (يكمل للشروط التالية)
         
-        # 3. استشارة Deep Learning للبيع
+        # 3. استشارة المستشارين للبيع (تصويت)
         if self.dl_client:
             try:
-                dl_decision = self.dl_client.get_sell_decision(symbol, position, current_price, analysis)
-                if dl_decision['action'] == 'SELL':
-                    return dl_decision
+                rsi = analysis.get('rsi', 50) if analysis else 50
+                macd_diff = analysis.get('macd_diff', 0) if analysis else 0
+                volume_ratio = analysis.get('volume_ratio', 1.0) if analysis else 1.0
+                trend = mtf.get('trend', 'neutral') if mtf else 'neutral'
+                
+                # المستشارين يصوتون: SELL (1) أو HOLD (0)
+                sell_votes = self.dl_client.vote_sell_now(
+                    symbol, profit_percent, rsi, macd_diff, volume_ratio, trend, hours_held
+                )
+                
+                # حساب نسبة التصويت
+                total_votes = len(sell_votes)
+                sell_count = sum(sell_votes.values())
+                sell_percentage = (sell_count / total_votes) * 100
+                
+                # الملك يقرر بناءً على التصويت
+                # لو 50% أو أكثر صوتوا بيع → الملك يبيع
+                if sell_percentage >= 50:
+                    print(f"🗳️ {symbol}: {sell_count}/{total_votes} voted SELL ({sell_percentage:.0f}%)")
+                    return {
+                        'action': 'SELL',
+                        'reason': f'Consultants voted SELL ({sell_percentage:.0f}%)',
+                        'profit': profit_percent
+                    }
+                else:
+                    # الأغلبية قالوا HOLD - نكمل للشروط التالية
+                    pass
+                    
             except Exception as e:
-                pass  # لو فيه خطأ، نكمل بالمنطق العادي
+                print(f"⚠️ Sell voting error: {e}")
         
         # 4. TP الذكي - الحد الأدنى للبيع بالربح
         if profit_percent >= tp_target:
