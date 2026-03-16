@@ -75,6 +75,15 @@ class StorageManager:
         """تحميل الفخاخ"""
         return self.storage.load_traps()
     
+    # ========== Consultant Votes ==========
+    def save_consultant_vote(self, vote_data):
+        """حفظ نتيجة تصويت مستشار"""
+        return self.storage.save_consultant_vote(vote_data)
+    
+    def load_consultant_votes(self, consultant_name=None, limit=1000):
+        """قراءة نتائج التصويت"""
+        return self.storage.load_consultant_votes(consultant_name, limit)
+    
     # ========== Positions (الحالي) ==========
     def save_positions(self, positions):
         """حفظ المراكز (متوافق مع النظام الحالي)"""
