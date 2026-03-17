@@ -39,34 +39,3 @@ def execute_sell(exchange, symbol, amount, reason=""):
 def calculate_sell_value(amount, price):
     """Calculate sell value"""
     return amount * price
-
-def should_sell_fast_tp(current_price, buy_price, partial_sold, target_percent=1.0):
-    """Check if should sell at fast TP"""
-    profit_percent = ((current_price - buy_price) / buy_price) * 100
-    
-    if not partial_sold and profit_percent >= target_percent:
-        return True, profit_percent
-    
-    return False, profit_percent
-
-def should_sell_bearish(mtf_analysis, current_price, buy_price):
-    """Check if should sell on bearish trend"""
-    if mtf_analysis['trend'] == 'bearish' and mtf_analysis['total'] >= 2:
-        profit_percent = ((current_price - buy_price) / buy_price) * 100
-        return True, profit_percent
-    
-    return False, 0
-
-def should_sell_stop_loss(current_price, highest_price, buy_price, stop_loss_percent=2.0):
-    """Check trailing stop loss"""
-    trailing_stop = highest_price * (1 - stop_loss_percent / 100)
-    
-    if current_price <= trailing_stop:
-        profit_percent = ((current_price - buy_price) / buy_price) * 100
-        return True, profit_percent, "Trailing Stop Loss"
-    
-    return False, 0, ""
-
-def update_highest_price(current_price, highest_price):
-    """Update highest price for trailing stop"""
-    return max(current_price, highest_price)
