@@ -205,7 +205,7 @@ class DeepLearningClientV2:
     
     def get_ranking_prediction(self, symbol):
         """
-        Coin Ranking: تقييم العملة
+        Coin Ranking: تقييم العملة (قديم - سيتم استبداله بـ Liquidity)
         Returns: rank_score (0-100), should_trade (bool)
         """
         accuracy = self.get_model_accuracy('ranking')
@@ -222,6 +222,81 @@ class DeepLearningClientV2:
             return {'rank_score': 65, 'should_trade': True, 'confidence_adjustment': 2}
         else:
             return {'rank_score': 50, 'should_trade': True, 'confidence_adjustment': 0}
+    
+    def get_liquidity_prediction(self, liquidity_metrics):
+        """
+        Liquidity Analyzer: تحليل السيولة من Order Book
+        Returns: liquidity_quality, should_trade, confidence_adjustment
+        """
+        accuracy = self.get_model_accuracy('liquidity')
+        
+        if accuracy < 0.55 or not liquidity_metrics:
+            return {'liquidity_quality': 'medium', 'should_trade': True, 'confidence_adjustment': 0}
+        
+        # استخراج المقاييس
+        liquidity_score = liquidity_metrics.get('liquidity_score', 50)
+        spread_percent = liquidity_metrics.get('spread_percent', 0.1)
+        depth_ratio = liquidity_metrics.get('depth_ratio', 1.0)
+        price_impact = liquidity_metrics.get('price_impact', 0.5)
+        volume_consistency = liquidity_metrics.get('volume_consistency', 50)
+        
+        # تقييم السيولة
+        quality_score = 0
+        
+        # 1. Liquidity Score (0-100)
+        if liquidity_score >= 80:
+            quality_score += 3
+        elif liquidity_score >= 60:
+            quality_score += 1
+        elif liquidity_score < 40:
+            quality_score -= 2
+        
+        # 2. Spread
+        if spread_percent < 0.1:
+            quality_score += 2
+        elif spread_percent > 0.5:
+            quality_score -= 3
+        
+        # 3. Depth Ratio (التوازن)
+        if 0.8 <= depth_ratio <= 1.3:
+            quality_score += 2
+        elif depth_ratio < 0.6 or depth_ratio > 1.6:
+            quality_score -= 2
+        
+        # 4. Price Impact
+        if price_impact < 0.2:
+            quality_score += 2
+        elif price_impact > 1.0:
+            quality_score -= 3
+        
+        # 5. Volume Consistency
+        if volume_consistency >= 70:
+            quality_score += 1
+        elif volume_consistency < 40:
+            quality_score -= 1
+        
+        # حساب التعديل بناءً على الدقة
+        boost_multiplier = 1.0
+        if accuracy >= 0.75:
+            boost_multiplier = 1.5
+        elif accuracy >= 0.65:
+            boost_multiplier = 1.2
+        
+        # القرار النهائي
+        if quality_score >= 6:
+            adjustment = int(8 * boost_multiplier)
+            return {'liquidity_quality': 'excellent', 'should_trade': True, 'confidence_adjustment': adjustment}
+        elif quality_score >= 3:
+            adjustment = int(4 * boost_multiplier)
+            return {'liquidity_quality': 'good', 'should_trade': True, 'confidence_adjustment': adjustment}
+        elif quality_score >= 0:
+            return {'liquidity_quality': 'medium', 'should_trade': True, 'confidence_adjustment': 0}
+        elif quality_score >= -3:
+            adjustment = int(-5 * boost_multiplier)
+            return {'liquidity_quality': 'poor', 'should_trade': True, 'confidence_adjustment': adjustment}
+        else:
+            adjustment = int(-10 * boost_multiplier)
+            return {'liquidity_quality': 'very_poor', 'should_trade': False, 'confidence_adjustment': adjustment}
     
     def get_chart_cnn_prediction(self, rsi, macd, volume_ratio, price_momentum):
         """
@@ -627,7 +702,7 @@ class DeepLearningClientV2:
         
         return votes
     
-    def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence):
+    def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence, liquidity_metrics=None):
         """
         المستشارين يصوتون: هل نشتري؟ (BUY/SKIP)
         Returns: buy_votes (dict with each consultant's vote: 1=BUY, 0=SKIP)
@@ -658,8 +733,20 @@ class DeepLearningClientV2:
         # شراء لو RSI طبيعي + volume طبيعي
         votes['anomaly'] = 1 if (30 < rsi < 70 and volume_ratio < 2.5) else 0
         
-        # Ranking vote
-        # شراء لو confidence جيد
-        votes['ranking'] = 1 if confidence >= 60 else 0
+        # Liquidity vote (الشيخ - محلل السيولة)
+        if liquidity_metrics:
+            liquidity_pred = self.get_liquidity_prediction(liquidity_metrics)
+            liquidity_score = liquidity_metrics.get('liquidity_score', 50)
+            spread = liquidity_metrics.get('spread_percent', 0.1)
+            
+            # شراء لو السيولة جيدة
+            votes['liquidity'] = 1 if (
+                liquidity_pred['should_trade'] and 
+                liquidity_score >= 60 and 
+                spread < 0.3
+            ) else 0
+        else:
+            # fallback للطريقة القديمة
+            votes['liquidity'] = 1 if confidence >= 60 else 0
         
         return votes
