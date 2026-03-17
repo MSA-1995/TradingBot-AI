@@ -5,7 +5,7 @@ All bot settings and constants
 
 # Trading Parameters
 MIN_CONFIDENCE = 55
-MAX_POSITIONS = 50  # الحد الأقصى للمراكز (أفضل 10 من 50)
+MAX_POSITIONS = 50  # الحد الأقصى للصفقات المفتوحة (كل العملات)
 TOTAL_COINS_TO_SCAN = 50
 
 # Capital Management
@@ -18,24 +18,10 @@ MAX_TRADE_AMOUNT = 30
 
 # Legacy (kept for compatibility)
 BASE_AMOUNT = 12
-BOOST_AMOUNT = 24
 
 # Risk Management
 STOP_LOSS_PERCENT = 2.0
 TAKE_PROFIT_PERCENT = 1.0
-TRAILING_STOP_PERCENT = 2.0
-
-# Technical Indicators
-RSI_PERIOD = 14
-RSI_OVERSOLD = 30
-RSI_OVERBOUGHT = 70
-
-MACD_FAST = 12
-MACD_SLOW = 26
-MACD_SIGNAL = 9
-
-# Volume
-MIN_VOLUME_RATIO = 1.0
 
 # Timing
 LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
