@@ -14,7 +14,7 @@ class DeepLearningClientV2:
         self.conn = None
         self._db_params = None
         self._connect_db()
-        print("🧠 Deep Learning Client V3 initialized (8 Models: 7 LSTM + 1 CNN)")
+        print("🧠 Deep Learning Client V3 initialized (8 Models: LightGBM)")
     
     def _connect_db(self):
         """Connect to PostgreSQL"""
