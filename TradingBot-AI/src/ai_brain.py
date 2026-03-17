@@ -235,7 +235,14 @@ class AIBrain:
                     'ranking_score': models_scores.get('ranking', 0) if models_scores else 0,
                     'predicted_tp': smart_targets['tp'],
                     'predicted_sl': smart_targets['sl'],
-                    'predicted_amount': amount
+                    'predicted_amount': amount,
+                    # المؤشرات الـ 5 الجديدة
+                    'atr': analysis.get('atr', 0),
+                    'ema_9': analysis.get('ema_9', 0),
+                    'ema_21': analysis.get('ema_21', 0),
+                    'bid_ask_spread': analysis.get('bid_ask_spread', 0),
+                    'volume_trend': analysis.get('volume_trend', 0),
+                    'price_change_1h': analysis.get('price_change_1h', 0)
                 }
             }
             
