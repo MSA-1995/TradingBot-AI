@@ -187,29 +187,4 @@ def get_multi_timeframe_analysis(exchange, symbol):
     except Exception as e:
         return {'trend': 'neutral', 'scores': {'bullish': 0, 'bearish': 0, 'neutral': 3}, 'total': 3}
 
-def calculate_momentum(df):
-    """Calculate price momentum"""
-    if len(df) < 10:
-        return 0
-    current_price = df['close'].iloc[-1]
-    past_price = df['close'].iloc[-10]
-    momentum = ((current_price - past_price) / past_price) * 100
-    return momentum
 
-def check_volume_smart(volume_ratio, confidence):
-    """Smart volume check based on confidence"""
-    if confidence >= 70:
-        return volume_ratio >= 0.8
-    elif confidence >= 60:
-        return volume_ratio >= 1.0
-    else:
-        return volume_ratio >= 1.2
-
-def adjust_confidence_for_oversold(rsi, macd_diff, confidence):
-    """Adjust confidence for oversold conditions"""
-    if rsi < 25:
-        if macd_diff < 10:
-            return confidence * 0.7
-        else:
-            return confidence * 0.85
-    return confidence
