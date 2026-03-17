@@ -445,7 +445,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             highest_price = position.get('highest_price', buy_price)
             
             # Update highest
-            highest_price = update_highest_price(current_price, highest_price)
+            highest_price = max(current_price, highest_price)
             with symbols_data_lock:
                 position['highest_price'] = highest_price
             
@@ -463,10 +463,9 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                 if mtf is None:
                     mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
                 
-                # الملك يقرر (مع استشارة Smart TP)
+                # الملك يقرر (بالتصويت فقط)
                 sell_decision = ai_brain.should_sell(
-                    symbol, position, current_price, analysis, mtf, 
-                    exit_strategy=exit_strategy  # Smart TP كمستشار
+                    symbol, position, current_price, analysis, mtf
                 )
                 
                 if sell_decision and sell_decision.get('action') == 'SELL':
