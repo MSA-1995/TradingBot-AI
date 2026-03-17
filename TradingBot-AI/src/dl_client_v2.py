@@ -626,3 +626,40 @@ class DeepLearningClientV2:
         votes['ranking'] = 1 if profit_percent > 1.5 else 0
         
         return votes
+    
+    def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence):
+        """
+        المستشارين يصوتون: هل نشتري؟ (BUY/SKIP)
+        Returns: buy_votes (dict with each consultant's vote: 1=BUY, 0=SKIP)
+        """
+        votes = {}
+        
+        # Exit Strategy vote
+        # شراء لو RSI منخفض + confidence جيد
+        votes['exit'] = 1 if (rsi < 40 and confidence >= 60) else 0
+        
+        # MTF vote (يراقب الترند)
+        # شراء لو MACD موجب + volume عالي
+        votes['mtf'] = 1 if (macd > 0 and volume_ratio > 1.2) else 0
+        
+        # Risk vote (محافظ)
+        # شراء لو RSI ليس مرتفع جداً
+        votes['risk'] = 1 if (rsi < 65 and confidence >= 65) else 0
+        
+        # Pattern vote
+        # شراء لو confidence عالي + momentum موجب
+        votes['pattern'] = 1 if (confidence >= 65 and price_momentum > 0) else 0
+        
+        # CNN vote
+        # شراء لو MACD قوي
+        votes['cnn'] = 1 if (macd > 2 and volume_ratio > 1.0) else 0
+        
+        # Anomaly vote (حذر من الشذوذ)
+        # شراء لو RSI طبيعي + volume طبيعي
+        votes['anomaly'] = 1 if (30 < rsi < 70 and volume_ratio < 2.5) else 0
+        
+        # Ranking vote
+        # شراء لو confidence جيد
+        votes['ranking'] = 1 if confidence >= 60 else 0
+        
+        return votes
