@@ -178,11 +178,11 @@ class AIBrain:
                     buy_vote_count = sum(buy_votes.values())
                     total_consultants = len(buy_votes)
                     
-                    # الملك يقرر بناءً على الأغلبية (50% أو أكثر)
+                    # الملك يقرر بناءً على 3/7 أو أكثر (43% كافي للشراء)
                     buy_percentage = (buy_vote_count / total_consultants * 100) if total_consultants > 0 else 0
                     
-                    if buy_vote_count < (total_consultants / 2):
-                        # الأغلبية رفضت الشراء
+                    if buy_vote_count < 3:  # لازم 3 مستشارين على الأقل يوافقون
+                        # أقل من 3 رفضوا الشراء
                         decision = {
                             'action': 'SKIP',
                             'reason': f'Consultants voted SKIP ({100-buy_percentage:.0f}%)',
@@ -707,8 +707,8 @@ class AIBrain:
                 sell_percentage = (sell_count / total_votes) * 100
                 
                 # الملك يقرر بناءً على التصويت
-                # لو 50% أو أكثر صوتوا بيع → الملك يبيع
-                if sell_percentage >= 50:
+                # لو 3 أو أكثر صوتوا بيع → الملك يبيع (43% كافي)
+                if sell_count >= 3:
                     print(f"🗳️ {symbol}: {sell_count}/{total_votes} voted SELL ({sell_percentage:.0f}%)")
                     return {
                         'action': 'SELL',
@@ -716,7 +716,7 @@ class AIBrain:
                         'profit': profit_percent
                     }
                 else:
-                    # الأغلبية قالوا HOLD - نكمل للشروط التالية
+                    # أقل من 3 قالوا HOLD - نكمل للشروط التالية
                     pass
                     
             except Exception as e:
