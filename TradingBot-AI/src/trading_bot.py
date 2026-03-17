@@ -921,14 +921,44 @@ try:
             if action == 'BUY':
                 news_display = f" | {result['news_summary']}" if result.get('news_summary') else ""
                 
+                # Display voting results if available
+                voting_display = ""
                 if 'decision' in result:
-                    print(f"{Fore.GREEN}🟢 BUY {symbol} 🧠 | AI Confidence:{result['confidence']}/120 | ${result['amount']}{news_display}{Style.RESET_ALL}")
+                    decision = result['decision']
+                    tp_target = decision.get('tp_target', 0)
+                    sl_target = decision.get('sl_target', 0)
+                    buy_vote_percentage = decision.get('buy_vote_percentage', 0)
+                    voting_display = f" | 🗳️ Buy:{buy_vote_percentage:.0f}% TP:{tp_target:.1f}% SL:{sl_target:.1f}% Amount:${result['amount']:.0f}"
+                
+                if 'decision' in result:
+                    print(f"{Fore.GREEN}🟢 BUY {symbol} 🧠 | AI Confidence:{result['confidence']}/120{voting_display}{news_display}{Style.RESET_ALL}")
                 else:
                     print(f"{Fore.GREEN}🟢 BUY {symbol} | Confidence:{result['confidence']}/120 | ${result['amount']}{Style.RESET_ALL}")
                 
                 buy_result = execute_buy(exchange, symbol, result['amount'], result['price'], result['confidence'])
                 if buy_result['success']:
-                    send_buy_notification(symbol, buy_result['amount'], result['price'], result['amount'], result['confidence'])
+                    # Get voting results if available
+                    tp_target = None
+                    sl_target = None
+                    buy_vote_percentage = None
+                    buy_vote_count = None
+                    total_consultants = None
+                    
+                    if 'decision' in result:
+                        tp_target = result['decision'].get('tp_target')
+                        sl_target = result['decision'].get('sl_target')
+                        buy_vote_percentage = result['decision'].get('buy_vote_percentage')
+                        buy_vote_count = result['decision'].get('buy_vote_count')
+                        total_consultants = result['decision'].get('total_consultants')
+                    
+                    send_buy_notification(symbol, buy_result['amount'], result['price'], result['amount'], result['confidence'], 
+                                        tp_target, sl_target, buy_vote_percentage, buy_vote_count, total_consultants)
+                    
+                    # Save buy voting results for learning
+                    if ai_brain and 'decision' in result:
+                        buy_votes = result['decision'].get('buy_votes', {})
+                        if buy_votes:
+                            ai_brain.save_buy_voting_results(symbol, buy_votes)
                     
                     position_data = {
                         'buy_price': buy_result['price'],
