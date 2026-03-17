@@ -173,8 +173,9 @@ class AIBrain:
                     macd = analysis.get('macd_diff', 0)
                     volume_ratio = analysis.get('volume_ratio', 1.0)
                     price_momentum = analysis.get('price_momentum', 0)
+                    liquidity_metrics = analysis.get('liquidity', {})
                     
-                    buy_votes = self.dl_client.vote_buy_now(rsi, macd, volume_ratio, price_momentum, optimized_confidence)
+                    buy_votes = self.dl_client.vote_buy_now(rsi, macd, volume_ratio, price_momentum, optimized_confidence, liquidity_metrics)
                     buy_vote_count = sum(buy_votes.values())
                     total_consultants = len(buy_votes)
                     
