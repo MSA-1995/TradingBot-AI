@@ -26,6 +26,7 @@ except:
 ENCRYPTED_API_KEY = "gAAAAABpqNT5S7vbJXLley0iN7H-kBtbmUZofnkpdadW0a3ygU6JyPxGCpCDUCzeXq9Vwv85JM4Tf9X-1Oe-oJrTFCpZ0gfthS_T6whxOtj8K60gCnG-hd8GRi0rsunWJEq1D2dZsJc6QEXGwrxhD9NOWeiHHYxY3GthbjH7alHNhu_7VY7BXiU="
 ENCRYPTED_SECRET_KEY = "gAAAAABpqNT51kkfLH9UbjItW_Gp-g93Fs6QT5h4g_rOhIK4n3cs3_K7ZMDBEEw_yrh-JJbbVSJS3-PzH9cZ7ta86_T_Em9N3Yra8QbSiIojOW3yzGBA5lL3mgISOYj6bpbpW6Dt4zLunlpz62lsXGyba_SmsvdFTnf2YzNy2BQfzc__jULwvPM="
 ENCRYPTED_WEBHOOK = "gAAAAABprab4hsuU0oVeIcTPlFqvimOULJLFRNAqFvSOwZtfwEJ6tEk9M4wvNjgcLlgZCysETBszSvYekkW4Zsba6qhpuLmR6wS4gT63WCRdwgJbw83OxIYU9tDEFN3RbUi2QSHR0sFQv8lkKCmEkl6pkCDnz8dAFcf91VBHQoRQNuUi5BaWl4WWuPi7Rz9X_FUsFTJ3b1y7g_n3RMiMuh3bErcLcejuQMmNXt4OsA3KEP3w6ZWhswU="
+ENCRYPTED_CRITICAL_WEBHOOK = "gAAAAABpuay0FYK_AXFBy_trEWffy5Ho8xzGr4-zSrASVWnVqipfKR3_k6C9VsucFp1qPEzcHaXDb8txhiVUkFrXFKTD9XIguwTnCZcpj6FqnGTKi7-jaCDb3eHEdeNiZcmKpax4ma_WNrlRHLJDTVDSuWvtff41bmMLyohJ3_ezK3Ox0-8iHeVDnutL1oyU7sMHwWfWY4f12xvc--03MTYqu42u_0IfNbEvyCt2LGvDNlVIJcCkQeg="
 
 # Master key for password encryption (hardcoded - secure)
 _MASTER_KEY = base64.urlsafe_b64encode(b'MSA_TRADING_BOT_2026_SECRET_KEY!')
@@ -35,6 +36,22 @@ def get_encryption_key():
     """Get encryption key - supports Fernet encrypted password"""
     # Try Environment Variable first
     encrypted_key = os.getenv('ENCRYPTION_KEY')
+    if not encrypted_key:
+        for env_file in [
+            '/home/container/TradingBot-AI/.env',
+            '/home/container/TradingBot/.env',
+            '/home/container/.env'
+        ]:
+            try:
+                with open(env_file) as f:
+                    for line in f:
+                        if line.startswith('ENCRYPTION_KEY='):
+                            encrypted_key = line.strip().split('=', 1)[1]
+                            break
+                if encrypted_key:
+                    break
+            except:
+                pass
     
     if encrypted_key:
         try:
@@ -118,6 +135,23 @@ def get_discord_webhook():
         key = base64.urlsafe_b64encode(kdf.derive(_KEY.encode()))
         fernet = Fernet(key)
         webhook = fernet.decrypt(ENCRYPTED_WEBHOOK.encode()).decode()
+        return webhook
+    except:
+        return None
+
+def get_critical_webhook():
+    """فك تشفير Critical Alerts Webhook"""
+    try:
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=b'binance_bot_salt_2026',
+            iterations=100000,
+            backend=default_backend()
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(_KEY.encode()))
+        fernet = Fernet(key)
+        webhook = fernet.decrypt(ENCRYPTED_CRITICAL_WEBHOOK.encode()).decode()
         return webhook
     except:
         return None
