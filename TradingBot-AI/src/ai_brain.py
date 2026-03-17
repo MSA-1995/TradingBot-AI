@@ -641,7 +641,7 @@ class AIBrain:
             'wait_hours': int(wait_hours)
         }
     
-    def should_sell(self, symbol, position, current_price, analysis, mtf, exit_strategy=None):
+    def should_sell(self, symbol, position, current_price, analysis, mtf):
         """القرار الذكي: هل نبيع؟ (الملك يقرر مع استشارة المستشارين)"""
         buy_price = position['buy_price']
         highest_price = position.get('highest_price', buy_price)
@@ -722,30 +722,12 @@ class AIBrain:
                         'reason': f'Consultants voted SELL ({sell_percentage:.0f}%)',
                         'profit': profit_percent
                     }
-                else:
-                    # أقل من 3 قالوا HOLD - نكمل للشروط التالية
-                    pass
                     
             except Exception as e:
                 print(f"⚠️ Sell voting error: {e}")
         
-        # 4. TP الذكي - الحد الأدنى للبيع بالربح
+        # 4. TP الذكي - الحد الأدنى للبيع بالربح (بدون استشارة Exit Strategy)
         if profit_percent >= tp_target:
-            # استشارة Smart TP (Exit Strategy) للتحسين
-            if exit_strategy:
-                try:
-                    smart_tp_decision = exit_strategy._check_smart_tp(
-                        symbol, profit_percent, position, analysis, mtf,
-                        exit_strategy._get_coin_exit_history(symbol)
-                    )
-                    
-                    # لو Smart TP قال بيع أو hold، نسمع له
-                    if smart_tp_decision.get('action') in ['SELL', 'HOLD']:
-                        return smart_tp_decision
-                except:
-                    pass  # لو فيه خطأ، نكمل بالمنطق العادي
-            
-            # المنطق العادي (بدون Smart TP)
             rsi = analysis.get('rsi', 50) if analysis else 50
             macd_diff = analysis.get('macd_diff', 0) if analysis else 0
             trend = mtf.get('trend', 'neutral') if mtf else 'neutral'
