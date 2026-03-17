@@ -161,6 +161,47 @@ class AIBrain:
         
         # 6. القرار النهائي
         if optimized_confidence >= 55:  # استخدام 55 (أكثر عدوانية للتعلم على Testnet)
+            
+            # 🗳️ المستشارين يصوتون: هل نشتري؟
+            buy_votes = {}
+            buy_vote_count = 0
+            total_consultants = 0
+            
+            if self.dl_client:
+                try:
+                    rsi = analysis.get('rsi', 50)
+                    macd = analysis.get('macd_diff', 0)
+                    volume_ratio = analysis.get('volume_ratio', 1.0)
+                    price_momentum = analysis.get('price_momentum', 0)
+                    
+                    buy_votes = self.dl_client.vote_buy_now(rsi, macd, volume_ratio, price_momentum, optimized_confidence)
+                    buy_vote_count = sum(buy_votes.values())
+                    total_consultants = len(buy_votes)
+                    
+                    # الملك يقرر بناءً على الأغلبية (50% أو أكثر)
+                    buy_percentage = (buy_vote_count / total_consultants * 100) if total_consultants > 0 else 0
+                    
+                    if buy_vote_count < (total_consultants / 2):
+                        # الأغلبية رفضت الشراء
+                        decision = {
+                            'action': 'SKIP',
+                            'reason': f'Consultants voted SKIP ({100-buy_percentage:.0f}%)',
+                            'confidence': optimized_confidence
+                        }
+                        self.storage.save_ai_decision({
+                            'symbol': symbol,
+                            'decision': 'SKIP',
+                            'reason': f'Voting rejected: {buy_vote_count}/{total_consultants}',
+                            'confidence': optimized_confidence
+                        })
+                        return decision
+                    
+                    print(f"🗳️ {symbol}: {buy_vote_count}/{total_consultants} voted BUY ({buy_percentage:.0f}%)")
+                
+                except Exception as e:
+                    print(f"⚠️ Buy voting error: {e}")
+                    # Fallback: continue without voting
+            
             # حساب المبلغ الذكي
             amount = self._calculate_smart_amount(symbol, optimized_confidence, analysis, risk_manager=risk_manager)
             
@@ -176,6 +217,10 @@ class AIBrain:
                 'max_wait_hours': smart_targets['wait_hours'],
                 'reason': f'AI optimized from {base_confidence} to {optimized_confidence}',
                 'success_probability': self._estimate_success_probability(similar_success),
+                'buy_vote_percentage': (buy_vote_count / total_consultants * 100) if total_consultants > 0 else 0,
+                'buy_vote_count': buy_vote_count,
+                'total_consultants': total_consultants,
+                'buy_votes': buy_votes,  # حفظ تصويت كل مستشار
                 'ai_data': {
                     'rsi': analysis.get('rsi', 50),
                     'macd': analysis.get('macd_diff', 0),
@@ -497,6 +542,24 @@ class AIBrain:
                 self.storage.save_consultant_vote(vote_record)
         except Exception as e:
             print(f"⚠️ Error saving voting results: {e}")
+    
+    def save_buy_voting_results(self, symbol, buy_votes):
+        """حفظ نتائج تصويت الشراء (يُستدعى عند الشراء)"""
+        try:
+            # حفظ تصويت كل مستشار على الشراء
+            for consultant_name, vote in buy_votes.items():
+                vote_record = {
+                    'symbol': symbol,
+                    'consultant_name': consultant_name,
+                    'vote_type': 'buy',
+                    'vote_value': float(vote),  # 1=BUY, 0=SKIP
+                    'actual_result': 1.0,  # تم الشراء فعلاً
+                    'is_correct': (vote == 1),  # صح لو صوت BUY
+                    'profit_percent': 0.0  # ما نعرف الربح بعد
+                }
+                self.storage.save_consultant_vote(vote_record)
+        except Exception as e:
+            print(f"⚠️ Error saving buy voting results: {e}")
 
     
     def _calculate_smart_targets(self, symbol, confidence, analysis, similar_patterns, risk_manager=None):
