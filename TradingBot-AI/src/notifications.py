@@ -66,7 +66,7 @@ def log_trade(action, symbol, amount, price, value, profit_percent=None, reason=
     except Exception as e:
         print(f"❌ Log error: {e}")
 
-def send_buy_notification(symbol, amount, price, value, confidence):
+def send_buy_notification(symbol, amount, price, value, confidence, tp_target=None, sl_target=None, buy_vote_percentage=None, buy_vote_count=None, total_consultants=None):
     """Send buy notification"""
     # Discord - احترافي
     fields = [
@@ -76,6 +76,14 @@ def send_buy_notification(symbol, amount, price, value, confidence):
         {"name": "Value", "value": f"${value:.2f}", "inline": True},
         {"name": "Confidence", "value": f"{confidence}/120", "inline": True}
     ]
+    
+    # Add price voting results if available
+    if tp_target is not None and sl_target is not None:
+        fields.append({"name": "Price Voting", "value": f"TP: {tp_target:.1f}% | SL: {sl_target:.1f}% | Amount: ${value:.0f}", "inline": False})
+    
+    # Add buy voting results if available
+    if buy_vote_percentage is not None and buy_vote_count is not None and total_consultants is not None:
+        fields.append({"name": "Buy Voting", "value": f"{buy_vote_percentage:.0f}% ({buy_vote_count}/{total_consultants} voted BUY)", "inline": False})
     
     send_discord_embed("BUY SIGNAL", fields, 'green')
     
