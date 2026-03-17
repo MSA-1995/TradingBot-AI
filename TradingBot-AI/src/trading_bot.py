@@ -1004,12 +1004,11 @@ try:
                             'ranking_score': 0
                         }
                         
-                        # Get MTF score
-                        if mtf_analyzer:
+                        # Get Smart Money score
+                        if smart_money_tracker:
                             try:
-                                mtf_analysis = mtf_analyzer.analyze(symbol)
-                                if mtf_analysis:
-                                    advisor_scores['mtf_score'] = mtf_analysis.get('confidence_boost', 0) or 0
+                                smart_money_boost = smart_money_tracker.get_confidence_adjustment(symbol, result['analysis'])
+                                advisor_scores['smart_money_score'] = smart_money_boost
                             except:
                                 pass
                         
@@ -1054,12 +1053,12 @@ try:
                             except:
                                 pass
                         
-                        # Get Ranking score
-                        if coin_ranker:
+                        # Get Liquidity score
+                        if liquidity_analyzer:
                             try:
-                                should_trade = coin_ranker.should_trade_coin(symbol)
-                                if should_trade:
-                                    advisor_scores['ranking_score'] = should_trade.get('confidence_adjustment', 0) or 0
+                                liquidity_check = liquidity_analyzer.should_trade_coin(symbol, result['analysis'])
+                                if liquidity_check:
+                                    advisor_scores['liquidity_score'] = liquidity_check.get('confidence_adjustment', 0) or 0
                             except:
                                 pass
                         
@@ -1136,18 +1135,8 @@ try:
                 except Exception as e:
                     print(f"⚠️ Risk report error: {e}")
             
-            # Coin Ranking Report
-            if coin_ranker:
-                try:
-                    ranking_report = coin_ranker.get_ranking_report()
-                    if ranking_report:
-                        print(f"\n🏆 Coin Ranking Report:")
-                        print(f"  Total Coins: {ranking_report['total_coins']}")
-                        print(f"  Strong Buy: {ranking_report['strong_buy_count']}")
-                        print(f"  Avoid: {ranking_report['avoid_count']}")
-                        print(f"  Avg Win Rate: {ranking_report['avg_win_rate']:.1f}%")
-                except Exception as e:
-                    print(f"⚠️ Ranking report error: {e}")
+            # Liquidity Report (optional - can be removed if not needed)
+            # Removed coin ranking report as it's replaced by liquidity analyzer
             
             # Anomaly Report
             if anomaly_detector:
