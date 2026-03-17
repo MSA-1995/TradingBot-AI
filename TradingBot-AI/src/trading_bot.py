@@ -98,12 +98,13 @@ try:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
     
-    from models.multi_timeframe_analyzer import MultiTimeframeAnalyzer
     from models.risk_manager import RiskManager
-    from models.coin_ranking_model import CoinRankingModel
     from models.anomaly_detector import AnomalyDetector
     from models.exit_strategy_model import ExitStrategyModel
     from models.enhanced_pattern_recognition import EnhancedPatternRecognition
+    from models.fibonacci_analyzer import FibonacciAnalyzer
+    from models.smart_money_tracker import SmartMoneyTracker
+    from models.liquidity_analyzer import LiquidityAnalyzer
     
     MODELS_ENABLED = True
 except Exception as e:
@@ -316,19 +317,21 @@ ai_brain = AIBrain(AI_BOUNDARIES) if AI_ENABLED else None
 
 # Advanced Models
 if MODELS_ENABLED:
-    mtf_analyzer = MultiTimeframeAnalyzer(exchange)
     risk_manager = RiskManager(storage)
-    coin_ranker = CoinRankingModel(storage)
     anomaly_detector = AnomalyDetector(exchange)
     exit_strategy = ExitStrategyModel(storage)
     pattern_recognizer = EnhancedPatternRecognition(storage)
+    fibonacci_analyzer = FibonacciAnalyzer()
+    smart_money_tracker = SmartMoneyTracker(exchange)
+    liquidity_analyzer = LiquidityAnalyzer(exchange)
 else:
-    mtf_analyzer = None
     risk_manager = None
-    coin_ranker = None
     anomaly_detector = None
     exit_strategy = None
     pattern_recognizer = None
+    fibonacci_analyzer = None
+    smart_money_tracker = None
+    liquidity_analyzer = None
 
 # ========== BANNER ==========
 print("=" * 60)
@@ -385,12 +388,13 @@ else:
     print(f"⚙️ AI Brain: DISABLED")
 
 if MODELS_ENABLED:
-    print(f"📊 Multi-Timeframe Analyzer: ACTIVE")
     print(f"🛡️ Risk Manager: ACTIVE")
-    print(f"🏆 Coin Ranking: ACTIVE")
     print(f"🚨 Anomaly Detector: ACTIVE")
     print(f"🎯 Exit Strategy: ACTIVE")
     print(f"🧠 Pattern Recognition: ACTIVE")
+    print(f"📊 Fibonacci Analyzer: ACTIVE")
+    print(f"🐋 Smart Money Tracker: ACTIVE")
+    print(f"💧 Liquidity Analyzer: ACTIVE")
 
 if NEWS_ENABLED:
     print(f"📰 News Sentiment Analyzer: ACTIVE")
@@ -542,18 +546,26 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             # Get MTF and calculate confidence
             mtf = analysis.get('mtf') or get_multi_timeframe_analysis(exchange_instance, symbol)
             
-            # Advanced MTF Analysis
-            mtf_boost = 0
-            if mtf_analyzer:
+            # Smart Money Analysis (بديل MTF)
+            smart_money_boost = 0
+            if smart_money_tracker:
                 try:
-                    mtf_analysis = mtf_analyzer.analyze(symbol)
-                    if mtf_analysis:
-                        mtf_boost = mtf_analysis.get('confidence_boost', 0) or 0
-                        entry_point = mtf_analyzer.get_best_entry_point(symbol)
-                        if entry_point and entry_point.get('entry') == 'EXCELLENT':
-                            mtf_boost += 5
+                    smart_money_boost = smart_money_tracker.get_confidence_adjustment(symbol, analysis)
+                    should_avoid, avoid_reason = smart_money_tracker.should_avoid(symbol, analysis)
+                    if should_avoid:
+                        return {'symbol': symbol, 'action': 'SKIP', 'reason': avoid_reason}
                 except Exception as e:
-                    mtf_boost = 0
+                    smart_money_boost = 0
+            
+            # Fibonacci Analysis
+            fibonacci_boost = 0
+            if fibonacci_analyzer:
+                try:
+                    df = analysis.get('df')
+                    if df is not None:
+                        fibonacci_boost = fibonacci_analyzer.get_confidence_boost(current_price, df)
+                except Exception as e:
+                    fibonacci_boost = 0
             
             # Calculate price drop
             price_drop = {'drop_percent': 0, 'confirmed': False}
@@ -590,16 +602,16 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     news_adjustment = 0
                     news_summary = "No news"
             
-            # Coin Ranking Check
-            coin_rank_adjustment = 0
-            if coin_ranker:
+            # Liquidity Check (بديل Coin Ranking)
+            liquidity_adjustment = 0
+            if liquidity_analyzer:
                 try:
-                    should_trade = coin_ranker.should_trade_coin(symbol)
+                    should_trade = liquidity_analyzer.should_trade_coin(symbol, analysis)
                     if not should_trade['trade']:
                         return {'symbol': symbol, 'action': 'SKIP', 'reason': should_trade['reason']}
-                    coin_rank_adjustment = should_trade.get('confidence_adjustment', 0) or 0
+                    liquidity_adjustment = should_trade.get('confidence_adjustment', 0) or 0
                 except Exception as e:
-                    coin_rank_adjustment = 0
+                    liquidity_adjustment = 0
             
             # Anomaly Detection
             if anomaly_detector:
@@ -628,20 +640,22 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             if ai_brain:
                 # Collect all models scores
                 models_scores = {
-                    'mtf': mtf_boost,
+                    'smart_money': smart_money_boost,
+                    'fibonacci': fibonacci_boost,
                     'risk': 0,  # Will be calculated below
                     'anomaly': 0,  # Already checked above
                     'exit': 0,
                     'pattern': pattern_adjustment,
-                    'ranking': coin_rank_adjustment
+                    'liquidity': liquidity_adjustment
                 }
                 
                 decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop, models_scores, risk_manager)
                 
                 # Apply all adjustments
                 try:
-                    mtf_boost = 0 if mtf_boost is None else mtf_boost
-                    coin_rank_adjustment = 0 if coin_rank_adjustment is None else coin_rank_adjustment
+                    smart_money_boost = 0 if smart_money_boost is None else smart_money_boost
+                    fibonacci_boost = 0 if fibonacci_boost is None else fibonacci_boost
+                    liquidity_adjustment = 0 if liquidity_adjustment is None else liquidity_adjustment
                     pattern_adjustment = 0 if pattern_adjustment is None else pattern_adjustment
                     news_adjustment = 0 if news_adjustment is None else news_adjustment
                     
@@ -660,7 +674,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         except:
                             dl_adjustment = 0
                     
-                    total_adjustment = mtf_boost + coin_rank_adjustment + pattern_adjustment + news_adjustment + dl_adjustment
+                    total_adjustment = smart_money_boost + fibonacci_boost + liquidity_adjustment + pattern_adjustment + news_adjustment + dl_adjustment
                     if total_adjustment != 0:
                         decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
                 except Exception as e:
@@ -725,14 +739,6 @@ try:
         loop_count += 1
         current_time = datetime.now().strftime("%H:%M:%S")
         print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
-        
-        # Update coin rankings (صامت) - استخدام العملات الديناميكية
-        if coin_ranker and loop_count % 600 == 1:  # تحسين السرعة: من 300 إلى 600 (كل 10 دقائق)
-            try:
-                current_symbols = get_dynamic_symbols()
-                rankings = coin_ranker.rank_all_coins(current_symbols)
-            except Exception as e:
-                pass
         
         # Balance (cached - update every 60 seconds - تحسين السرعة)
         if loop_count == 1 or loop_count % 60 == 0:
