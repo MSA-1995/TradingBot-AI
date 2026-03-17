@@ -31,10 +31,48 @@ def get_market_analysis(exchange, symbol, limit=60):
         df['price_change'] = df['close'].pct_change(10) * 100
         df['price_change'] = df['price_change'].fillna(0)  # Fill NaN with 0
         
+        # ========== الإضافات الجديدة (5 مؤشرات) ==========
+        
+        # 1. ATR (Average True Range) - للمخاطرة
+        df['high_low'] = df['high'] - df['low']
+        df['high_close'] = abs(df['high'] - df['close'].shift())
+        df['low_close'] = abs(df['low'] - df['close'].shift())
+        df['true_range'] = df[['high_low', 'high_close', 'low_close']].max(axis=1)
+        df['atr'] = df['true_range'].rolling(window=14).mean()
+        df['atr'] = df['atr'].fillna(1.0)
+        
+        # 2. EMA 9/21 Crossover - للأنماط
+        df['ema_9'] = df['close'].ewm(span=9, adjust=False).mean()
+        df['ema_21'] = df['close'].ewm(span=21, adjust=False).mean()
+        df['ema_crossover'] = (df['ema_9'] > df['ema_21']).astype(int) * 2 - 1  # 1 or -1
+        
+        # 3. Bid-Ask Spread - للفخاخ (سيتم حسابه من API)
+        # سيتم إضافته لاحقاً من ticker data
+        
+        # 4. Volume Trend - للبيع
+        df['volume_trend'] = df['volume'].pct_change(3) * 100  # تغير الحجم في آخر 3 شموع
+        df['volume_trend'] = df['volume_trend'].fillna(0)
+        
+        # 5. Price Change 1h - للشذوذ
+        if len(df) >= 12:  # 12 شموع × 5 دقائق = ساعة
+            df['price_change_1h'] = ((df['close'] - df['close'].shift(12)) / df['close'].shift(12)) * 100
+        else:
+            df['price_change_1h'] = 0
+        df['price_change_1h'] = df['price_change_1h'].fillna(0)
+        
         # Multi-timeframe analysis من نفس البيانات
         mtf_analysis = calculate_mtf_from_5m_data(df)
         
         latest = df.iloc[-1]
+        
+        # Get Bid-Ask Spread from ticker
+        bid_ask_spread = 0
+        try:
+            ticker = exchange.fetch_ticker(symbol)
+            if ticker.get('bid') and ticker.get('ask'):
+                bid_ask_spread = ((ticker['ask'] - ticker['bid']) / ticker['bid']) * 100
+        except:
+            bid_ask_spread = 0
         
         return {
             'rsi': latest['rsi'],
@@ -47,7 +85,15 @@ def get_market_analysis(exchange, symbol, limit=60):
             'price_momentum': latest['price_change'],
             'close': latest['close'],
             'df': df,
-            'mtf': mtf_analysis  # إضافة تحليل multi-timeframe
+            'mtf': mtf_analysis,  # إضافة تحليل multi-timeframe
+            # الإضافات الجديدة
+            'atr': latest['atr'],
+            'ema_9': latest['ema_9'],
+            'ema_21': latest['ema_21'],
+            'ema_crossover': latest['ema_crossover'],
+            'bid_ask_spread': bid_ask_spread,
+            'volume_trend': latest['volume_trend'],
+            'price_change_1h': latest['price_change_1h']
         }
     except Exception as e:
         print(f"❌ Analysis error {symbol}: {e}")
