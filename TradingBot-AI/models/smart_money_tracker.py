@@ -73,8 +73,14 @@ class SmartMoneyTracker:
             recent_df = df.tail(10)
             
             # إذا السعر طالع والحجم يزيد = تراكم (Accumulation)
-            price_trend = (recent_df['close'].iloc[-1] - recent_df['close'].iloc[0]) / recent_df['close'].iloc[0]
-            volume_trend = (recent_df['volume'].iloc[-1] - recent_df['volume'].iloc[0]) / recent_df['volume'].iloc[0]
+            first_close = recent_df['close'].iloc[0]
+            first_volume = recent_df['volume'].iloc[0]
+            
+            if first_close == 0 or first_volume == 0:
+                return 0
+            
+            price_trend = (recent_df['close'].iloc[-1] - first_close) / first_close
+            volume_trend = (recent_df['volume'].iloc[-1] - first_volume) / first_volume
             
             if price_trend > 0 and volume_trend > 0:
                 # تراكم قوي
