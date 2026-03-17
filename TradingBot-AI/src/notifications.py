@@ -6,9 +6,10 @@ Handles Discord messages and file logging
 import requests
 from datetime import datetime
 import os
-from config_encrypted import get_discord_webhook
+from config_encrypted import get_discord_webhook, get_critical_webhook
 
 DISCORD_WEBHOOK = get_discord_webhook()
+CRITICAL_WEBHOOK = get_critical_webhook()
 
 def send_discord_embed(title, fields, color='blue', thumbnail_url=None):
     """Send embed message to Discord"""
@@ -165,7 +166,11 @@ def send_startup_notification():
 
 def send_critical_alert(error_type, message, details=None):
     """Send critical error alert to Discord"""
+    if not CRITICAL_WEBHOOK:
+        return
+    
     fields = [
+        {"name": "Bot", "value": "Trading Bot", "inline": True},
         {"name": "Error Type", "value": error_type, "inline": True},
         {"name": "Timestamp", "value": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "inline": True},
         {"name": "Message", "value": message, "inline": False}
@@ -174,7 +179,20 @@ def send_critical_alert(error_type, message, details=None):
     if details:
         fields.append({"name": "Details", "value": str(details)[:1000], "inline": False})
     
-    send_discord_embed("🚨 CRITICAL ALERT", fields, 'red')
+    embed = {
+        "title": "🚨 CRITICAL ALERT",
+        "color": 0xff0000,  # Red
+        "fields": fields,
+        "footer": {
+            "text": "MSA Trading Bot • System Alerts"
+        },
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    try:
+        requests.post(CRITICAL_WEBHOOK, json={"embeds": [embed]}, timeout=5)
+    except:
+        pass
 
 def send_database_error(error_message):
     """Send database connection error alert"""
