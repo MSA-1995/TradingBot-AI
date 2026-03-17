@@ -101,10 +101,10 @@ def send_sell_notification(symbol, amount, price, value, profit_percent, reason)
         color = 'yellow'
     elif "STOP" in reason or "LOSS" in reason:
         signal_type = "STOP LOSS"
-        color = 'red'
+        color = 'yellow'  # Changed from red to yellow
     else:
         signal_type = "SELL SIGNAL"
-        color = 'red'
+        color = 'yellow'  # Changed from red to yellow
     
     # تحديد علامة الربح
     profit_sign = "+" if profit_percent > 0 else ""
