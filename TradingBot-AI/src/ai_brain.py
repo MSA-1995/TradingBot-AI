@@ -23,16 +23,16 @@ class AIBrain:
         # تحميل المعرفة السابقة
         self.load_knowledge()
         
-        # MTF Analyzer (optional)
+        # Smart Money Tracker (optional)
         try:
             import sys
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             if project_root not in sys.path:
                 sys.path.insert(0, project_root)
-            from models.multi_timeframe_analyzer import MultiTimeframeAnalyzer
-            self.mtf_analyzer = None  # Will be set externally
+            from models.smart_money_tracker import SmartMoneyTracker
+            self.smart_money_tracker = None  # Will be set externally
         except:
-            self.mtf_analyzer = None
+            self.smart_money_tracker = None
         
         # Deep Learning Client (optional)
         try:
