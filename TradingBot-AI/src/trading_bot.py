@@ -64,8 +64,8 @@ from config_encrypted import get_api_keys, get_discord_webhook
 from config import *
 
 # Modules
-from analysis import get_market_analysis, get_multi_timeframe_analysis, calculate_momentum
-from trading import execute_buy, execute_sell, calculate_sell_value, should_sell_fast_tp, should_sell_bearish, should_sell_stop_loss, update_highest_price
+from analysis import get_market_analysis, get_multi_timeframe_analysis
+from trading import execute_buy, execute_sell, calculate_sell_value
 from notifications import send_buy_notification, send_sell_notification, send_positions_report, send_startup_notification
 from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent, format_price
 from storage import StorageManager
