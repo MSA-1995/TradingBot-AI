@@ -161,3 +161,49 @@ def send_startup_notification():
     ]
     
     send_discord_embed("BOT STARTED", fields, 'blue')
+
+
+def send_critical_alert(error_type, message, details=None):
+    """Send critical error alert to Discord"""
+    fields = [
+        {"name": "Error Type", "value": error_type, "inline": True},
+        {"name": "Timestamp", "value": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "inline": True},
+        {"name": "Message", "value": message, "inline": False}
+    ]
+    
+    if details:
+        fields.append({"name": "Details", "value": str(details)[:1000], "inline": False})
+    
+    send_discord_embed("🚨 CRITICAL ALERT", fields, 'red')
+
+def send_database_error(error_message):
+    """Send database connection error alert"""
+    send_critical_alert(
+        "Database Connection",
+        "Failed to connect to database",
+        error_message
+    )
+
+def send_model_error(model_name, error_message):
+    """Send model loading/prediction error alert"""
+    send_critical_alert(
+        f"Model Error: {model_name}",
+        "Model failed to load or predict",
+        error_message
+    )
+
+def send_training_error(error_message):
+    """Send training failure alert"""
+    send_critical_alert(
+        "Training Failed",
+        "Deep Learning training encountered an error",
+        error_message
+    )
+
+def send_exchange_error(error_message):
+    """Send exchange API error alert"""
+    send_critical_alert(
+        "Exchange API Error",
+        "Failed to connect to Binance",
+        error_message
+    )
