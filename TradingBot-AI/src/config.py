@@ -21,7 +21,7 @@ BASE_AMOUNT = 12
 
 # Risk Management
 STOP_LOSS_PERCENT = 2.0
-TAKE_PROFIT_PERCENT = 1.0
+# TAKE_PROFIT_PERCENT removed - البيع يتم عبر تصويت المستشارين فقط
 
 # Timing
 LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
