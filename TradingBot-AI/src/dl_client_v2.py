@@ -179,30 +179,11 @@ class DeepLearningClientV2:
     
     def get_exit_prediction(self, rsi, macd, confidence, price_momentum, profit_percent):
         """
-        Exit Strategy: متى نبيع؟
+        Exit Strategy: متى نبيع؟ (غير مستخدم - البيع عبر التصويت فقط)
         Returns: should_exit (bool), reason, confidence_boost
         """
-        accuracy = self.get_model_accuracy('exit')
-        
-        if accuracy < 0.55:
-            return {'should_exit': False, 'reason': 'Hold', 'confidence_boost': 0}
-        
-        # قرار البيع
-        exit_score = 0
-        
-        if profit_percent > 1.5:
-            exit_score += 3
-        if rsi > 70:
-            exit_score += 2
-        if macd < -5:
-            exit_score += 2
-        
-        if exit_score >= 5:
-            return {'should_exit': True, 'reason': 'Strong exit signal', 'confidence_boost': 10}
-        elif exit_score >= 3:
-            return {'should_exit': True, 'reason': 'Exit signal', 'confidence_boost': 5}
-        else:
-            return {'should_exit': False, 'reason': 'Hold', 'confidence_boost': 0}
+        # هذه الدالة غير مستخدمة - البيع يتم عبر vote_sell_now فقط
+        return {'should_exit': False, 'reason': 'Hold', 'confidence_boost': 0}
     
     def get_pattern_prediction(self, rsi, macd, volume_ratio, price_momentum, confidence):
         """
@@ -605,36 +586,10 @@ class DeepLearningClientV2:
     
     def get_sell_decision(self, symbol, position, current_price, analysis):
         """
-        قرار البيع الشامل من كل الموديلات
+        قرار البيع الشامل (غير مستخدم - البيع عبر ai_brain.should_sell فقط)
         """
-        try:
-            buy_price = position['buy_price']
-            profit_percent = ((current_price - buy_price) / buy_price) * 100
-            
-            rsi = analysis.get('rsi', 50)
-            macd = analysis.get('macd_diff', 0)
-            confidence = analysis.get('confidence', 60)
-            price_momentum = analysis.get('price_momentum', 0)
-            
-            # استشارة Exit Strategy
-            exit_result = self.get_exit_prediction(rsi, macd, confidence, price_momentum, profit_percent)
-            
-            if exit_result['should_exit']:
-                return {
-                    'action': 'SELL',
-                    'reason': exit_result['reason'],
-                    'profit': profit_percent
-                }
-            
-            return {
-                'action': 'HOLD',
-                'reason': 'No exit signal',
-                'profit': profit_percent
-            }
-        
-        except Exception as e:
-            print(f"⚠️ Sell decision error: {e}")
-            return {'action': 'HOLD', 'reason': 'Error'}
+        # هذه الدالة غير مستخدمة - البيع يتم عبر ai_brain.should_sell + التصويت
+        return {'action': 'HOLD', 'reason': 'Use ai_brain.should_sell instead'}
     
     def is_available(self):
         """فحص إذا الموديلات متوفرة"""
@@ -690,39 +645,59 @@ class DeepLearningClientV2:
 
     def vote_sell_now(self, symbol, profit_percent, rsi, macd, volume_ratio, trend, hours_held):
         """
-        المستشارين يصوتون: هل نبيع الحين؟ (SELL/HOLD)
-        يصوتون SELL فقط لو السوق تغير أو وصل الهدف - مو لمجرد ربح صغير
-        Returns: sell_votes (dict with each consultant's vote: 1=SELL, 0=HOLD)
+        المستشارين يراقبون ويصوتون: هل نبيع الحين؟
+        
+        بالربح: يراقبون السوق - لو وصل الحد أو بدأ ينقلب → بيع (كفاية طمع)
+        بالخسارة: يراقبون العملة - لو انهارت وما في أمل → بيع (قبل اللوست)
+        
+        شروط متوسطة - لا صارمة ولا متساهلة
+        Returns: sell_votes (dict: 1=SELL, 0=HOLD)
         """
         votes = {}
         
-        # Exit Strategy vote
-        # بيع لو ربح كبير > 2% أو خسارة كبيرة < -1.5%
-        votes['exit'] = 1 if (profit_percent > 2.0 or profit_percent < -1.5) else 0
+        # Exit Strategy - يراقب الربح والخسارة
+        # ربح: > 2.5% (وصل حد جيد)
+        # خسارة: < -1.2% (انهيار - بيع قبل اللوست)
+        votes['exit'] = 1 if (profit_percent > 2.5 or profit_percent < -1.2) else 0
         
-        # MTF vote (يراقب الترند)
-        # بيع لو bearish + ربح موجب (حماية الربح)
-        votes['mtf'] = 1 if (trend == 'bearish' and profit_percent > 0.5) else 0
+        # MTF - يراقب الترند
+        # ربح: bearish + ربح > 1% (السوق انقلب - كفاية)
+        # خسارة: strong_bearish + خسارة < -0.5% (انهيار قوي)
+        if profit_percent > 0:
+            votes['mtf'] = 1 if (trend == 'bearish' and profit_percent > 1.0) else 0
+        else:
+            votes['mtf'] = 1 if (trend == 'strong_bearish' and profit_percent < -0.5) else 0
         
-        # Risk vote (محافظ - يبيع بسرعة)
-        # بيع لو RSI مرتفع جداً أو خسارة
-        votes['risk'] = 1 if (rsi > 75 or profit_percent < -0.8) else 0
+        # Risk - محافظ لكن متوسط
+        # ربح: RSI > 78 (overbought - وقف)
+        # خسارة: < -1% (خطر)
+        votes['risk'] = 1 if (rsi > 78 or profit_percent < -1.0) else 0
         
-        # Pattern vote
-        # بيع لو ربح جيد + MACD سالب قوي (ترند ينقلب)
-        votes['pattern'] = 1 if (profit_percent > 1.5 and macd < -5) else 0
+        # Pattern - يراقب الأنماط
+        # ربح: > 2% + MACD سالب قوي (ترند ينقلب)
+        # خسارة: MACD < -15 + خسارة (انهيار قوي)
+        if profit_percent > 0:
+            votes['pattern'] = 1 if (profit_percent > 2.0 and macd < -7) else 0
+        else:
+            votes['pattern'] = 1 if (macd < -15 and profit_percent < -0.8) else 0
         
-        # CNN vote
-        # بيع لو ربح كبير > 2%
-        votes['cnn'] = 1 if profit_percent > 2.0 else 0
+        # CNN - يراقب الشارت
+        # ربح: > 2.5%
+        # خسارة: < -1.2%
+        votes['cnn'] = 1 if (profit_percent > 2.5 or profit_percent < -1.2) else 0
         
-        # Anomaly vote (يبيع لو شاف شذوذ قوي)
-        # بيع لو RSI شاذ جداً أو volume شاذ جداً
-        votes['anomaly'] = 1 if (rsi > 85 or rsi < 15 or volume_ratio > 4.0) else 0
+        # Anomaly - يكشف الشذوذ
+        # ربح: RSI شاذ جداً (> 85)
+        # خسارة: RSI منهار (< 20) أو volume شاذ
+        if profit_percent > 0:
+            votes['anomaly'] = 1 if rsi > 85 else 0
+        else:
+            votes['anomaly'] = 1 if (rsi < 20 or volume_ratio > 4.0) else 0
         
-        # Liquidity vote (الشيخ)
-        # بيع لو ربح كبير > 2%
-        votes['liquidity'] = 1 if profit_percent > 2.0 else 0
+        # Liquidity - الشيخ
+        # ربح: > 2.5%
+        # خسارة: < -1.2%
+        votes['liquidity'] = 1 if (profit_percent > 2.5 or profit_percent < -1.2) else 0
         
         return votes
     
