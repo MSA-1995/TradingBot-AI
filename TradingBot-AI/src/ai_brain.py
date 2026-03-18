@@ -667,6 +667,7 @@ class AIBrain:
         
         if drop_from_high >= 2.0:
             # نزل 2% من أعلى سعر - بيع
+            print(f"🛑 {symbol}: Trailing Stop triggered (dropped {drop_from_high:.2f}% from peak)")
             return {
                 'action': 'SELL',
                 'reason': 'TRAILING STOP -2%',
@@ -688,6 +689,7 @@ class AIBrain:
             )
             
             if market_falling_hard:
+                print(f"⚠️ {symbol}: Market crash detected - early exit")
                 return {
                     'action': 'SELL',
                     'reason': f'EARLY STOP (Market crash)',
@@ -718,6 +720,7 @@ class AIBrain:
                 # لو 3 أو أكثر صوتوا بيع → الملك يبيع (43% كافي)
                 if sell_count >= 3:
                     print(f"🗳️ {symbol}: {sell_count}/{total_votes} voted SELL ({sell_percentage:.0f}%)")
+                    print(f"   Votes: {sell_votes}")  # طباعة تفاصيل التصويت
                     return {
                         'action': 'SELL',
                         'reason': f'Consultants voted SELL ({sell_percentage:.0f}%)',
@@ -740,9 +743,11 @@ class AIBrain:
             )
             
             if market_rising:
+                print(f"📈 {symbol}: TP {tp_target}% reached but market still rising - HOLD")
                 return {'action': 'HOLD', 'reason': f'TP {tp_target}% reached but market rising'}
             
             # السوق ميت أو نازل - بيع
+            print(f"🎯 {symbol}: TP {tp_target}% reached - taking profit")
             return {
                 'action': 'SELL',
                 'reason': f'AI TP {tp_target}%',
