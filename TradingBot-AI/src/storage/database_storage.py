@@ -346,18 +346,21 @@ class DatabaseStorage:
             cursor.execute("DELETE FROM learned_patterns WHERE last_updated < NOW() - INTERVAL '30 days'")
             patterns_deleted = cursor.rowcount
             
-            cursor.execute("DELETE FROM ai_decisions WHERE timestamp < NOW() - INTERVAL '90 days'")
+            cursor.execute("DELETE FROM ai_decisions WHERE timestamp < NOW() - INTERVAL '30 days'")
             decisions_deleted = cursor.rowcount
             
-            cursor.execute("DELETE FROM trap_memory WHERE timestamp < NOW() - INTERVAL '90 days'")
+            cursor.execute("DELETE FROM trap_memory WHERE timestamp < NOW() - INTERVAL '30 days'")
             traps_deleted = cursor.rowcount
+            
+            cursor.execute("DELETE FROM consultant_votes WHERE timestamp < NOW() - INTERVAL '30 days'")
+            votes_deleted = cursor.rowcount
             
             conn.commit()
             cursor.close()
             
-            total_deleted = trades_deleted + patterns_deleted + decisions_deleted + traps_deleted
+            total_deleted = trades_deleted + patterns_deleted + decisions_deleted + traps_deleted + votes_deleted
             if total_deleted > 0:
-                print(f"🗑️ Cleaned: {trades_deleted} trades, {patterns_deleted} patterns, {decisions_deleted} AI decisions, {traps_deleted} traps")
+                print(f"🗑️ Cleaned: {trades_deleted} trades, {patterns_deleted} patterns, {decisions_deleted} AI decisions, {traps_deleted} traps, {votes_deleted} votes")
             
             return True
         except Exception as e:
