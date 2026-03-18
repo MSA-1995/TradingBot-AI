@@ -340,27 +340,29 @@ class DatabaseStorage:
             conn = self._get_conn()
             cursor = conn.cursor()
             
-            cursor.execute("DELETE FROM trades_history WHERE timestamp < NOW() - INTERVAL '30 days'")
+            # بيانات التدريب: 6 أشهر (مهمة للـ Deep Learning Trainer)
+            cursor.execute("DELETE FROM trades_history WHERE timestamp < NOW() - INTERVAL '180 days'")
             trades_deleted = cursor.rowcount
             
-            cursor.execute("DELETE FROM learned_patterns WHERE last_updated < NOW() - INTERVAL '30 days'")
+            cursor.execute("DELETE FROM learned_patterns WHERE last_updated < NOW() - INTERVAL '180 days'")
             patterns_deleted = cursor.rowcount
             
-            cursor.execute("DELETE FROM ai_decisions WHERE timestamp < NOW() - INTERVAL '30 days'")
-            decisions_deleted = cursor.rowcount
-            
-            cursor.execute("DELETE FROM trap_memory WHERE timestamp < NOW() - INTERVAL '30 days'")
+            cursor.execute("DELETE FROM trap_memory WHERE timestamp < NOW() - INTERVAL '180 days'")
             traps_deleted = cursor.rowcount
             
-            cursor.execute("DELETE FROM consultant_votes WHERE timestamp < NOW() - INTERVAL '30 days'")
+            cursor.execute("DELETE FROM consultant_votes WHERE timestamp < NOW() - INTERVAL '180 days'")
             votes_deleted = cursor.rowcount
+            
+            # ai_decisions: 30 يوم فقط (للمراقبة - لا يستخدمها الـ Trainer)
+            cursor.execute("DELETE FROM ai_decisions WHERE timestamp < NOW() - INTERVAL '30 days'")
+            decisions_deleted = cursor.rowcount
             
             conn.commit()
             cursor.close()
             
             total_deleted = trades_deleted + patterns_deleted + decisions_deleted + traps_deleted + votes_deleted
             if total_deleted > 0:
-                print(f"🗑️ Cleaned: {trades_deleted} trades, {patterns_deleted} patterns, {decisions_deleted} AI decisions, {traps_deleted} traps, {votes_deleted} votes")
+                print(f"🗑️ Cleaned: {trades_deleted} trades (6m), {patterns_deleted} patterns (6m), {decisions_deleted} AI decisions (30d), {traps_deleted} traps (6m), {votes_deleted} votes (6m)")
             
             return True
         except Exception as e:
