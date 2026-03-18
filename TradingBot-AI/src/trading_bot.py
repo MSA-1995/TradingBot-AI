@@ -482,27 +482,24 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'reason': sell_decision.get('reason', 'Hold')
                     }
             else:
-                # Fallback: لو AI Brain مو موجود (نادر)
+                # Fallback: لو AI Brain مو موجود (نادر جداً)
+                # Trailing Stop -2% هو الحماية الوحيدة
                 if mtf is None:
                     mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
                 
-                # Stop Loss إجباري
-                if profit_percent <= -2.0:
-                    sell_reason = "STOP LOSS -2%"
-                # Bearish Exit
-                elif mtf.get('trend') == 'bearish' and profit_percent > 0:
-                    sell_reason = "BEARISH TREND"
+                # ما في stop loss ثابت - الحماية عبر:
+                # 1. تصويت المستشارين (-0.8% إلى -1.2%)
+                # 2. Trailing Stop -2% (جدار نهائي)
                 
-                if not sell_reason:
-                    return {
-                        'symbol': symbol,
-                        'action': 'HOLD',
-                        'price': current_price,
-                        'profit': profit_percent,
-                        'buy_price': buy_price,
-                        'highest': highest_price,
-                        'reason': 'Hold'
-                    }
+                return {
+                    'symbol': symbol,
+                    'action': 'HOLD',
+                    'price': current_price,
+                    'profit': profit_percent,
+                    'buy_price': buy_price,
+                    'highest': highest_price,
+                    'reason': 'Hold - waiting for consultants vote'
+                }
             
             # Execute sell
             if sell_reason:
