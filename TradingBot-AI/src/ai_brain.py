@@ -166,6 +166,8 @@ class AIBrain:
             buy_votes = {}
             buy_vote_count = 0
             total_consultants = 0
+            min_votes_required = 3  # default
+            market_status = 'neutral'
             
             if self.dl_client:
                 try:
@@ -175,29 +177,60 @@ class AIBrain:
                     price_momentum = analysis.get('price_momentum', 0)
                     liquidity_metrics = analysis.get('liquidity', {})
                     
-                    buy_votes = self.dl_client.vote_buy_now(rsi, macd, volume_ratio, price_momentum, optimized_confidence, liquidity_metrics)
+                    # حساب تغير BTC و ETH في آخر ساعة
+                    market_sentiment = None
+                    try:
+                        btc_change_1h = analysis.get('btc_change_1h', 0)
+                        eth_change_1h = analysis.get('eth_change_1h', 0)
+                        market_sentiment = {
+                            'btc_change_1h': btc_change_1h,
+                            'eth_change_1h': eth_change_1h
+                        }
+                    except:
+                        pass
+                    
+                    buy_votes, min_votes_required, market_status = self.dl_client.vote_buy_now(
+                        rsi, macd, volume_ratio, price_momentum, optimized_confidence, 
+                        liquidity_metrics, market_sentiment
+                    )
                     buy_vote_count = sum(buy_votes.values())
                     total_consultants = len(buy_votes)
                     
-                    # الملك يقرر بناءً على 3/7 أو أكثر (43% كافي للشراء)
+                    # الملك يقرر بناءً على min_votes_required (يتغير حسب السوق)
                     buy_percentage = (buy_vote_count / total_consultants * 100) if total_consultants > 0 else 0
                     
-                    if buy_vote_count < 3:  # لازم 3 مستشارين على الأقل يوافقون
-                        # أقل من 3 رفضوا الشراء
+                    # فحص السوق العام
+                    if market_status == 'strong_bearish':
+                        # السوق نازل قوي - توقف تام
                         decision = {
                             'action': 'SKIP',
-                            'reason': f'Consultants voted SKIP ({100-buy_percentage:.0f}%)',
+                            'reason': f'Market strong bearish (BTC/ETH < -2%)',
                             'confidence': optimized_confidence
                         }
                         self.storage.save_ai_decision({
                             'symbol': symbol,
                             'decision': 'SKIP',
-                            'reason': f'Voting rejected: {buy_vote_count}/{total_consultants}',
+                            'reason': 'Market strong bearish',
                             'confidence': optimized_confidence
                         })
                         return decision
                     
-                    print(f"🗳️ {symbol}: {buy_vote_count}/{total_consultants} voted BUY ({buy_percentage:.0f}%)")
+                    if buy_vote_count < min_votes_required:
+                        # لم يصل للحد المطلوب
+                        decision = {
+                            'action': 'SKIP',
+                            'reason': f'Consultants voted SKIP ({buy_vote_count}/{min_votes_required} required, market: {market_status})',
+                            'confidence': optimized_confidence
+                        }
+                        self.storage.save_ai_decision({
+                            'symbol': symbol,
+                            'decision': 'SKIP',
+                            'reason': f'Voting rejected: {buy_vote_count}/{total_consultants} (need {min_votes_required}, market: {market_status})',
+                            'confidence': optimized_confidence
+                        })
+                        return decision
+                    
+                    print(f"🗳️ {symbol}: {buy_vote_count}/{total_consultants} voted BUY ({buy_percentage:.0f}%) | Market: {market_status} | Required: {min_votes_required}/7")
                 
                 except Exception as e:
                     print(f"⚠️ Buy voting error: {e}")
@@ -699,7 +732,7 @@ class AIBrain:
             # السوق عادي - AI يقرر بحرية (يكمل للشروط التالية)
         
         # 3. استشارة المستشارين للبيع (تصويت - النظام الوحيد للبيع)
-        # المستشارين يراقبون العملة والسوق ويصوتون
+        # المستشارين يراقبون العملة + السوق العام ويصوتون
         if self.dl_client:
             try:
                 rsi = analysis.get('rsi', 50) if analysis else 50
@@ -707,11 +740,23 @@ class AIBrain:
                 volume_ratio = analysis.get('volume_ratio', 1.0) if analysis else 1.0
                 trend = mtf.get('trend', 'neutral') if mtf else 'neutral'
                 
+                # حساب تغير BTC و ETH في آخر ساعة
+                market_sentiment = None
+                try:
+                    btc_change_1h = analysis.get('btc_change_1h', 0) if analysis else 0
+                    eth_change_1h = analysis.get('eth_change_1h', 0) if analysis else 0
+                    market_sentiment = {
+                        'btc_change_1h': btc_change_1h,
+                        'eth_change_1h': eth_change_1h
+                    }
+                except:
+                    pass
+                
                 # المستشارين يصوتون: SELL (1) أو HOLD (0)
-                # بالربح: يراقبون السوق - لو وصل الحد أو انقلب → بيع
-                # بالخسارة: يراقبون العملة - لو انهارت → بيع قبل اللوست
+                # بالربح: يراقبون العملة + السوق - لو السوق بينقلب → بيع (كفاية طمع)
+                # بالخسارة: يراقبون العملة + السوق - لو السوق نازل → بيع (قبل تنزل أكثر)
                 sell_votes = self.dl_client.vote_sell_now(
-                    symbol, profit_percent, rsi, macd_diff, volume_ratio, trend, hours_held
+                    symbol, profit_percent, rsi, macd_diff, volume_ratio, trend, hours_held, market_sentiment
                 )
                 
                 # حساب نسبة التصويت
@@ -723,7 +768,12 @@ class AIBrain:
                 # 3/7 أو أكثر → بيع فوراً (سواء ربح أو خسارة)
                 if sell_count >= 3:
                     reason_type = "profit" if profit_percent > 0 else "loss"
-                    print(f"🗳️ {symbol}: {sell_count}/{total_votes} voted SELL ({sell_percentage:.0f}%) - {reason_type}")
+                    market_info = ""
+                    if market_sentiment:
+                        btc = market_sentiment['btc_change_1h']
+                        eth = market_sentiment['eth_change_1h']
+                        market_info = f" | Market: BTC {btc:+.1f}% ETH {eth:+.1f}%"
+                    print(f"🗳️ {symbol}: {sell_count}/{total_votes} voted SELL ({sell_percentage:.0f}%) - {reason_type}{market_info}")
                     return {
                         'action': 'SELL',
                         'reason': f'Consultants voted SELL ({sell_percentage:.0f}%)',
