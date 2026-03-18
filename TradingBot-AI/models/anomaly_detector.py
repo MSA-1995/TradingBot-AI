@@ -13,48 +13,73 @@ class AnomalyDetector:
         print("🚨 Anomaly Detector initialized")
     
     def detect_anomalies(self, symbol, analysis):
-        """كشف الشذوذات في العملة"""
+        """كشف الشذوذات في العملة - نظام نقاط متوازن"""
         try:
             anomalies = []
-            severity = 'NORMAL'
+            anomaly_score = 0  # نظام النقاط الجديد
             
             # 1. فحص Pump (ارتفاع مفاجئ)
             pump_detected = self._detect_pump(symbol, analysis)
             if pump_detected:
                 anomalies.append(pump_detected)
-                severity = 'HIGH'
+                if pump_detected['risk'] == 'HIGH':
+                    anomaly_score += 3  # شذوذ قوي
+                elif pump_detected['risk'] == 'MEDIUM':
+                    anomaly_score += 1  # شذوذ خفيف
             
             # 2. فحص Dump (انخفاض مفاجئ)
             dump_detected = self._detect_dump(symbol, analysis)
             if dump_detected:
                 anomalies.append(dump_detected)
-                severity = 'HIGH'
+                if dump_detected['risk'] == 'CRITICAL':
+                    anomaly_score += 4  # خطر جداً
+                elif dump_detected['risk'] == 'MEDIUM':
+                    anomaly_score += 1  # تحذير فقط
             
             # 3. فحص Volume الشاذ
             volume_anomaly = self._detect_volume_anomaly(analysis)
             if volume_anomaly:
                 anomalies.append(volume_anomaly)
-                if severity == 'NORMAL':
-                    severity = 'MEDIUM'
+                if volume_anomaly['risk'] == 'HIGH':
+                    anomaly_score += 3
+                elif volume_anomaly['risk'] == 'MEDIUM':
+                    anomaly_score += 1
             
             # 4. فحص Volatility العالية
             volatility_anomaly = self._detect_high_volatility(symbol)
             if volatility_anomaly:
                 anomalies.append(volatility_anomaly)
-                if severity == 'NORMAL':
-                    severity = 'MEDIUM'
+                anomaly_score += 1
             
             # 5. فحص Price Manipulation
             manipulation = self._detect_manipulation(symbol, analysis)
             if manipulation:
                 anomalies.append(manipulation)
+                if manipulation['risk'] == 'CRITICAL':
+                    anomaly_score += 5  # فخ واضح
+                elif manipulation['risk'] == 'HIGH':
+                    anomaly_score += 3
+            
+            # تحديد الخطورة بناءً على النقاط
+            if anomaly_score >= 5:
                 severity = 'CRITICAL'
+                safe_to_trade = False
+            elif anomaly_score >= 3:
+                severity = 'HIGH'
+                safe_to_trade = True  # تحذير قوي لكن مو رفض
+            elif anomaly_score >= 1:
+                severity = 'MEDIUM'
+                safe_to_trade = True  # تحذير خفيف
+            else:
+                severity = 'NORMAL'
+                safe_to_trade = True
             
             result = {
                 'symbol': symbol,
                 'anomalies': anomalies,
                 'severity': severity,
-                'safe_to_trade': severity in ['NORMAL', 'LOW', 'MEDIUM'],  # Changed: accept MEDIUM
+                'anomaly_score': anomaly_score,  # جديد
+                'safe_to_trade': safe_to_trade,
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -73,6 +98,7 @@ class AnomalyDetector:
                 'symbol': symbol,
                 'anomalies': [],
                 'severity': 'NORMAL',
+                'anomaly_score': 0,
                 'safe_to_trade': True
             }
     
