@@ -647,10 +647,10 @@ class DeepLearningClientV2:
         """
         المستشارين يراقبون ويصوتون: هل نبيع الحين؟
         
-        بالربح: يراقبون العملة + السوق - لو السوق بينقلب → بيع (كفاية طمع)
+        بالربح: يراقبون العملة + السوق (BTC+ETH+BNB) - لو السوق بينقلب → بيع (كفاية طمع)
         بالخسارة: يراقبون العملة + السوق - لو السوق نازل → بيع (قبل تنزل أكثر)
         
-        market_sentiment: {'btc_change_1h': float, 'eth_change_1h': float}
+        market_sentiment: {'btc_change_1h': float, 'eth_change_1h': float, 'bnb_change_1h': float}
         شروط متوسطة - لا صارمة ولا متساهلة
         Returns: sell_votes (dict: 1=SELL, 0=HOLD)
         """
@@ -659,16 +659,25 @@ class DeepLearningClientV2:
         # استخراج بيانات السوق
         btc_change = 0
         eth_change = 0
+        bnb_change = 0
         market_falling = False
         market_rising = False
         
         if market_sentiment:
             btc_change = market_sentiment.get('btc_change_1h', 0)
             eth_change = market_sentiment.get('eth_change_1h', 0)
-            # السوق نازل: BTC أو ETH < -1%
-            market_falling = (btc_change < -1.0 or eth_change < -1.0)
-            # السوق طالع: BTC و ETH > +1%
-            market_rising = (btc_change > 1.0 and eth_change > 1.0)
+            bnb_change = market_sentiment.get('bnb_change_1h', 0)
+            
+            # حساب متوسط التغير
+            avg_change = (btc_change + eth_change + bnb_change) / 3
+            
+            # السوق نازل: أغلبية < -1% أو متوسط < -1%
+            falling_count = sum(1 for c in [btc_change, eth_change, bnb_change] if c < -1.0)
+            market_falling = (falling_count >= 2 or avg_change < -1.0)
+            
+            # السوق طالع: أغلبية > +1% أو متوسط > +1%
+            rising_count = sum(1 for c in [btc_change, eth_change, bnb_change] if c > 1.0)
+            market_rising = (rising_count >= 2 or avg_change > 1.0)
         
         # Exit Strategy - يراقب الربح والخسارة + السوق
         if profit_percent > 0:
@@ -728,17 +737,27 @@ class DeepLearningClientV2:
         
         return votes
     
-    def get_market_sentiment(self, btc_change_1h, eth_change_1h):
+    def get_market_sentiment(self, btc_change_1h, eth_change_1h, bnb_change_1h):
         """
-        تحليل السوق العام (BTC + ETH)
+        تحليل السوق العام (BTC + ETH + BNB)
         Returns: market_status, min_votes_required
         """
+        # حساب متوسط التغير
+        changes = [btc_change_1h, eth_change_1h, bnb_change_1h]
+        avg_change = sum(changes) / len(changes)
+        
+        # عد العملات النازلة/الطالعة
+        falling_count = sum(1 for c in changes if c < -1.0)
+        rising_count = sum(1 for c in changes if c > 1.0)
+        
         # Strong Bearish: توقف تام
-        if btc_change_1h < -2.0 or eth_change_1h < -2.0:
+        # أغلبية نازلة (2/3 أو أكثر) أو متوسط < -2%
+        if falling_count >= 2 or avg_change < -2.0:
             return 'strong_bearish', 8  # مستحيل (8/7) = توقف
         
         # Bearish: حذر (نحتاج 5/7)
-        if btc_change_1h < -1.0 or eth_change_1h < -1.0:
+        # واحدة نازلة قوي أو متوسط < -1%
+        if falling_count >= 1 or avg_change < -1.0:
             return 'bearish', 5
         
         # Neutral/Bullish: عادي (3/7)
@@ -747,7 +766,7 @@ class DeepLearningClientV2:
     def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence, liquidity_metrics=None, market_sentiment=None):
         """
         المستشارين يصوتون: هل نشتري؟ (BUY/SKIP)
-        market_sentiment: {'btc_change_1h': float, 'eth_change_1h': float}
+        market_sentiment: {'btc_change_1h': float, 'eth_change_1h': float, 'bnb_change_1h': float}
         Returns: buy_votes (dict with each consultant's vote: 1=BUY, 0=SKIP), min_votes_required
         """
         # فحص السوق العام أولاً
@@ -757,7 +776,8 @@ class DeepLearningClientV2:
         if market_sentiment:
             btc_change = market_sentiment.get('btc_change_1h', 0)
             eth_change = market_sentiment.get('eth_change_1h', 0)
-            market_status, min_votes_required = self.get_market_sentiment(btc_change, eth_change)
+            bnb_change = market_sentiment.get('bnb_change_1h', 0)
+            market_status, min_votes_required = self.get_market_sentiment(btc_change, eth_change, bnb_change)
         
         votes = {}
         
