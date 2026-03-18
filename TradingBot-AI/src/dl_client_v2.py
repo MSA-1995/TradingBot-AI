@@ -657,47 +657,47 @@ class DeepLearningClientV2:
         
         # Exit Strategy - يراقب الربح والخسارة
         # ربح: > 2.5% (وصل حد جيد)
-        # خسارة: < -1.2% (انهيار - بيع قبل اللوست)
-        votes['exit'] = 1 if (profit_percent > 2.5 or profit_percent < -1.2) else 0
+        # خسارة: < -0.8% (انهيار - بيع قبل اللوست)
+        votes['exit'] = 1 if (profit_percent > 2.5 or profit_percent < -0.8) else 0
         
         # MTF - يراقب الترند
         # ربح: bearish + ربح > 1% (السوق انقلب - كفاية)
-        # خسارة: strong_bearish + خسارة < -0.5% (انهيار قوي)
+        # خسارة: bearish + خسارة < -0.5% (انهيار)
         if profit_percent > 0:
             votes['mtf'] = 1 if (trend == 'bearish' and profit_percent > 1.0) else 0
         else:
-            votes['mtf'] = 1 if (trend == 'strong_bearish' and profit_percent < -0.5) else 0
+            votes['mtf'] = 1 if (trend in ['bearish', 'strong_bearish'] and profit_percent < -0.5) else 0
         
         # Risk - محافظ لكن متوسط
         # ربح: RSI > 78 (overbought - وقف)
-        # خسارة: < -1% (خطر)
-        votes['risk'] = 1 if (rsi > 78 or profit_percent < -1.0) else 0
+        # خسارة: < -0.8% (خطر)
+        votes['risk'] = 1 if (rsi > 78 or profit_percent < -0.8) else 0
         
         # Pattern - يراقب الأنماط
         # ربح: > 2% + MACD سالب قوي (ترند ينقلب)
-        # خسارة: MACD < -15 + خسارة (انهيار قوي)
+        # خسارة: MACD < -10 + خسارة < -0.6% (انهيار)
         if profit_percent > 0:
             votes['pattern'] = 1 if (profit_percent > 2.0 and macd < -7) else 0
         else:
-            votes['pattern'] = 1 if (macd < -15 and profit_percent < -0.8) else 0
+            votes['pattern'] = 1 if (macd < -10 and profit_percent < -0.6) else 0
         
         # CNN - يراقب الشارت
         # ربح: > 2.5%
-        # خسارة: < -1.2%
-        votes['cnn'] = 1 if (profit_percent > 2.5 or profit_percent < -1.2) else 0
+        # خسارة: < -0.8%
+        votes['cnn'] = 1 if (profit_percent > 2.5 or profit_percent < -0.8) else 0
         
         # Anomaly - يكشف الشذوذ
         # ربح: RSI شاذ جداً (> 85)
-        # خسارة: RSI منهار (< 20) أو volume شاذ
+        # خسارة: RSI منهار (< 25) أو volume شاذ (> 3.5)
         if profit_percent > 0:
             votes['anomaly'] = 1 if rsi > 85 else 0
         else:
-            votes['anomaly'] = 1 if (rsi < 20 or volume_ratio > 4.0) else 0
+            votes['anomaly'] = 1 if (rsi < 25 or volume_ratio > 3.5) else 0
         
         # Liquidity - الشيخ
         # ربح: > 2.5%
-        # خسارة: < -1.2%
-        votes['liquidity'] = 1 if (profit_percent > 2.5 or profit_percent < -1.2) else 0
+        # خسارة: < -0.8%
+        votes['liquidity'] = 1 if (profit_percent > 2.5 or profit_percent < -0.8) else 0
         
         return votes
     
