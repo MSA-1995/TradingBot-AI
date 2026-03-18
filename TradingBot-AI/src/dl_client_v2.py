@@ -126,30 +126,56 @@ class DeepLearningClientV2:
     
     def get_anomaly_prediction(self, rsi, macd, volume_ratio, price_momentum):
         """
-        Anomaly Detector: كشف الحالات الشاذة
-        Returns: is_anomaly (bool), severity ('low', 'medium', 'high')
+        Anomaly Detector: كشف الحالات الشاذة - نظام نقاط متوازن
+        Returns: is_anomaly (bool), severity ('low', 'medium', 'high'), confidence_adjustment
         """
         accuracy = self.get_model_accuracy('anomaly')
         
         if accuracy < 0.55:
-            return {'is_anomaly': False, 'severity': 'low'}
+            return {'is_anomaly': False, 'severity': 'low', 'confidence_adjustment': 0}
         
-        # كشف الشذوذ
+        # كشف الشذوذ - نظام نقاط متوازن
         anomaly_score = 0
         
-        if rsi < 20 or rsi > 80:
-            anomaly_score += 2
-        if volume_ratio > 3.0:
-            anomaly_score += 2
-        if abs(macd) > 15:
+        # شذوذ خفيف
+        if rsi < 25 or rsi > 75:
             anomaly_score += 1
         
-        if anomaly_score >= 4:
-            return {'is_anomaly': True, 'severity': 'high'}
-        elif anomaly_score >= 2:
-            return {'is_anomaly': True, 'severity': 'medium'}
+        # شذوذ متوسط
+        if volume_ratio > 2.5:
+            anomaly_score += 2
+        
+        # شذوذ قوي
+        if rsi < 15 or rsi > 85:
+            anomaly_score += 3
+        if volume_ratio > 4.0:
+            anomaly_score += 3
+        if abs(macd) > 20:
+            anomaly_score += 2
+        
+        # حساب التعديل بناءً على الدقة
+        boost_multiplier = 1.0
+        if accuracy >= 0.75:
+            boost_multiplier = 1.5
+        elif accuracy >= 0.65:
+            boost_multiplier = 1.2
+        
+        # القرار النهائي
+        if anomaly_score >= 5:
+            # شذوذ قوي جداً - تحذير قوي
+            adjustment = int(-10 * boost_multiplier)
+            return {'is_anomaly': True, 'severity': 'high', 'confidence_adjustment': adjustment}
+        elif anomaly_score >= 3:
+            # شذوذ متوسط - تحذير متوسط
+            adjustment = int(-5 * boost_multiplier)
+            return {'is_anomaly': True, 'severity': 'medium', 'confidence_adjustment': adjustment}
+        elif anomaly_score >= 1:
+            # شذوذ خفيف - تحذير خفيف
+            adjustment = int(-2 * boost_multiplier)
+            return {'is_anomaly': True, 'severity': 'low', 'confidence_adjustment': adjustment}
         else:
-            return {'is_anomaly': False, 'severity': 'low'}
+            # طبيعي
+            return {'is_anomaly': False, 'severity': 'normal', 'confidence_adjustment': 0}
     
     def get_exit_prediction(self, rsi, macd, confidence, price_momentum, profit_percent):
         """
@@ -512,22 +538,19 @@ class DeepLearningClientV2:
             ranking_result = self.get_ranking_prediction(symbol)
             cnn_result = self.get_chart_cnn_prediction(rsi, macd, volume_ratio, price_momentum)
             
-            # حساب التعديل من المستشارين
+            # حساب التعديل من المستشارين (بما فيهم Anomaly)
             consultants_adjustment = (
                 mtf_boost +
                 risk_result['confidence_adjustment'] +
+                anomaly_result['confidence_adjustment'] +  # يعطي -10 أو -5 أو -2 أو 0
                 pattern_result['confidence_adjustment'] +
                 ranking_result['confidence_adjustment'] +
                 cnn_result['confidence_adjustment']
             )
             
-            # فحص الشذوذ
-            if anomaly_result['is_anomaly'] and anomaly_result['severity'] == 'high':
-                return {
-                    'action': 'SKIP',
-                    'reason': 'High anomaly detected',
-                    'confidence_adjustment': 0
-                }
+            # فحص الشذوذ القوي جداً فقط (CRITICAL)
+            # ملاحظة: anomaly_result من DL client مختلف عن anomaly_detector من models
+            # هنا نعتمد على confidence_adjustment بدل الرفض المباشر
             
             # فحص النمط
             if pattern_result['pattern_type'] == 'trap':
