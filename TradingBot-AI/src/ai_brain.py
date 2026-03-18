@@ -698,7 +698,8 @@ class AIBrain:
             
             # السوق عادي - AI يقرر بحرية (يكمل للشروط التالية)
         
-        # 3. استشارة المستشارين للبيع (تصويت)
+        # 3. استشارة المستشارين للبيع (تصويت - النظام الوحيد للبيع)
+        # المستشارين يراقبون العملة والسوق ويصوتون
         if self.dl_client:
             try:
                 rsi = analysis.get('rsi', 50) if analysis else 50
@@ -707,6 +708,8 @@ class AIBrain:
                 trend = mtf.get('trend', 'neutral') if mtf else 'neutral'
                 
                 # المستشارين يصوتون: SELL (1) أو HOLD (0)
+                # بالربح: يراقبون السوق - لو وصل الحد أو انقلب → بيع
+                # بالخسارة: يراقبون العملة - لو انهارت → بيع قبل اللوست
                 sell_votes = self.dl_client.vote_sell_now(
                     symbol, profit_percent, rsi, macd_diff, volume_ratio, trend, hours_held
                 )
@@ -717,10 +720,10 @@ class AIBrain:
                 sell_percentage = (sell_count / total_votes) * 100
                 
                 # الملك يقرر بناءً على التصويت
-                # لو 3 أو أكثر صوتوا بيع → الملك يبيع (43% كافي)
+                # 3/7 أو أكثر → بيع فوراً (سواء ربح أو خسارة)
                 if sell_count >= 3:
-                    print(f"🗳️ {symbol}: {sell_count}/{total_votes} voted SELL ({sell_percentage:.0f}%)")
-                    print(f"   Votes: {sell_votes}")  # طباعة تفاصيل التصويت
+                    reason_type = "profit" if profit_percent > 0 else "loss"
+                    print(f"🗳️ {symbol}: {sell_count}/{total_votes} voted SELL ({sell_percentage:.0f}%) - {reason_type}")
                     return {
                         'action': 'SELL',
                         'reason': f'Consultants voted SELL ({sell_percentage:.0f}%)',
@@ -730,47 +733,15 @@ class AIBrain:
             except Exception as e:
                 print(f"⚠️ Sell voting error: {e}")
         
-        # 4. TP الذكي - الحد الأدنى للبيع بالربح (بدون استشارة Exit Strategy)
-        if profit_percent >= tp_target:
-            rsi = analysis.get('rsi', 50) if analysis else 50
-            macd_diff = analysis.get('macd_diff', 0) if analysis else 0
-            trend = mtf.get('trend', 'neutral') if mtf else 'neutral'
-            
-            market_rising = (
-                trend == 'bullish' and
-                macd_diff > 0 and
-                rsi < 70  # مو overbought
-            )
-            
-            if market_rising:
-                print(f"📈 {symbol}: TP {tp_target}% reached but market still rising - HOLD")
-                return {'action': 'HOLD', 'reason': f'TP {tp_target}% reached but market rising'}
-            
-            # السوق ميت أو نازل - بيع
-            print(f"🎯 {symbol}: TP {tp_target}% reached - taking profit")
-            return {
-                'action': 'SELL',
-                'reason': f'AI TP {tp_target}%',
-                'profit': profit_percent
-            }
+        # 4. TP الذكي - تم إلغاؤه
+        # البيع يتم فقط عبر تصويت المستشارين (3/7)
+        # TP المحفوظ للمعلومات فقط
         
-        # 5. Bearish Exit
-        if mtf.get('trend') == 'bearish' and mtf.get('total', 0) >= 2:
-            # لو فيه ربح موجب - بيع
-            if profit_percent > 0.1:
-                return {
-                    'action': 'SELL',
-                    'reason': 'BEARISH TREND',
-                    'profit': profit_percent
-                }
+        # 5. Bearish Exit - تم إلغاؤه
+        # البيع يتم فقط عبر تصويت المستشارين
         
-        # 6. انتهى وقت الانتظار
-        if hours_held >= max_wait_hours and profit_percent < 0:
-            return {
-                'action': 'SELL',
-                'reason': f'TIMEOUT {max_wait_hours}h',
-                'profit': profit_percent
-            }
+        # 6. Timeout - تم إلغاؤه
+        # البيع يتم فقط عبر تصويت المستشارين أو Trailing Stop
         
         # 7. Hold
         return {'action': 'HOLD', 'reason': 'Waiting for target'}
