@@ -643,69 +643,122 @@ class DeepLearningClientV2:
         except Exception as e:
             return {}
 
-    def vote_sell_now(self, symbol, profit_percent, rsi, macd, volume_ratio, trend, hours_held):
+    def vote_sell_now(self, symbol, profit_percent, rsi, macd, volume_ratio, trend, hours_held, market_sentiment=None):
         """
         المستشارين يراقبون ويصوتون: هل نبيع الحين؟
         
-        بالربح: يراقبون السوق - لو وصل الحد أو بدأ ينقلب → بيع (كفاية طمع)
-        بالخسارة: يراقبون العملة - لو انهارت وما في أمل → بيع (قبل اللوست)
+        بالربح: يراقبون العملة + السوق - لو السوق بينقلب → بيع (كفاية طمع)
+        بالخسارة: يراقبون العملة + السوق - لو السوق نازل → بيع (قبل تنزل أكثر)
         
+        market_sentiment: {'btc_change_1h': float, 'eth_change_1h': float}
         شروط متوسطة - لا صارمة ولا متساهلة
         Returns: sell_votes (dict: 1=SELL, 0=HOLD)
         """
         votes = {}
         
-        # Exit Strategy - يراقب الربح والخسارة
-        # ربح: > 2.5% (وصل حد جيد)
-        # خسارة: < -0.8% (انهيار - بيع قبل اللوست)
-        votes['exit'] = 1 if (profit_percent > 2.5 or profit_percent < -0.8) else 0
+        # استخراج بيانات السوق
+        btc_change = 0
+        eth_change = 0
+        market_falling = False
+        market_rising = False
         
-        # MTF - يراقب الترند
-        # ربح: bearish + ربح > 1% (السوق انقلب - كفاية)
-        # خسارة: bearish + خسارة < -0.5% (انهيار)
+        if market_sentiment:
+            btc_change = market_sentiment.get('btc_change_1h', 0)
+            eth_change = market_sentiment.get('eth_change_1h', 0)
+            # السوق نازل: BTC أو ETH < -1%
+            market_falling = (btc_change < -1.0 or eth_change < -1.0)
+            # السوق طالع: BTC و ETH > +1%
+            market_rising = (btc_change > 1.0 and eth_change > 1.0)
+        
+        # Exit Strategy - يراقب الربح والخسارة + السوق
         if profit_percent > 0:
-            votes['mtf'] = 1 if (trend == 'bearish' and profit_percent > 1.0) else 0
+            # ربح: > 2.5% أو (> 1% + السوق نازل)
+            votes['exit'] = 1 if (profit_percent > 2.5 or (profit_percent > 1.0 and market_falling)) else 0
         else:
-            votes['mtf'] = 1 if (trend in ['bearish', 'strong_bearish'] and profit_percent < -0.5) else 0
+            # خسارة: < -0.8% أو (< -0.5% + السوق نازل)
+            votes['exit'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and market_falling)) else 0
         
-        # Risk - محافظ لكن متوسط
-        # ربح: RSI > 78 (overbought - وقف)
-        # خسارة: < -0.8% (خطر)
-        votes['risk'] = 1 if (rsi > 78 or profit_percent < -0.8) else 0
-        
-        # Pattern - يراقب الأنماط
-        # ربح: > 2% + MACD سالب قوي (ترند ينقلب)
-        # خسارة: MACD < -10 + خسارة < -0.6% (انهيار)
+        # MTF - يراقب الترند + السوق
         if profit_percent > 0:
-            votes['pattern'] = 1 if (profit_percent > 2.0 and macd < -7) else 0
+            # ربح: bearish + ربح > 1% أو (ربح > 0.5% + السوق نازل قوي)
+            votes['mtf'] = 1 if (trend == 'bearish' and profit_percent > 1.0) or (profit_percent > 0.5 and btc_change < -1.5) else 0
         else:
-            votes['pattern'] = 1 if (macd < -10 and profit_percent < -0.6) else 0
+            # خسارة: bearish + خسارة < -0.5% أو (خسارة < -0.3% + السوق نازل)
+            votes['mtf'] = 1 if (trend in ['bearish', 'strong_bearish'] and profit_percent < -0.5) or (profit_percent < -0.3 and market_falling) else 0
         
-        # CNN - يراقب الشارت
-        # ربح: > 2.5%
-        # خسارة: < -0.8%
-        votes['cnn'] = 1 if (profit_percent > 2.5 or profit_percent < -0.8) else 0
-        
-        # Anomaly - يكشف الشذوذ
-        # ربح: RSI شاذ جداً (> 85)
-        # خسارة: RSI منهار (< 25) أو volume شاذ (> 3.5)
+        # Risk - محافظ + يشوف السوق
         if profit_percent > 0:
-            votes['anomaly'] = 1 if rsi > 85 else 0
+            # ربح: RSI > 78 أو (ربح > 1.5% + السوق نازل)
+            votes['risk'] = 1 if (rsi > 78 or (profit_percent > 1.5 and market_falling)) else 0
         else:
-            votes['anomaly'] = 1 if (rsi < 25 or volume_ratio > 3.5) else 0
+            # خسارة: < -0.8% أو (< -0.5% + السوق نازل قوي)
+            votes['risk'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and btc_change < -1.5)) else 0
         
-        # Liquidity - الشيخ
-        # ربح: > 2.5%
-        # خسارة: < -0.8%
-        votes['liquidity'] = 1 if (profit_percent > 2.5 or profit_percent < -0.8) else 0
+        # Pattern - يراقب الأنماط + السوق
+        if profit_percent > 0:
+            # ربح: > 2% + MACD سالب قوي أو (> 1% + السوق نازل + MACD < -5)
+            votes['pattern'] = 1 if (profit_percent > 2.0 and macd < -7) or (profit_percent > 1.0 and market_falling and macd < -5) else 0
+        else:
+            # خسارة: MACD < -10 + خسارة < -0.6% أو (MACD < -8 + خسارة < -0.4% + السوق نازل)
+            votes['pattern'] = 1 if (macd < -10 and profit_percent < -0.6) or (macd < -8 and profit_percent < -0.4 and market_falling) else 0
+        
+        # CNN - يراقب الشارت + السوق
+        if profit_percent > 0:
+            # ربح: > 2.5% أو (> 1.2% + السوق نازل)
+            votes['cnn'] = 1 if (profit_percent > 2.5 or (profit_percent > 1.2 and market_falling)) else 0
+        else:
+            # خسارة: < -0.8% أو (< -0.5% + السوق نازل)
+            votes['cnn'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and market_falling)) else 0
+        
+        # Anomaly - يكشف الشذوذ + السوق
+        if profit_percent > 0:
+            # ربح: RSI شاذ جداً (> 85) أو (RSI > 75 + السوق نازل)
+            votes['anomaly'] = 1 if (rsi > 85 or (rsi > 75 and market_falling)) else 0
+        else:
+            # خسارة: RSI منهار (< 25) أو volume شاذ (> 3.5) أو (RSI < 30 + السوق نازل)
+            votes['anomaly'] = 1 if (rsi < 25 or volume_ratio > 3.5 or (rsi < 30 and market_falling)) else 0
+        
+        # Liquidity - الشيخ + السوق
+        if profit_percent > 0:
+            # ربح: > 2.5% أو (> 1% + السوق نازل)
+            votes['liquidity'] = 1 if (profit_percent > 2.5 or (profit_percent > 1.0 and market_falling)) else 0
+        else:
+            # خسارة: < -0.8% أو (< -0.5% + السوق نازل)
+            votes['liquidity'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and market_falling)) else 0
         
         return votes
     
-    def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence, liquidity_metrics=None):
+    def get_market_sentiment(self, btc_change_1h, eth_change_1h):
+        """
+        تحليل السوق العام (BTC + ETH)
+        Returns: market_status, min_votes_required
+        """
+        # Strong Bearish: توقف تام
+        if btc_change_1h < -2.0 or eth_change_1h < -2.0:
+            return 'strong_bearish', 8  # مستحيل (8/7) = توقف
+        
+        # Bearish: حذر (نحتاج 5/7)
+        if btc_change_1h < -1.0 or eth_change_1h < -1.0:
+            return 'bearish', 5
+        
+        # Neutral/Bullish: عادي (3/7)
+        return 'neutral', 3
+    
+    def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence, liquidity_metrics=None, market_sentiment=None):
         """
         المستشارين يصوتون: هل نشتري؟ (BUY/SKIP)
-        Returns: buy_votes (dict with each consultant's vote: 1=BUY, 0=SKIP)
+        market_sentiment: {'btc_change_1h': float, 'eth_change_1h': float}
+        Returns: buy_votes (dict with each consultant's vote: 1=BUY, 0=SKIP), min_votes_required
         """
+        # فحص السوق العام أولاً
+        min_votes_required = 3  # default
+        market_status = 'neutral'
+        
+        if market_sentiment:
+            btc_change = market_sentiment.get('btc_change_1h', 0)
+            eth_change = market_sentiment.get('eth_change_1h', 0)
+            market_status, min_votes_required = self.get_market_sentiment(btc_change, eth_change)
+        
         votes = {}
         
         # Exit Strategy vote
@@ -748,4 +801,4 @@ class DeepLearningClientV2:
             # fallback للطريقة القديمة
             votes['liquidity'] = 1 if confidence >= 60 else 0
         
-        return votes
+        return votes, min_votes_required, market_status
