@@ -691,37 +691,38 @@ class DeepLearningClientV2:
     def vote_sell_now(self, symbol, profit_percent, rsi, macd, volume_ratio, trend, hours_held):
         """
         المستشارين يصوتون: هل نبيع الحين؟ (SELL/HOLD)
+        يصوتون SELL فقط لو السوق تغير أو وصل الهدف - مو لمجرد ربح صغير
         Returns: sell_votes (dict with each consultant's vote: 1=SELL, 0=HOLD)
         """
         votes = {}
         
         # Exit Strategy vote
-        # بيع لو ربح > 1.5% أو خسارة < -1.5%
-        votes['exit'] = 1 if (profit_percent > 1.5 or profit_percent < -1.5) else 0
+        # بيع لو ربح كبير > 2% أو خسارة كبيرة < -1.5%
+        votes['exit'] = 1 if (profit_percent > 2.0 or profit_percent < -1.5) else 0
         
         # MTF vote (يراقب الترند)
-        # بيع لو bearish + ربح موجب
+        # بيع لو bearish + ربح موجب (حماية الربح)
         votes['mtf'] = 1 if (trend == 'bearish' and profit_percent > 0.5) else 0
         
         # Risk vote (محافظ - يبيع بسرعة)
-        # بيع لو RSI > 70 أو خسارة
-        votes['risk'] = 1 if (rsi > 70 or profit_percent < -0.5) else 0
+        # بيع لو RSI مرتفع جداً أو خسارة
+        votes['risk'] = 1 if (rsi > 75 or profit_percent < -0.8) else 0
         
         # Pattern vote
-        # بيع لو ربح جيد + MACD سالب
-        votes['pattern'] = 1 if (profit_percent > 1.0 and macd < 0) else 0
+        # بيع لو ربح جيد + MACD سالب قوي (ترند ينقلب)
+        votes['pattern'] = 1 if (profit_percent > 1.5 and macd < -5) else 0
         
         # CNN vote
-        # بيع لو ربح > 1.2%
-        votes['cnn'] = 1 if profit_percent > 1.2 else 0
+        # بيع لو ربح كبير > 2%
+        votes['cnn'] = 1 if profit_percent > 2.0 else 0
         
-        # Anomaly vote (يبيع لو شاف شذوذ)
-        # بيع لو RSI شاذ أو volume شاذ
-        votes['anomaly'] = 1 if (rsi > 80 or rsi < 20 or volume_ratio > 3.0) else 0
+        # Anomaly vote (يبيع لو شاف شذوذ قوي)
+        # بيع لو RSI شاذ جداً أو volume شاذ جداً
+        votes['anomaly'] = 1 if (rsi > 85 or rsi < 15 or volume_ratio > 4.0) else 0
         
-        # Ranking vote
-        # بيع لو ربح > 1.5%
-        votes['ranking'] = 1 if profit_percent > 1.5 else 0
+        # Liquidity vote (الشيخ)
+        # بيع لو ربح كبير > 2%
+        votes['liquidity'] = 1 if profit_percent > 2.0 else 0
         
         return votes
     
