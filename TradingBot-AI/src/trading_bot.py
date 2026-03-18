@@ -612,14 +612,25 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                 except Exception as e:
                     liquidity_adjustment = 0
             
-            # Anomaly Detection
+            # Anomaly Detection - نظام نقاط متوازن
+            anomaly_adjustment = 0
             if anomaly_detector:
                 try:
                     anomaly_result = anomaly_detector.detect_anomalies(symbol, analysis)
+                    
+                    # فقط CRITICAL يرفض الشراء (نقاط >= 5)
                     if not anomaly_result['safe_to_trade']:
                         return {'symbol': symbol, 'action': 'SKIP', 'reason': f"ANOMALY: {anomaly_result['severity']}"}
+                    
+                    # HIGH و MEDIUM يعطون تحذير (تقليل confidence)
+                    anomaly_score = anomaly_result.get('anomaly_score', 0)
+                    if anomaly_score >= 3:
+                        anomaly_adjustment = -10  # تحذير قوي
+                    elif anomaly_score >= 1:
+                        anomaly_adjustment = -5   # تحذير متوسط
+                    
                 except Exception as e:
-                    pass
+                    anomaly_adjustment = 0
             
             # Pattern Recognition
             pattern_adjustment = 0
@@ -673,7 +684,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         except:
                             dl_adjustment = 0
                     
-                    total_adjustment = smart_money_boost + fibonacci_boost + liquidity_adjustment + pattern_adjustment + news_adjustment + dl_adjustment
+                    total_adjustment = smart_money_boost + fibonacci_boost + liquidity_adjustment + pattern_adjustment + news_adjustment + anomaly_adjustment + dl_adjustment
                     if total_adjustment != 0:
                         decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
                 except Exception as e:
