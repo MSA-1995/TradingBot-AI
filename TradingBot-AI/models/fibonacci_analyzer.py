@@ -1,6 +1,9 @@
 """
-📊 Fibonacci Retracement Analyzer
+📊 Fibonacci Retracement Analyzer - Enhanced
 يحدد أفضل نقاط الدخول بناءً على مستويات فيبوناتشي
++ تتبع نجاح المستويات
++ تكيف مع العملات
++ دمج مع Volume
 """
 
 class FibonacciAnalyzer:
@@ -15,7 +18,16 @@ class FibonacciAnalyzer:
             '78.6': 0.786,
             '100': 1.0
         }
-        print("📊 Fibonacci Analyzer initialized")
+        
+        # تتبع نجاح المستويات
+        self.level_success = {
+            '61.8': {'success': 0, 'fail': 0},
+            '50': {'success': 0, 'fail': 0},
+            '38.2': {'success': 0, 'fail': 0},
+            '78.6': {'success': 0, 'fail': 0}
+        }
+        
+        print("📊 Fibonacci Analyzer initialized (Enhanced)")
     
     def calculate_levels(self, high, low):
         """حساب مستويات فيبوناتشي"""
@@ -74,8 +86,31 @@ class FibonacciAnalyzer:
         except Exception as e:
             return None
     
-    def is_at_support(self, current_price, df, tolerance=0.5):
-        """هل السعر عند مستوى دعم فيبوناتشي؟"""
+    def get_level_strength(self, level_name):
+        """حساب قوة المستوى بناءً على التاريخ"""
+        if level_name not in self.level_success:
+            return 1.0  # قوة عادية
+        
+        stats = self.level_success[level_name]
+        total = stats['success'] + stats['fail']
+        
+        if total < 5:
+            return 1.0  # بيانات قليلة
+        
+        success_rate = stats['success'] / total
+        
+        # قوة المستوى (0.5 - 1.5)
+        if success_rate > 0.7:
+            return 1.5  # قوي جداً
+        elif success_rate > 0.6:
+            return 1.3  # قوي
+        elif success_rate < 0.4:
+            return 0.7  # ضعيف
+        else:
+            return 1.0  # عادي
+    
+    def is_at_support(self, current_price, df, tolerance=0.5, volume_ratio=1.0, symbol=''):
+        """هل السعر عند مستوى دعم فيبوناتشي؟ (محسّن)"""
         try:
             support = self.get_support_level(current_price, df)
             if not support:
@@ -86,22 +121,38 @@ class FibonacciAnalyzer:
             
             # إذا السعر قريب من مستوى دعم (أقل من tolerance%)
             if distance <= tolerance:
-                # المستويات القوية
+                # حساب Boost الأساسي
                 if level in ['61.8', '50']:
-                    return True, 10  # boost قوي
+                    base_boost = 15  # boost قوي (زيادة من 10)
                 elif level in ['38.2', '78.6']:
-                    return True, 5   # boost متوسط
+                    base_boost = 8   # boost متوسط (زيادة من 5)
                 else:
-                    return True, 3   # boost ضعيف
+                    base_boost = 5   # boost ضعيف (زيادة من 3)
+                
+                # تعديل حسب قوة المستوى (من التاريخ)
+                level_strength = self.get_level_strength(level)
+                base_boost = int(base_boost * level_strength)
+                
+                # تعديل حسب Volume
+                if volume_ratio > 1.5:
+                    base_boost = int(base_boost * 1.3)  # volume عالي = أقوى
+                elif volume_ratio < 0.8:
+                    base_boost = int(base_boost * 0.8)  # volume ضعيف = أضعف
+                
+                # تعديل حسب العملة
+                if 'BTC' in symbol or 'ETH' in symbol:
+                    base_boost = int(base_boost * 1.2)  # العملات الكبيرة أقوى
+                
+                return True, base_boost
             
             return False, 0
         except:
             return False, 0
     
-    def get_confidence_boost(self, current_price, df):
-        """حساب زيادة الثقة بناءً على فيبوناتشي"""
+    def get_confidence_boost(self, current_price, df, volume_ratio=1.0, symbol=''):
+        """حساب زيادة الثقة بناءً على فيبوناتشي (محسّن)"""
         try:
-            at_support, boost = self.is_at_support(current_price, df)
+            at_support, boost = self.is_at_support(current_price, df, volume_ratio=volume_ratio, symbol=symbol)
             
             if at_support:
                 return boost
@@ -114,13 +165,27 @@ class FibonacciAnalyzer:
             distance = support['distance']
             level = support['level']
             
-            # إذا قريب من مستوى قوي (1-2%)
+            # إذا قريب من مستوى قوي (0.5-2%)
             if level in ['61.8', '50'] and 0.5 < distance <= 2.0:
-                return 3  # boost صغير (قريب من الدعم)
+                base_boost = 5  # boost صغير (زيادة من 3)
+                
+                # تعديل حسب قوة المستوى
+                level_strength = self.get_level_strength(level)
+                base_boost = int(base_boost * level_strength)
+                
+                return base_boost
             
             return 0
         except:
             return 0
+    
+    def record_level_result(self, level_name, success):
+        """تسجيل نتيجة المستوى (للتعلم)"""
+        if level_name in self.level_success:
+            if success:
+                self.level_success[level_name]['success'] += 1
+            else:
+                self.level_success[level_name]['fail'] += 1
     
     def get_stop_loss_level(self, entry_price, df):
         """تحديد Stop Loss تحت مستوى فيبوناتشي"""
