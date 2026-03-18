@@ -60,6 +60,32 @@ def get_market_analysis(exchange, symbol, limit=60):
             df['price_change_1h'] = 0
         df['price_change_1h'] = df['price_change_1h'].fillna(0)
         
+        # ========== حساب تغير BTC و ETH (للسوق العام) ==========
+        btc_change_1h = 0
+        eth_change_1h = 0
+        
+        # جلب BTC و ETH فقط لو العملة مو BTC أو ETH
+        if symbol not in ['BTC/USDT', 'ETH/USDT']:
+            try:
+                # BTC change
+                btc_ohlcv = exchange.fetch_ohlcv('BTC/USDT', '5m', limit=13)
+                if len(btc_ohlcv) >= 13:
+                    btc_current = btc_ohlcv[-1][4]  # close
+                    btc_1h_ago = btc_ohlcv[-13][4]  # close قبل ساعة
+                    btc_change_1h = ((btc_current - btc_1h_ago) / btc_1h_ago) * 100
+            except:
+                btc_change_1h = 0
+            
+            try:
+                # ETH change
+                eth_ohlcv = exchange.fetch_ohlcv('ETH/USDT', '5m', limit=13)
+                if len(eth_ohlcv) >= 13:
+                    eth_current = eth_ohlcv[-1][4]
+                    eth_1h_ago = eth_ohlcv[-13][4]
+                    eth_change_1h = ((eth_current - eth_1h_ago) / eth_1h_ago) * 100
+            except:
+                eth_change_1h = 0
+        
         # Multi-timeframe analysis من نفس البيانات
         mtf_analysis = calculate_mtf_from_5m_data(df)
         
@@ -98,7 +124,10 @@ def get_market_analysis(exchange, symbol, limit=60):
             'volume_trend': latest['volume_trend'],
             'price_change_1h': latest['price_change_1h'],
             # بيانات السيولة
-            'liquidity': liquidity_metrics
+            'liquidity': liquidity_metrics,
+            # بيانات السوق العام
+            'btc_change_1h': btc_change_1h,
+            'eth_change_1h': eth_change_1h
         }
     except Exception as e:
         print(f"❌ Analysis error {symbol}: {e}")
