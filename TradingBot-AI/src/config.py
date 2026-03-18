@@ -20,8 +20,9 @@ MAX_TRADE_AMOUNT = 30
 BASE_AMOUNT = 12
 
 # Risk Management
-STOP_LOSS_PERCENT = 2.0
-# TAKE_PROFIT_PERCENT removed - البيع يتم عبر تصويت المستشارين فقط
+# Stop Loss removed - الحماية عبر:
+# 1. تصويت المستشارين (-0.8% إلى -1.2%)
+# 2. Trailing Stop -2% من أعلى سعر (جدار نهائي)
 
 # Timing
 LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
