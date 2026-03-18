@@ -556,13 +556,16 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                 except Exception as e:
                     smart_money_boost = 0
             
-            # Fibonacci Analysis
+            # Fibonacci Analysis (محسّن)
             fibonacci_boost = 0
             if fibonacci_analyzer:
                 try:
                     df = analysis.get('df')
+                    volume_ratio = analysis.get('volume_ratio', 1.0)
                     if df is not None:
-                        fibonacci_boost = fibonacci_analyzer.get_confidence_boost(current_price, df)
+                        fibonacci_boost = fibonacci_analyzer.get_confidence_boost(
+                            current_price, df, volume_ratio=volume_ratio, symbol=symbol
+                        )
                 except Exception as e:
                     fibonacci_boost = 0
             
