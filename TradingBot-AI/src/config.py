@@ -28,25 +28,23 @@ BASE_AMOUNT = 12
 LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
 REPORT_INTERVAL = 30
 
-# قائمة العملات الثابتة (50 عملة مشهورة)
+# قائمة العملات الثابتة (Top 50 by Market Cap - March 2026)
 SYMBOLS = [
-    # كبار العملات
-    'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT',
-    'ADA/USDT', 'AVAX/USDT', 'DOGE/USDT', 'TRX/USDT', 'DOT/USDT',
-    # DeFi
-    'LINK/USDT', 'UNI/USDT', 'AAVE/USDT', 'CRV/USDT', 'LDO/USDT',
-    'SUSHI/USDT', 'COMP/USDT', 'SNX/USDT', 'ZRX/USDT', '1INCH/USDT',
-    # Layer 2
-    'ARB/USDT', 'OP/USDT', 'POL/USDT', 'IMX/USDT', 'LRC/USDT',
-    # Layer 1
-    'ATOM/USDT', 'NEAR/USDT', 'APT/USDT', 'SUI/USDT', 'SEI/USDT',
-    'INJ/USDT', 'TIA/USDT', 'S/USDT', 'ALGO/USDT', 'EGLD/USDT',
-    # Meme & Others
-    'SHIB/USDT', 'PEPE/USDT', 'FLOKI/USDT', 'WIF/USDT', 'BONK/USDT',
-    # Exchange & Infra
-    'LTC/USDT', 'BCH/USDT', 'FIL/USDT', 'ICP/USDT', 'RENDER/USDT',
-    # Gaming & NFT
-    'AXS/USDT', 'SAND/USDT', 'MANA/USDT', 'ENJ/USDT', 'GALA/USDT',
+    # Top 10 - Giants
+    'BTC/USDT', 'ETH/USDT', 'XRP/USDT', 'BNB/USDT', 'SOL/USDT',
+    'DOGE/USDT', 'ADA/USDT', 'TRX/USDT', 'AVAX/USDT', 'TON/USDT',
+    # 11-20 - Major Alts
+    'LINK/USDT', 'DOT/USDT', 'BCH/USDT', 'NEAR/USDT', 'LTC/USDT',
+    'UNI/USDT', 'ATOM/USDT', 'XLM/USDT', 'HBAR/USDT', 'ICP/USDT',
+    # 21-30 - Strong Layer 1 & Layer 2
+    'APT/USDT', 'ARB/USDT', 'OP/USDT', 'SUI/USDT', 'INJ/USDT',
+    'TIA/USDT', 'SEI/USDT', 'FTM/USDT', 'ALGO/USDT', 'VET/USDT',
+    # 31-40 - DeFi & Infrastructure
+    'AAVE/USDT', 'FIL/USDT', 'RENDER/USDT', 'GRT/USDT', 'RUNE/USDT',
+    'LDO/USDT', 'CRV/USDT', 'SNX/USDT', 'MKR/USDT', 'THETA/USDT',
+    # 41-50 - Meme, Gaming & Others
+    'SHIB/USDT', 'PEPE/USDT', 'WIF/USDT', 'FLOKI/USDT', 'BONK/USDT',
+    'IMX/USDT', 'SAND/USDT', 'MANA/USDT', 'AXS/USDT', 'GALA/USDT',
 ]
 
 # عدد العملات النشطة للتداول (الأقوى من القائمة)
