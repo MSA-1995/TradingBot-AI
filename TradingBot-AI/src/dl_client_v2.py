@@ -686,11 +686,11 @@ class DeepLearningClientV2:
         # نراقب 4 عوامل، إذا تحققت 3 منها نبيع فوراً عند القمة
         reversal_score = 0
         
-        # 1. شكل الشمعة/التشبع (RSI): تشبع شرائي قوي
-        if rsi > 70: reversal_score += 1
+        # 1. شكل الشمعة/التشبع (RSI): تشبع شرائي متوسط (65) بدلاً من الصارم (70)
+        if rsi > 65: reversal_score += 1
             
-        # 2. حجم التداول (Volume): فوليوم انفجاري يعني قمة تصريفية
-        if volume_ratio > 2.5: reversal_score += 1
+        # 2. حجم التداول (Volume): فوليوم نشط (1.5) بدلاً من الانفجاري (2.5)
+        if volume_ratio > 1.5: reversal_score += 1
             
         # 3. الزخم والتقارب (MACD): ضعف العزم (سلبي) رغم وجود السعر في القمة
         if macd < 0: reversal_score += 1
@@ -709,8 +709,8 @@ class DeepLearningClientV2:
             # ربح: (> 1% + السوق نازل) أو اكتشاف القمة (تم حذف هدف 2.5% الثابت)
             votes['exit'] = 1 if ((profit_percent > 1.0 and market_falling) or peak_signal) else 0
         else:
-            # خسارة: < -0.8% أو (< -0.5% + السوق نازل)
-            votes['exit'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and market_falling)) else 0
+            # خسارة: لا نبيع، نعتمد على Trailing Stop (-2%) في AI Brain فقط
+            votes['exit'] = 0 
         
         # MTF - يراقب الترند + السوق
         if profit_percent > 0:
@@ -718,47 +718,47 @@ class DeepLearningClientV2:
             votes['mtf'] = 1 if (trend == 'bearish' and profit_percent > 1.0) or (profit_percent > 0.5 and btc_change < -1.5) or peak_signal else 0
         else:
             # خسارة: bearish + خسارة < -0.5% أو (خسارة < -0.3% + السوق نازل)
-            votes['mtf'] = 1 if (trend in ['bearish', 'strong_bearish'] and profit_percent < -0.5) or (profit_percent < -0.3 and market_falling) else 0
+            votes['mtf'] = 0
         
         # Risk - محافظ + يشوف السوق
         if profit_percent > 0:
             # ربح: RSI > 78 أو (ربح > 1.5% + السوق نازل) أو اكتشاف القمة
             votes['risk'] = 1 if (rsi > 78 or (profit_percent > 1.5 and market_falling) or peak_signal) else 0
         else:
-            # خسارة: < -0.8% أو (< -0.5% + السوق نازل قوي)
-            votes['risk'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and btc_change < -1.5)) else 0
+            # خسارة: لا نبيع
+            votes['risk'] = 0 
         
         # Pattern - يراقب الأنماط + السوق
         if profit_percent > 0:
             # ربح: > 2% + MACD سالب قوي أو (> 1% + السوق نازل + MACD < -5) أو اكتشاف القمة
             votes['pattern'] = 1 if (profit_percent > 2.0 and macd < -7) or (profit_percent > 1.0 and market_falling and macd < -5) or peak_signal else 0
         else:
-            # خسارة: MACD < -10 + خسارة < -0.6% أو (MACD < -8 + خسارة < -0.4% + السوق نازل)
-            votes['pattern'] = 1 if (macd < -10 and profit_percent < -0.6) or (macd < -8 and profit_percent < -0.4 and market_falling) else 0
+            # خسارة: لا نبيع
+            votes['pattern'] = 0
         
         # CNN - يراقب الشارت + السوق
         if profit_percent > 0:
             # ربح: (> 1.2% + السوق نازل) أو اكتشاف القمة (تم حذف هدف 2.5% الثابت)
             votes['cnn'] = 1 if ((profit_percent > 1.2 and market_falling) or peak_signal) else 0
         else:
-            # خسارة: < -0.8% أو (< -0.5% + السوق نازل)
-            votes['cnn'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and market_falling)) else 0
+            # خسارة: لا نبيع
+            votes['cnn'] = 0
         
         # Anomaly - يكشف الشذوذ + السوق
         if profit_percent > 0:
             # ربح: RSI شاذ جداً (> 85) أو (RSI > 75 + السوق نازل) أو اكتشاف القمة
             votes['anomaly'] = 1 if (rsi > 85 or (rsi > 75 and market_falling) or peak_signal) else 0
         else:
-            # خسارة: RSI منهار (< 25) أو volume شاذ (> 3.5) أو (RSI < 30 + السوق نازل)
-            votes['anomaly'] = 1 if (rsi < 25 or volume_ratio > 3.5 or (rsi < 30 and market_falling)) else 0
+            # خسارة: لا نبيع
+            votes['anomaly'] = 0
         
         # Liquidity - الشيخ + السوق
         if profit_percent > 0:
             # ربح: (> 1% + السوق نازل) أو اكتشاف القمة (تم حذف هدف 2.5% الثابت)
             votes['liquidity'] = 1 if ((profit_percent > 1.0 and market_falling) or peak_signal) else 0
         else:
-            # خسارة: < -0.8% أو (< -0.5% + السوق نازل)
-            votes['liquidity'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and market_falling)) else 0
+            # خسارة: لا نبيع
+            votes['liquidity'] = 0
         
         return votes
     
