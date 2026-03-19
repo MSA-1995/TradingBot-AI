@@ -631,4 +631,10 @@ ctx = {
     'get_dynamic_symbols_fn': get_dynamic_symbols,
 }
 
-run_main_loop(exchange, ctx)
+while True:
+    try:
+        run_main_loop(exchange, ctx)
+    except Exception as e:
+        print(f"❌ Critical error: {e}")
+        print(f"🔄 Restarting in 5 seconds...")
+        time.sleep(5)
