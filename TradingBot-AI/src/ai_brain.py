@@ -191,9 +191,33 @@ class AIBrain:
                     except:
                         pass
                     
+                    # --- تحليل الشموع (Sniper Mode) ---
+                    candle_analysis = {'is_rejection': False, 'is_accumulation': False}
+                    try:
+                        df = analysis.get('df')
+                        if df is not None and not df.empty:
+                            last = df.iloc[-1]
+                            open_p = float(last['open'])
+                            close_p = float(last['close'])
+                            low_p = float(last['low'])
+                            
+                            body = abs(close_p - open_p)
+                            lower_wick = min(open_p, close_p) - low_p
+                            
+                            # 1. Rejection (Hammer/Pinbar): الذيل السفلي أكبر من الجسم بـ 1.2 مرة (متوسط)
+                            if lower_wick > (body * 1.2):
+                                candle_analysis['is_rejection'] = True
+                                
+                            # 2. Accumulation: فوليوم عالي (> 1.3) مع تحرك سعري بسيط (< 0.4%)
+                            change_pct = (body / open_p) * 100 if open_p > 0 else 0
+                            if volume_ratio > 1.3 and change_pct < 0.4:
+                                candle_analysis['is_accumulation'] = True
+                    except Exception:
+                        pass
+                    
                     buy_votes, min_votes_required, market_status = self.dl_client.vote_buy_now(
                         rsi, macd, volume_ratio, price_momentum, optimized_confidence, 
-                        liquidity_metrics, market_sentiment
+                        liquidity_metrics, market_sentiment, candle_analysis
                     )
                     buy_vote_count = sum(buy_votes.values())
                     total_consultants = len(buy_votes)
