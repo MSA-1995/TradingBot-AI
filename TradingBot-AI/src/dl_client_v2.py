@@ -698,13 +698,16 @@ class DeepLearningClientV2:
         # 4. ضغط السوق (Market): السوق العام بدأ ينزف
         if market_falling: reversal_score += 1
             
-        # إشارة القمة: اتفاق 3 من 4 مؤشرات + وجود ربح (حتى لو بسيط)
-        peak_signal = (profit_percent > 0.5 and reversal_score >= 3)
+        # شرط "الشمعة الحمراء/بداية الانعكاس": السعر نزل قليلاً عن أعلى نقطة (ليس في قمة الاندفاع)
+        is_reversing = (drop_from_high_percent > 0.0)
+        
+        # إشارة القمة: اتفاق 3 من 4 مؤشرات + ربح يغطي الرسوم (> 0.8%) + بداية انعكاس فعلي
+        peak_signal = (profit_percent > 0.8 and reversal_score >= 3 and is_reversing)
         
         # Exit Strategy - يراقب الربح والخسارة + السوق
         if profit_percent > 0:
-            # ربح: > 2.5% أو (> 1% + السوق نازل) أو اكتشاف القمة
-            votes['exit'] = 1 if (profit_percent > 2.5 or (profit_percent > 1.0 and market_falling) or peak_signal) else 0
+            # ربح: (> 1% + السوق نازل) أو اكتشاف القمة (تم حذف هدف 2.5% الثابت)
+            votes['exit'] = 1 if ((profit_percent > 1.0 and market_falling) or peak_signal) else 0
         else:
             # خسارة: < -0.8% أو (< -0.5% + السوق نازل)
             votes['exit'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and market_falling)) else 0
@@ -735,8 +738,8 @@ class DeepLearningClientV2:
         
         # CNN - يراقب الشارت + السوق
         if profit_percent > 0:
-            # ربح: > 2.5% أو (> 1.2% + السوق نازل) أو اكتشاف القمة
-            votes['cnn'] = 1 if (profit_percent > 2.5 or (profit_percent > 1.2 and market_falling) or peak_signal) else 0
+            # ربح: (> 1.2% + السوق نازل) أو اكتشاف القمة (تم حذف هدف 2.5% الثابت)
+            votes['cnn'] = 1 if ((profit_percent > 1.2 and market_falling) or peak_signal) else 0
         else:
             # خسارة: < -0.8% أو (< -0.5% + السوق نازل)
             votes['cnn'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and market_falling)) else 0
@@ -751,8 +754,8 @@ class DeepLearningClientV2:
         
         # Liquidity - الشيخ + السوق
         if profit_percent > 0:
-            # ربح: > 2.5% أو (> 1% + السوق نازل) أو اكتشاف القمة
-            votes['liquidity'] = 1 if (profit_percent > 2.5 or (profit_percent > 1.0 and market_falling) or peak_signal) else 0
+            # ربح: (> 1% + السوق نازل) أو اكتشاف القمة (تم حذف هدف 2.5% الثابت)
+            votes['liquidity'] = 1 if ((profit_percent > 1.0 and market_falling) or peak_signal) else 0
         else:
             # خسارة: < -0.8% أو (< -0.5% + السوق نازل)
             votes['liquidity'] = 1 if (profit_percent < -0.8 or (profit_percent < -0.5 and market_falling)) else 0
