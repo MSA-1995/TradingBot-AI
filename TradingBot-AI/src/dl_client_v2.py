@@ -788,15 +788,23 @@ class DeepLearningClientV2:
         # Neutral/Bullish: عادي (3/7)
         return 'neutral', 3
     
-    def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence, liquidity_metrics=None, market_sentiment=None):
+    def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence, liquidity_metrics=None, market_sentiment=None, candle_analysis=None):
         """
         المستشارين يصوتون: هل نشتري؟ (BUY/SKIP)
         market_sentiment: {'btc_change_1h': float, 'eth_change_1h': float, 'bnb_change_1h': float}
+        candle_analysis: {'is_rejection': bool, 'is_accumulation': bool}
         Returns: buy_votes (dict with each consultant's vote: 1=BUY, 0=SKIP), min_votes_required
         """
         # فحص السوق العام أولاً
         min_votes_required = 3  # default
         market_status = 'neutral'
+        
+        # استخراج تحليل الشموع (القناص)
+        is_rejection = False
+        is_accumulation = False
+        if candle_analysis:
+            is_rejection = candle_analysis.get('is_rejection', False)
+            is_accumulation = candle_analysis.get('is_accumulation', False)
         
         if market_sentiment:
             btc_change = market_sentiment.get('btc_change_1h', 0)
@@ -806,29 +814,30 @@ class DeepLearningClientV2:
         
         votes = {}
         
-        # Exit Strategy vote
-        # شراء لو RSI منخفض + confidence جيد
-        votes['exit'] = 1 if (rsi < 40 and confidence >= 60) else 0
+        # 1. Exit Strategy (القناص):
+        # يشتري في حالتين:
+        # أ. فرصة رخيصة جداً (RSI < 42) - كلاسيكي
+        # ب. فرصة ذكية (RSI < 55 + وجود ذيل رفض أو تجميع) -> هذا هو الدهاء!
+        votes['exit'] = 1 if (rsi < 42 or (rsi < 55 and (is_rejection or is_accumulation))) else 0
         
-        # MTF vote (يراقب الترند)
-        # شراء لو MACD موجب + volume عالي
-        votes['mtf'] = 1 if (macd > 0 and volume_ratio > 1.2) else 0
+        # 2. MTF vote (صائد الانفجار):
+        # شراء لو MACD موجب + volume عالي (كلاسيكي)
+        # أو لو فيه تجميع واضح (فوليوم عالي وسعر ثابت) حتى لو MACD لسه ما قلب
+        votes['mtf'] = 1 if ((macd > 0 and volume_ratio > 1.2) or is_accumulation) else 0
         
-        # Risk vote (محافظ)
-        # شراء لو RSI ليس مرتفع جداً
+        # 3. Risk vote (محافظ - متوسط الصرامة):
         votes['risk'] = 1 if (rsi < 65 and confidence >= 65) else 0
         
-        # Pattern vote
-        # شراء لو confidence عالي + momentum موجب
-        votes['pattern'] = 1 if (confidence >= 65 and price_momentum > 0) else 0
+        # 4. Pattern vote (الأنماط):
+        votes['pattern'] = 1 if (confidence >= 60 and (price_momentum > 0 or is_rejection)) else 0
         
-        # CNN vote
-        # شراء لو MACD قوي
-        votes['cnn'] = 1 if (macd > 2 and volume_ratio > 1.0) else 0
+        # 5. CNN vote (الزخم):
+        votes['cnn'] = 1 if ((macd > 2 and volume_ratio > 1.0) or (is_rejection and volume_ratio > 1.5)) else 0
         
-        # Anomaly vote (حذر من الشذوذ)
-        # شراء لو RSI طبيعي + volume طبيعي
-        votes['anomaly'] = 1 if (30 < rsi < 70 and volume_ratio < 2.5) else 0
+        # 6. Anomaly vote (كاشف الفخاخ):
+        # يرفض الشراء إذا الفوليوم جنوني (> 4.0) لأنه غالباً تصريف (Panic Dump)
+        # يسمح بالشراء في القاع (RSI < 30) فقط إذا كان هناك "ذيل رفض" (ارتداد)
+        votes['anomaly'] = 1 if (volume_ratio < 4.0 and (rsi > 30 or is_rejection)) else 0
         
         # Liquidity vote (الشيخ - محلل السيولة)
         if liquidity_metrics:
