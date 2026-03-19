@@ -713,29 +713,8 @@ class AIBrain:
                 'profit': profit_percent
             }
         
-        # 2. فحص الخسارة مع تحليل السوق (AI حر يقرر)
-        if profit_percent < 0:
-            rsi = analysis.get('rsi', 50) if analysis else 50
-            macd_diff = analysis.get('macd_diff', 0) if analysis else 0
-            trend = mtf.get('trend', 'neutral') if mtf else 'neutral'
-            
-            # السوق نازل قوي جداً - بيع مبكر (حماية)
-            market_falling_hard = (
-                trend in ['bearish', 'strong_bearish'] and
-                macd_diff < -10 and  # أقوى من -5
-                rsi > 65 and  # overbought في نزول
-                profit_percent <= -1.0  # خسارة -1% على الأقل
-            )
-            
-            if market_falling_hard:
-                print(f"⚠️ {symbol}: Market crash detected - early exit")
-                return {
-                    'action': 'SELL',
-                    'reason': f'EARLY STOP (Market crash)',
-                    'profit': profit_percent
-                }
-            
-            # السوق عادي - AI يقرر بحرية (يكمل للشروط التالية)
+        # 2. فحص الخسارة: تم إلغاء البيع اليدوي بخسارة
+        # نعتمد فقط على Trailing Stop في الأعلى (-2% من القمة)
         
         # 3. استشارة المستشارين للبيع (تصويت - النظام الوحيد للبيع)
         # المستشارين يراقبون العملة + السوق العام ويصوتون
