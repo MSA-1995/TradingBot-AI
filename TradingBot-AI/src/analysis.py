@@ -5,11 +5,15 @@ Handles RSI, MACD, Volume, Momentum calculations
 
 import pandas as pd
 import ta
+from datetime import datetime
+
+# ذاكرة مؤقتة لبيانات السوق العام (BTC, ETH, BNB) لتقليل الطلبات
+_market_cache = {'time': None, 'data': {}}
 
 def get_market_analysis(exchange, symbol, limit=60):
     """Get technical analysis for a symbol with multi-timeframe data"""
     try:
-        # جلب بيانات أكثر لتحليل multi-timeframe
+        # 1. جلب بيانات العملة الحالية (لحظي ومباشر)
         ohlcv = exchange.fetch_ohlcv(symbol, '5m', limit=limit)
         df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         
@@ -65,42 +69,52 @@ def get_market_analysis(exchange, symbol, limit=60):
         eth_change_1h = 0
         bnb_change_1h = 0
         
-        # جلب BTC, ETH, BNB فقط لو العملة مو واحدة منهم
+        # استخدام الذاكرة المؤقتة لبيانات السوق العام (تحديث كل 20 ثانية)
+        global _market_cache
+        current_time = datetime.now()
+        cache_valid = False
+        
+        if _market_cache['time'] and (current_time - _market_cache['time']).total_seconds() < 20:
+            cache_valid = True
+        
+        # إذا الكاش قديم، نحدثه
+        if not cache_valid:
+            new_market_data = {}
+            for market_coin in ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']:
+                try:
+                    m_ohlcv = exchange.fetch_ohlcv(market_coin, '5m', limit=13)
+                    if len(m_ohlcv) >= 13:
+                        m_current = m_ohlcv[-1][4]
+                        m_1h_ago = m_ohlcv[-13][4]
+                        change = ((m_current - m_1h_ago) / m_1h_ago) * 100
+                        new_market_data[market_coin] = change
+                    else:
+                        new_market_data[market_coin] = 0
+                except:
+                    new_market_data[market_coin] = 0
+            
+            _market_cache = {
+                'time': current_time,
+                'data': new_market_data
+            }
+            # print(f"🔄 Market data updated") # Debug
+
+        # قراءة البيانات من الكاش أو التحديث
+        market_data = _market_cache['data']
+        
         if symbol not in ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']:
-            try:
-                # BTC change
-                btc_ohlcv = exchange.fetch_ohlcv('BTC/USDT', '5m', limit=13)
-                if len(btc_ohlcv) >= 13:
-                    btc_current = btc_ohlcv[-1][4]  # close
-                    btc_1h_ago = btc_ohlcv[-13][4]  # close قبل ساعة
-                    btc_change_1h = ((btc_current - btc_1h_ago) / btc_1h_ago) * 100
-            except:
-                btc_change_1h = 0
-            
-            try:
-                # ETH change
-                eth_ohlcv = exchange.fetch_ohlcv('ETH/USDT', '5m', limit=13)
-                if len(eth_ohlcv) >= 13:
-                    eth_current = eth_ohlcv[-1][4]
-                    eth_1h_ago = eth_ohlcv[-13][4]
-                    eth_change_1h = ((eth_current - eth_1h_ago) / eth_1h_ago) * 100
-            except:
-                eth_change_1h = 0
-            
-            try:
-                # BNB change
-                bnb_ohlcv = exchange.fetch_ohlcv('BNB/USDT', '5m', limit=13)
-                if len(bnb_ohlcv) >= 13:
-                    bnb_current = bnb_ohlcv[-1][4]
-                    bnb_1h_ago = bnb_ohlcv[-13][4]
-                    bnb_change_1h = ((bnb_current - bnb_1h_ago) / bnb_1h_ago) * 100
-            except:
-                bnb_change_1h = 0
+            btc_change_1h = market_data.get('BTC/USDT', 0)
+            eth_change_1h = market_data.get('ETH/USDT', 0)
+            bnb_change_1h = market_data.get('BNB/USDT', 0)
         
         # Multi-timeframe analysis من نفس البيانات
         mtf_analysis = calculate_mtf_from_5m_data(df)
         
         latest = df.iloc[-1]
+        
+        # تحسين: إذا المؤشرات سيئة جداً، لا داعي لجلب Order Book (توفير وقت)
+        # إذا RSI > 65 (تشبع شرائي) وما زلنا نبحث عن شراء، غالباً لن نشتري
+        # ولكن نحتاج السيولة للموديلات، سنكتفي بتحسين سرعة السوق العام حالياً
         
         # Get Bid-Ask Spread from ticker
         bid_ask_spread = 0
