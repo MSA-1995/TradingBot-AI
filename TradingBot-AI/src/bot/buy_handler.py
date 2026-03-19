@@ -36,10 +36,8 @@ def process_buy(result, exchange, ctx):
     voting_display = ""
     if 'decision' in result:
         decision = result['decision']
-        tp_target = decision.get('tp_target', 0)
-        sl_target = decision.get('sl_target', 0)
         buy_vote_percentage = decision.get('buy_vote_percentage', 0)
-        voting_display = f" | 🗳️ Buy:{buy_vote_percentage:.0f}% TP:{tp_target:.1f}% SL:{sl_target:.1f}% Amount:${result['amount']:.0f}"
+        voting_display = f" | 🗳️ Buy:{buy_vote_percentage:.0f}% Amount:${result['amount']:.0f}"
 
     if 'decision' in result:
         print(f"{Fore.GREEN}🟢 BUY {symbol} 🧠 | AI Confidence:{result['confidence']}/120{voting_display}{news_display}{Style.RESET_ALL}")
@@ -58,8 +56,8 @@ def process_buy(result, exchange, ctx):
     total_consultants = None
 
     if 'decision' in result:
-        tp_target          = result['decision'].get('tp_target')
-        sl_target          = result['decision'].get('sl_target')
+        tp_target          = None
+        sl_target          = None
         buy_vote_percentage = result['decision'].get('buy_vote_percentage')
         buy_vote_count     = result['decision'].get('buy_vote_count')
         total_consultants  = result['decision'].get('total_consultants')
@@ -158,8 +156,8 @@ def process_buy(result, exchange, ctx):
                 pass
 
         position_data.update({
-            'tp_target':      decision.get('tp_target', 1.0),
-            'sl_target':      decision.get('sl_target', 2.0),
+            'tp_target':      0,
+            'sl_target':      0,
             'max_wait_hours': decision.get('max_wait_hours', 48),
             'ai_data':        advisor_scores
         })
