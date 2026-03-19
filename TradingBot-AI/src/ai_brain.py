@@ -265,16 +265,16 @@ class AIBrain:
             # حساب المبلغ الذكي
             amount = self._calculate_smart_amount(symbol, optimized_confidence, analysis, risk_manager=risk_manager)
             
-            # حساب TP و SL الذكي
-            smart_targets = self._calculate_smart_targets(symbol, optimized_confidence, analysis, similar_success, risk_manager=risk_manager)
+            # تم إلغاء توقعات السعر والأيام (الاعتماد على القناص والستوب المتحرك فقط)
+            # smart_targets = self._calculate_smart_targets(...)
             
             decision = {
                 'action': 'BUY',
                 'confidence': optimized_confidence,
                 'amount': amount,
-                'tp_target': smart_targets['tp'],
-                'sl_target': smart_targets['sl'],
-                'max_wait_hours': smart_targets['wait_hours'],
+                'tp_target': None,
+                'sl_target': None,
+                'max_wait_hours': 72,  # شرط الزومبي الثابت (3 أيام)
                 'reason': f'AI optimized from {base_confidence} to {optimized_confidence}',
                 'success_probability': self._estimate_success_probability(similar_success),
                 'buy_vote_percentage': (buy_vote_count / total_consultants * 100) if total_consultants > 0 else 0,
@@ -293,8 +293,8 @@ class AIBrain:
                     'exit_score': models_scores.get('exit', 0) if models_scores else 0,
                     'pattern_score': models_scores.get('pattern', 0) if models_scores else 0,
                     'ranking_score': models_scores.get('ranking', 0) if models_scores else 0,
-                    'predicted_tp': smart_targets['tp'],
-                    'predicted_sl': smart_targets['sl'],
+                    'predicted_tp': 0,
+                    'predicted_sl': 0,
                     'predicted_amount': amount,
                     # المؤشرات الـ 5 الجديدة
                     'atr': analysis.get('atr', 0),
@@ -311,9 +311,9 @@ class AIBrain:
                 'decision': 'BUY',
                 'confidence': optimized_confidence,
                 'amount': amount,
-                'tp_target': smart_targets['tp'],
-                'sl_target': smart_targets['sl'],
-                'max_wait_hours': smart_targets['wait_hours'],
+                'tp_target': 0,
+                'sl_target': 0,
+                'max_wait_hours': 72,
                 'base_confidence': base_confidence,
                 'reasoning': decision['reason']
             })
@@ -630,75 +630,11 @@ class AIBrain:
 
     
     def _calculate_smart_targets(self, symbol, confidence, analysis, similar_patterns, risk_manager=None):
-        """حساب TP و SL والانتظار بالتصويت من المستشارين + Risk Manager"""
-        import pandas as pd
-        
-        rsi = analysis.get('rsi', 50)
-        macd = analysis.get('macd_diff', 0)
-        volume_ratio = analysis.get('volume_ratio', 1.0)
-        price_momentum = analysis.get('price_momentum', 0)
-        
-        # استشارة المستشارين للتصويت
-        if self.dl_client:
-            try:
-                # TP Voting
-                tp_votes = self.dl_client.vote_tp_target(rsi, macd, volume_ratio, price_momentum, confidence)
-                avg_tp = sum(tp_votes.values()) / len(tp_votes)
-                
-                # الملك يعدل (±1%)
-                king_adjustment_tp = min(max((confidence - 65) * 0.02, -1.0), 1.0)
-                final_tp = max(0.5, min(11.0, avg_tp + king_adjustment_tp))
-                
-                # Risk Manager vote for SL
-                risk_sl_vote = None
-                if risk_manager:
-                    try:
-                        # Risk Manager يصوت بناءً على المخاطر
-                        sharpe = risk_manager.calculate_sharpe_ratio(symbol, days=7)
-                        if sharpe > 1.0:
-                            risk_sl_vote = -1.8  # patient
-                        elif sharpe > 0.5:
-                            risk_sl_vote = -1.2
-                        else:
-                            risk_sl_vote = -0.8  # strict
-                    except:
-                        pass
-                
-                # SL Voting (7 مستشارين + Risk Manager)
-                sl_votes = self.dl_client.vote_stop_loss(rsi, macd, volume_ratio, confidence, risk_sl_vote)
-                avg_sl = sum(sl_votes.values()) / len(sl_votes)
-                
-                # الملك يعدل (±0.3%)
-                king_adjustment_sl = min(max((confidence - 65) * 0.006, -0.3), 0.3)
-                final_sl = max(-2.3, min(-0.1, avg_sl + king_adjustment_sl))
-                
-                tp = round(final_tp, 1)
-                sl = round(abs(final_sl), 1)
-                
-                print(f"📊 {symbol}: TP={avg_tp:.1f}%→{tp}% | SL={avg_sl:.1f}%→{-sl}%")
-                
-            except Exception as e:
-                print(f"⚠️ Voting error: {e}")
-                # Fallback
-                tp = 2.0
-                sl = 1.5
-        else:
-            # Fallback if DL not available
-            tp = 2.0
-            sl = 1.5
-        
-        # Wait hours (based on TP)
-        if tp >= 5:
-            wait_hours = 72
-        elif tp >= 3:
-            wait_hours = 60
-        else:
-            wait_hours = 48
-        
+        """دالة فارغة - تم إلغاء التوقعات"""
         return {
-            'tp': tp,
-            'sl': sl,
-            'wait_hours': int(wait_hours)
+            'tp': 0,
+            'sl': 0,
+            'wait_hours': 72
         }
     
     def should_sell(self, symbol, position, current_price, analysis, mtf):
@@ -724,6 +660,16 @@ class AIBrain:
         # حساب أعلى ربح محقق والنزول منه (للمستشارين)
         highest_profit_percent = ((highest_price - buy_price) / buy_price) * 100
         drop_from_high_percent = ((highest_price - current_price) / buy_price) * 100
+
+        # 0. Zombie Trade Check (3 Days Limit)
+        # إذا مرت 72 ساعة (3 أيام) يتم البيع فوراً لتحرير السيولة
+        if hours_held >= 72:
+            print(f"🧟 {symbol}: Zombie trade detected (> 72h) - Selling to free up liquidity")
+            return {
+                'action': 'SELL',
+                'reason': 'ZOMBIE TRADE (72h timeout)',
+                'profit': profit_percent
+            }
 
         # 1. Trailing Stop Loss (من أعلى سعر - الحد الأقصى -2%)
         drop_from_high = ((highest_price - current_price) / highest_price) * 100
