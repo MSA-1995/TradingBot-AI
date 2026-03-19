@@ -126,7 +126,7 @@ def get_market_analysis(exchange, symbol, limit=60):
             bid_ask_spread = 0
         
         # ========== إضافة بيانات السيولة (Order Book) ==========
-        liquidity_metrics = get_liquidity_metrics(exchange, symbol)
+        liquidity_metrics = get_liquidity_metrics(exchange, symbol, df)
         
         return {
             'rsi': latest['rsi'],
@@ -249,7 +249,7 @@ def get_multi_timeframe_analysis(exchange, symbol):
 
 
 
-def get_liquidity_metrics(exchange, symbol):
+def get_liquidity_metrics(exchange, symbol, df_5m=None):
     """
     قياس السيولة من Order Book
     Returns: dict with liquidity metrics
@@ -329,9 +329,9 @@ def get_liquidity_metrics(exchange, symbol):
         # 7. تحليل ثبات الحجم (من البيانات التاريخية)
         volume_consistency = 50  # default
         try:
-            ohlcv = exchange.fetch_ohlcv(symbol, '1h', limit=24)
-            if ohlcv and len(ohlcv) >= 24:
-                volumes = [candle[5] for candle in ohlcv]
+            # تحسين السرعة: استخدام بيانات 5 دقائق بدلاً من طلب بيانات 1 ساعة جديدة
+            if df_5m is not None and not df_5m.empty:
+                volumes = df_5m['volume'].tolist()
                 import numpy as np
                 volume_mean = np.mean(volumes)
                 volume_std = np.std(volumes)
