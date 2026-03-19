@@ -78,10 +78,6 @@ def send_buy_notification(symbol, amount, price, value, confidence, tp_target=No
         {"name": "Confidence", "value": f"{confidence}/120", "inline": True}
     ]
     
-    # Add price voting results if available
-    if tp_target is not None and sl_target is not None:
-        fields.append({"name": "Price Voting", "value": f"TP: {tp_target:.1f}% | SL: {sl_target:.1f}% | Amount: ${value:.0f}", "inline": False})
-    
     # Add buy voting results if available
     if buy_vote_percentage is not None and buy_vote_count is not None and total_consultants is not None:
         fields.append({"name": "Buy Voting", "value": f"{buy_vote_percentage:.0f}% ({buy_vote_count}/{total_consultants} voted BUY)", "inline": False})
