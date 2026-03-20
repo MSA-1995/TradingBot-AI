@@ -267,8 +267,8 @@ def run_main_loop(exchange, ctx):
 
                 last_report_time = datetime.now()
 
-            # Status heartbeat — silently edit the status message every 5 minutes
-            if (datetime.now() - last_status_update).total_seconds() >= 300:
+            # Status heartbeat — silently edit the status message every 10 seconds (for testing)
+            if (datetime.now() - last_status_update).total_seconds() >= 10:
                 update_status_heartbeat()
                 last_status_update = datetime.now()
 
