@@ -4,7 +4,6 @@ Handles news sentiment analysis from database
 """
 
 import os
-
 from datetime import datetime
 self.last_summary_time = None
 
@@ -15,6 +14,7 @@ _previous_bot_status = None
 class NewsAnalyzer:
     def __init__(self):
 
+        self.last_summary_time = None
         self.database_url = os.getenv("DATABASE_URL")
         self.enabled = bool(self.database_url)
         self.cache = {}
