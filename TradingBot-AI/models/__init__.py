@@ -10,6 +10,7 @@ from .enhanced_pattern_recognition import EnhancedPatternRecognition
 from .fibonacci_analyzer import FibonacciAnalyzer
 from .smart_money_tracker import SmartMoneyTracker
 from .liquidity_analyzer import LiquidityAnalyzer
+from .rescue_scalper import RescueScalper
 
 __all__ = [
     'RiskManager',
@@ -18,5 +19,6 @@ __all__ = [
     'EnhancedPatternRecognition',
     'FibonacciAnalyzer',
     'SmartMoneyTracker',
-    'LiquidityAnalyzer'
+    'LiquidityAnalyzer',
+    'RescueScalper'
 ]
