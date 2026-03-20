@@ -4,9 +4,9 @@ Handles news sentiment analysis from database
 """
 
 import os
-from datetime import datetime
 
-        self.last_summary_time = None
+from datetime import datetime
+self.last_summary_time = None
 
 # =========================
 # Declare global here
