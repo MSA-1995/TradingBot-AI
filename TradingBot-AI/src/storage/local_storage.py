@@ -107,6 +107,14 @@ class LocalStorage:
         filepath = os.path.join(self.base_path, 'learning', 'trap_memory.json')
         return self._load_json(filepath, [])
     
+    # ========== Rescue Data (Crazy Trainer) ==========
+    def save_rescue_event(self, rescue_data):
+        filepath = os.path.join(self.base_path, 'learning', 'rescue_events.json')
+        events = self._load_json(filepath, [])
+        rescue_data['timestamp'] = datetime.now().isoformat()
+        events.append(rescue_data)
+        return self._save_json(filepath, events)
+    
     # ========== Positions (متوافق مع storage.py الحالي) ==========
     def save_positions(self, positions):
         filepath = os.path.join(self.base_path, 'position.json')
