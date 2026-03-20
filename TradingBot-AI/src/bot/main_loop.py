@@ -5,13 +5,13 @@ Runs the continuous analysis and execution cycle.
 
 import time
 import gc
-from datetime import datetime, timedelta
+from datetime import datetime
 from colorama import Fore, Style
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import get_active_positions_count, get_total_invested, should_send_report, format_price
-from notifications import send_positions_report, write_heartbeat, send_bot_status
-from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRADE, MAX_CAPITAL, SYSTEM_STATUS_INTERVAL_SECONDS, SYSTEM_HEARTBEAT_WRITE_INTERVAL_SECONDS
+from notifications import send_positions_report
+from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRADE, MAX_CAPITAL
 
 from bot.sell_handler import process_sell
 from bot.buy_handler import process_buy
@@ -40,37 +40,14 @@ def run_main_loop(exchange, ctx):
     get_dynamic_symbols_fn = ctx['get_dynamic_symbols_fn']
 
     try:
-        bot_start_time = datetime.now()
-        last_status_sent_time = bot_start_time - timedelta(seconds=SYSTEM_STATUS_INTERVAL_SECONDS)
-        last_heartbeat_written_time = bot_start_time - timedelta(seconds=SYSTEM_HEARTBEAT_WRITE_INTERVAL_SECONDS)
-
         loop_count = 0
         available  = 0
         last_report_time = datetime.now()
 
         while True:
             loop_count += 1
-            now = datetime.now()
-            current_time = now.strftime("%H:%M:%S")
+            current_time = datetime.now().strftime("%H:%M:%S")
             print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
-
-            # ===== System status heartbeat (low-noise) =====
-            try:
-                if (now - last_heartbeat_written_time).total_seconds() >= SYSTEM_HEARTBEAT_WRITE_INTERVAL_SECONDS:
-                    last_hb_iso = write_heartbeat("ONLINE")  # disk heartbeat
-                    last_heartbeat_written_time = now
-                else:
-                    last_hb_iso = None
-
-                if (now - last_status_sent_time).total_seconds() >= SYSTEM_STATUS_INTERVAL_SECONDS:
-                    # Use heartbeat timestamp if we wrote it in this loop; otherwise fall back to `now`.
-                    last_seen = last_hb_iso or now.isoformat()
-                    send_bot_status("ONLINE", last_heartbeat_iso=last_seen)
-                    last_status_sent_time = now
-            except:
-                import traceback
-                print("❌ [SYSTEM STATUS] heartbeat/status loop failed")
-                traceback.print_exc()
 
             # Balance (cached - update every 60 seconds - تحسين السرعة)
             if loop_count == 1 or loop_count % 60 == 0:
@@ -258,12 +235,6 @@ def run_main_loop(exchange, ctx):
                                 print(f"Severity: {stop_check['severity']}")
                                 if stop_check['severity'] == 'CRITICAL':
                                     print(f"🛑 Stopping bot for safety...")
-                                    try:
-                                        # Send a single OFFLINE status before stopping.
-                                        send_bot_status("OFFLINE", reason=stop_check.get('reason'))
-                                        write_heartbeat("OFFLINE")
-                                    except:
-                                        pass
                                     break
                     except Exception as e:
                         print(f"⚠️ Risk report error: {e}")
