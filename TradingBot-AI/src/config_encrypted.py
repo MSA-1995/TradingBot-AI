@@ -147,6 +147,7 @@ def get_critical_webhook():
     try:
         plain = os.getenv("CRITICAL_WEBHOOK_PLAIN")
         print(f"🧩 [CRITICAL WEBHOOK] CRITICAL_WEBHOOK_PLAIN present={bool(plain)} len={len(plain) if plain else 0}")
+
         if plain:
             return plain
     except:
