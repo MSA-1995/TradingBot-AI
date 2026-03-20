@@ -20,6 +20,14 @@ class AIBrain:
         self.learned_patterns = []
         self.trap_memory = []
         
+        # إضافة الخبل (Rescue Scalper)
+        try:
+            from models.rescue_scalper import RescueScalper
+            self.rescue_scalper = RescueScalper()
+        except Exception as e:
+            print(f"⚠️ Could not load RescueScalper: {e}")
+            self.rescue_scalper = None
+        
         # تحميل المعرفة السابقة
         self.load_knowledge()
         
@@ -662,14 +670,41 @@ class AIBrain:
         drop_from_high_percent = ((highest_price - current_price) / buy_price) * 100
 
         # 0. Zombie Trade Check (3 Days Limit)
-        # إذا مرت 72 ساعة (3 أيام) يتم البيع فوراً لتحرير السيولة
+        # إذا مرت 72 ساعة (3 أيام) يتم تسليم العملة للخبل (Rescue Scalper)
         if hours_held >= 72:
-            print(f"🧟 {symbol}: Zombie trade detected (> 72h) - Selling to free up liquidity")
-            return {
-                'action': 'SELL',
-                'reason': 'ZOMBIE TRADE (72h timeout)',
-                'profit': profit_percent
-            }
+            if self.rescue_scalper:
+                print(f"🤪 {symbol}: Handing over to Crazy Rescue Scalper (> 72h)...")
+                rescue_decision = self.rescue_scalper.get_exit_decision(symbol, analysis, profit_percent)
+                
+                if rescue_decision['action'] == 'SELL':
+                    # حفظ محاولة الإنقاذ للتدريب
+                    self.storage.save_rescue_event({
+                        'symbol': symbol,
+                        'hours_held': hours_held,
+                        'final_profit': profit_percent,
+                        'exit_reason': rescue_decision['reason'],
+                        'market_conditions': {
+                            'rsi': analysis.get('rsi'),
+                            'volume': analysis.get('volume_ratio')
+                        }
+                    })
+                    return {
+                        'action': 'SELL',
+                        'reason': rescue_decision['reason'],
+                        'profit': profit_percent
+                    }
+                else:
+                    return {
+                        'action': 'HOLD',
+                        'reason': rescue_decision['reason']
+                    }
+            else:
+                # Fallback للمكنسة القديمة لو الخبل مو موجود
+                return {
+                    'action': 'SELL',
+                    'reason': 'ZOMBIE TRADE (72h timeout)',
+                    'profit': profit_percent
+                }
 
         # 1. Trailing Stop Loss (من أعلى سعر - الحد الأقصى -2%)
         drop_from_high = ((highest_price - current_price) / highest_price) * 100
