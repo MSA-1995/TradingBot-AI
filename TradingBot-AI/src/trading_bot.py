@@ -66,7 +66,7 @@ from config import *
 # Modules
 from analysis import get_market_analysis, get_multi_timeframe_analysis
 from trading import execute_buy, execute_sell, calculate_sell_value
-from notifications import send_buy_notification, send_sell_notification, send_positions_report, send_startup_notification
+from notifications import send_buy_notification, send_sell_notification, send_positions_report, send_startup_notification, send_bot_status, write_heartbeat
 from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent, format_price
 from storage import StorageManager
 from capital_manager import CapitalManager  # إدارة رأس المال
@@ -635,6 +635,11 @@ while True:
     try:
         run_main_loop(exchange, ctx)
     except Exception as e:
+        try:
+            send_bot_status("OFFLINE", reason=f"Critical error: {e}")
+            write_heartbeat("OFFLINE")
+        except:
+            pass
         print(f"❌ Critical error: {e}")
         print(f"🔄 Restarting in 5 seconds...")
         time.sleep(5)
