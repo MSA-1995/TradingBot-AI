@@ -10,7 +10,7 @@ from colorama import Fore, Style
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import get_active_positions_count, get_total_invested, should_send_report, format_price
-from notifications import send_positions_report
+from notifications import send_positions_report, update_status_heartbeat, send_bot_offline_status
 from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRADE, MAX_CAPITAL
 
 from bot.sell_handler import process_sell
@@ -42,7 +42,8 @@ def run_main_loop(exchange, ctx):
     try:
         loop_count = 0
         available  = 0
-        last_report_time = datetime.now()
+        last_report_time  = datetime.now()
+        last_status_update = datetime.now()
 
         while True:
             loop_count += 1
@@ -266,6 +267,11 @@ def run_main_loop(exchange, ctx):
 
                 last_report_time = datetime.now()
 
+            # Status heartbeat — silently edit the status message every 5 minutes
+            if (datetime.now() - last_status_update).total_seconds() >= 300:
+                update_status_heartbeat()
+                last_status_update = datetime.now()
+
             # Cleanup
             gc.collect()
 
@@ -273,6 +279,7 @@ def run_main_loop(exchange, ctx):
 
     except KeyboardInterrupt:
         print("\n\n🛑 Bot stopped")
+        send_bot_offline_status()
     except Exception as e:
         import traceback
         print(f"\n❌ Error: {e}")
