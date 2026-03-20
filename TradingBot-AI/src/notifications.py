@@ -6,9 +6,7 @@ Handles Discord messages and file logging
 import requests
 from datetime import datetime
 import os
-import json
 from config_encrypted import get_discord_webhook, get_critical_webhook
-from config import SYSTEM_HEARTBEAT_FILE
 
 DISCORD_WEBHOOK = get_discord_webhook()
 CRITICAL_WEBHOOK = get_critical_webhook()
@@ -160,68 +158,6 @@ def send_startup_notification():
     ]
     
     send_discord_embed("BOT STARTED", fields, 'blue')
-
-
-def write_heartbeat(state: str = "ONLINE"):
-    """Write last heartbeat timestamp to disk (for offline monitoring)."""
-    try:
-        heartbeat_dir = os.path.dirname(SYSTEM_HEARTBEAT_FILE) or "."
-        os.makedirs(heartbeat_dir, exist_ok=True)
-        ts = datetime.now().isoformat()
-        payload = {
-            "state": state,
-            "timestamp": ts,
-        }
-        with open(SYSTEM_HEARTBEAT_FILE, "w", encoding="utf-8") as f:
-            json.dump(payload, f)
-        return ts
-    except Exception as e:
-        print(f"⚠️ [HEARTBEAT] failed writing '{SYSTEM_HEARTBEAT_FILE}': {e}")
-        return None
-
-
-def send_bot_status(state: str, last_heartbeat_iso: str = None, reason: str = None):
-    """
-    Send a low-noise bot ONLINE/OFFLINE status message to `system-alerts`.
-    Uses CRITICAL_WEBHOOK so it goes to the same room.
-    """
-    if not CRITICAL_WEBHOOK:
-        # Avoid logging the webhook itself (may contain secrets).
-        print("⚠️ [BOT STATUS] CRITICAL_WEBHOOK is empty/None -> status not sent")
-        return
-
-    print(f"🔔 [BOT STATUS] sending state={state} (to system-alerts webhook)")
-
-    now_iso = datetime.now().isoformat()
-    last_seen = last_heartbeat_iso or now_iso
-
-    colors = {
-        "ONLINE": 0x00ff00,
-        "OFFLINE": 0xff0000,
-    }
-    color = colors.get(state, 0x0000ff)
-
-    fields = [
-        {"name": "State", "value": state, "inline": True},
-        {"name": "Last heartbeat", "value": last_seen, "inline": False},
-    ]
-    if reason:
-        fields.append({"name": "Reason", "value": str(reason)[:1000], "inline": False})
-
-    embed = {
-        "title": "🤖 BOT STATUS",
-        "color": color,
-        "fields": fields,
-        "footer": {"text": "MSA Trading Bot • System Status"},
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-
-    try:
-        resp = requests.post(CRITICAL_WEBHOOK, json={"embeds": [embed]}, timeout=5)
-        # Discord webhook errors usually come back with a status code / message.
-        print(f"✅ [BOT STATUS] Discord response: {resp.status_code}")
-    except Exception as e:
-        print(f"❌ [BOT STATUS] failed sending status to Discord: {e}")
 
 
 def send_critical_alert(error_type, message, details=None):
