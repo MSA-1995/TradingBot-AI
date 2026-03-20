@@ -145,6 +145,7 @@ def get_critical_webhook():
     # use it directly (avoids issues with a stale encrypted value).
     try:
         plain = os.getenv("CRITICAL_WEBHOOK_PLAIN")
+        print(f"🧩 [CRITICAL WEBHOOK] CRITICAL_WEBHOOK_PLAIN present={bool(plain)} len={len(plain) if plain else 0}")
         if plain:
             return plain
     except:
@@ -160,7 +161,10 @@ def get_critical_webhook():
         )
         key = base64.urlsafe_b64encode(kdf.derive(_KEY.encode()))
         fernet = Fernet(key)
+        print(f"🧩 [CRITICAL WEBHOOK] Decrypting ENCRYPTED_CRITICAL_WEBHOOK len={len(ENCRYPTED_CRITICAL_WEBHOOK)}")
         webhook = fernet.decrypt(ENCRYPTED_CRITICAL_WEBHOOK.encode()).decode()
+        print("✅ [CRITICAL WEBHOOK] decrypt success")
         return webhook
-    except:
+    except Exception as e:
+        print(f"❌ [CRITICAL WEBHOOK] decrypt failed: {type(e).__name__}: {e}")
         return None
