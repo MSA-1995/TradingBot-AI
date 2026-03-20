@@ -68,7 +68,9 @@ def run_main_loop(exchange, ctx):
                     send_bot_status("ONLINE", last_heartbeat_iso=last_seen)
                     last_status_sent_time = now
             except:
-                pass
+                import traceback
+                print("❌ [SYSTEM STATUS] heartbeat/status loop failed")
+                traceback.print_exc()
 
             # Balance (cached - update every 60 seconds - تحسين السرعة)
             if loop_count == 1 or loop_count % 60 == 0:
