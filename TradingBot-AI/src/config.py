@@ -28,12 +28,6 @@ BASE_AMOUNT = 12
 LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
 REPORT_INTERVAL = 30
 
-# Discord Bot Status (system-alerts)
-# يرسل حالة ONLINE بشكل دوري بدون إزعاج (بدل إشعارات حرجة لكل شيء)
-SYSTEM_STATUS_INTERVAL_SECONDS = 300  # كل 5 دقائق
-SYSTEM_HEARTBEAT_WRITE_INTERVAL_SECONDS = 60  # تحديث ملف heartbeat كل دقيقة
-SYSTEM_HEARTBEAT_FILE = 'data/heartbeat.json'
-
 # قائمة العملات الثابتة (Top 50 by Market Cap - March 2026)
 SYMBOLS = [
     # Top 10 - Giants
