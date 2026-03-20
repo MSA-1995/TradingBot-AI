@@ -39,11 +39,12 @@ def _load_status_message_id():
 
 def _save_status_message_id(msg_id):
     try:
-        os.makedirs('data', exist_ok=True)
+        os.makedirs(os.path.dirname(_STATUS_FILE), exist_ok=True)
         with open(_STATUS_FILE, 'w') as f:
             f.write(str(msg_id))
-    except:
-        pass
+        print(f"📡 [Status] ID saved to: {_STATUS_FILE}")
+    except Exception as e:
+        print(f"📡 [Status] ❌ Could not save message ID: {e}")
 
 
 def _build_status_embed(is_online, last_heartbeat=None):
@@ -89,6 +90,8 @@ def _post_or_edit_status(is_online, last_heartbeat=None):
     payload = {"embeds": [embed]}
     msg_id = _load_status_message_id()
     status_label = "🟢 ONLINE" if is_online else "🔴 OFFLINE"
+    print(f"📡 [Status] ID file: {_STATUS_FILE}")
+    print(f"📡 [Status] Loaded ID: {msg_id}")
 
     try:
         if msg_id:
@@ -128,6 +131,11 @@ def send_bot_online_status():
 
 def send_bot_offline_status():
     """Call on shutdown — switches the status message to 🔴 OFFLINE."""
+    # Clear the start time to show accurate offline time
+    global _BOT_START_TIME
+    _BOT_START_TIME = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+    
+    # Try to edit existing message first, then create new one if needed
     _post_or_edit_status(
         is_online=False,
         last_heartbeat=datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
@@ -136,6 +144,9 @@ def send_bot_offline_status():
 
 def update_status_heartbeat():
     """Call periodically — updates the 'Last Heartbeat' timestamp silently (no new messages)."""
+    # Force update by clearing the message ID to create a new one
+    global _BOT_START_TIME
+    _BOT_START_TIME = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
     _post_or_edit_status(
         is_online=True,
         last_heartbeat=datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
