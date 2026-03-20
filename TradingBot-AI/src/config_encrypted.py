@@ -143,6 +143,7 @@ def get_critical_webhook():
     """فك تشفير Critical Alerts Webhook"""
     # If you provide a plain webhook via environment variable,
     # use it directly (avoids issues with a stale encrypted value).
+
     try:
         plain = os.getenv("CRITICAL_WEBHOOK_PLAIN")
         print(f"🧩 [CRITICAL WEBHOOK] CRITICAL_WEBHOOK_PLAIN present={bool(plain)} len={len(plain) if plain else 0}")
