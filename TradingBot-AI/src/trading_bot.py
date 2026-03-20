@@ -275,6 +275,7 @@ print(f"🔺 Max Confidence: {AI_BOUNDARIES['max_confidence']}/120\n")
 
 # Send startup notification to Discord
 send_startup_notification()
+send_bot_status("ONLINE")
 
 last_report_time = datetime.now()
 
@@ -639,6 +640,10 @@ while True:
             send_bot_status("OFFLINE", reason=f"Critical error: {e}")
             write_heartbeat("OFFLINE")
         except:
+            try:
+                send_bot_status("OFFLINE", reason=f"Critical error: {e}")
+            except:
+                pass
             pass
         print(f"❌ Critical error: {e}")
         print(f"🔄 Restarting in 5 seconds...")
