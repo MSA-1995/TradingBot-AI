@@ -141,6 +141,15 @@ def get_discord_webhook():
 
 def get_critical_webhook():
     """فك تشفير Critical Alerts Webhook"""
+    # If you provide a plain webhook via environment variable,
+    # use it directly (avoids issues with a stale encrypted value).
+    try:
+        plain = os.getenv("CRITICAL_WEBHOOK_PLAIN")
+        if plain:
+            return plain
+    except:
+        pass
+
     try:
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
