@@ -175,8 +175,9 @@ def write_heartbeat(state: str = "ONLINE"):
         with open(SYSTEM_HEARTBEAT_FILE, "w", encoding="utf-8") as f:
             json.dump(payload, f)
         return ts
-    except:
-        pass
+    except Exception as e:
+        print(f"⚠️ [HEARTBEAT] failed writing '{SYSTEM_HEARTBEAT_FILE}': {e}")
+        return None
 
 
 def send_bot_status(state: str, last_heartbeat_iso: str = None, reason: str = None):
@@ -185,7 +186,11 @@ def send_bot_status(state: str, last_heartbeat_iso: str = None, reason: str = No
     Uses CRITICAL_WEBHOOK so it goes to the same room.
     """
     if not CRITICAL_WEBHOOK:
+        # Avoid logging the webhook itself (may contain secrets).
+        print("⚠️ [BOT STATUS] CRITICAL_WEBHOOK is empty/None -> status not sent")
         return
+
+    print(f"🔔 [BOT STATUS] sending state={state} (to system-alerts webhook)")
 
     now_iso = datetime.now().isoformat()
     last_seen = last_heartbeat_iso or now_iso
@@ -212,9 +217,11 @@ def send_bot_status(state: str, last_heartbeat_iso: str = None, reason: str = No
     }
 
     try:
-        requests.post(CRITICAL_WEBHOOK, json={"embeds": [embed]}, timeout=5)
-    except:
-        pass
+        resp = requests.post(CRITICAL_WEBHOOK, json={"embeds": [embed]}, timeout=5)
+        # Discord webhook errors usually come back with a status code / message.
+        print(f"✅ [BOT STATUS] Discord response: {resp.status_code}")
+    except Exception as e:
+        print(f"❌ [BOT STATUS] failed sending status to Discord: {e}")
 
 
 def send_critical_alert(error_type, message, details=None):
