@@ -281,6 +281,18 @@ import atexit
 send_bot_online_status()
 atexit.register(send_bot_offline_status)
 
+# Add signal handler for graceful shutdown
+import signal
+import sys
+
+def signal_handler(sig, frame):
+    print("\n🛑 Received interrupt signal - shutting down gracefully...")
+    send_bot_offline_status()
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
 last_report_time = datetime.now()
 
 # Thread lock for shared variables
