@@ -66,7 +66,7 @@ from config import *
 # Modules
 from analysis import get_market_analysis, get_multi_timeframe_analysis
 from trading import execute_buy, execute_sell, calculate_sell_value
-from notifications import send_buy_notification, send_sell_notification, send_positions_report, send_startup_notification
+from notifications import send_buy_notification, send_sell_notification, send_positions_report, send_startup_notification, send_bot_online_status, send_bot_offline_status
 from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent, format_price
 from storage import StorageManager
 from capital_manager import CapitalManager  # إدارة رأس المال
@@ -275,6 +275,11 @@ print(f"🔺 Max Confidence: {AI_BOUNDARIES['max_confidence']}/120\n")
 
 # Send startup notification to Discord
 send_startup_notification()
+
+# Status message: show 🟢 ONLINE in critical channel (edits existing pinned message)
+import atexit
+send_bot_online_status()
+atexit.register(send_bot_offline_status)
 
 last_report_time = datetime.now()
 
