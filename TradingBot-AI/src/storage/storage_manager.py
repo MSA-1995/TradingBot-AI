@@ -84,6 +84,13 @@ class StorageManager:
         """قراءة نتائج التصويت"""
         return self.storage.load_consultant_votes(consultant_name, limit)
     
+    # ========== Rescue (Crazy) Data ==========
+    def save_rescue_event(self, rescue_data):
+        """حفظ بيانات الإنقاذ لتدريب الخبل"""
+        if hasattr(self.storage, 'save_rescue_event'):
+            return self.storage.save_rescue_event(rescue_data)
+        return False
+    
     # ========== Positions (الحالي) ==========
     def save_positions(self, positions):
         """حفظ المراكز (متوافق مع النظام الحالي)"""
