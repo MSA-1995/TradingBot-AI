@@ -10,6 +10,44 @@ from datetime import datetime
 # ذاكرة مؤقتة لبيانات السوق العام (BTC, ETH, BNB) لتقليل الطلبات
 _market_cache = {'time': None, 'data': {}}
 
+def analyze_reversal(df, current_price):
+    """
+    تحليل الارتداد من القاع اللحظي
+    Returns: dict with reversal analysis
+    """
+    if df is None or len(df) < 5:
+        return {
+            'low_1h': 0,
+            'bounce_percent': 0,
+            'is_reversing': False
+        }
+    
+    try:
+        # تحديد القاع في آخر ساعة (12 شمعة * 5 دقائق)
+        low_1h = df['low'].tail(12).min() if len(df) >= 12 else df['low'].min()
+        
+        # حساب نسبة الارتداد من القاع
+        if low_1h > 0:
+            bounce_percent = ((current_price - low_1h) / low_1h) * 100
+        else:
+            bounce_percent = 0
+            
+        # هل بدأ السعر بالارتداد؟ (ارتد 0.1% على الأقل)
+        is_reversing = bounce_percent >= 0.1
+        
+        return {
+            'low_1h': low_1h,
+            'bounce_percent': bounce_percent,
+            'is_reversing': is_reversing
+        }
+        
+    except Exception as e:
+        return {
+            'low_1h': 0,
+            'bounce_percent': 0,
+            'is_reversing': False
+        }
+
 def get_market_analysis(exchange, symbol, limit=60):
     """Get technical analysis for a symbol with multi-timeframe data"""
     try:
@@ -127,6 +165,9 @@ def get_market_analysis(exchange, symbol, limit=60):
         
         # ========== إضافة بيانات السيولة (Order Book) ==========
         liquidity_metrics = get_liquidity_metrics(exchange, symbol, df)
+
+        # ========== Reversal Analysis (New) ==========
+        reversal_analysis = analyze_reversal(df, latest['close'])
         
         return {
             'rsi': latest['rsi'],
@@ -148,6 +189,7 @@ def get_market_analysis(exchange, symbol, limit=60):
             'bid_ask_spread': bid_ask_spread,
             'volume_trend': latest['volume_trend'],
             'price_change_1h': latest['price_change_1h'],
+            'reversal': reversal_analysis,  # إضافة تحليل الارتداد
             # بيانات السيولة
             'liquidity': liquidity_metrics,
             # بيانات السوق العام (Top 3)
