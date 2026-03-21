@@ -176,59 +176,41 @@ class AIBrain:
             total_consultants = 0
             min_votes_required = 3  # default
             market_status = 'neutral'
-            
+
             if self.dl_client:
                 try:
+                    # تجميع البيانات اللازمة للتصويت
                     rsi = analysis.get('rsi', 50)
                     macd = analysis.get('macd_diff', 0)
                     volume_ratio = analysis.get('volume_ratio', 1.0)
                     price_momentum = analysis.get('price_momentum', 0)
                     liquidity_metrics = analysis.get('liquidity', {})
-                    
-                    # حساب تغير BTC, ETH, BNB في آخر ساعة
-                    market_sentiment = None
-                    try:
-                        btc_change_1h = analysis.get('btc_change_1h', 0)
-                        eth_change_1h = analysis.get('eth_change_1h', 0)
-                        bnb_change_1h = analysis.get('bnb_change_1h', 0)
-                        market_sentiment = {
-                            'btc_change_1h': btc_change_1h,
-                            'eth_change_1h': eth_change_1h,
-                            'bnb_change_1h': bnb_change_1h
-                        }
-                    except:
-                        pass
-                    
-                    # --- تحليل الشموع (Sniper Mode) ---
-                    candle_analysis = {'is_rejection': False, 'is_accumulation': False}
-                    try:
-                        df = analysis.get('df')
-                        if df is not None and not df.empty:
-                            last = df.iloc[-1]
-                            open_p = float(last['open'])
-                            close_p = float(last['close'])
-                            low_p = float(last['low'])
-                            
-                            body = abs(close_p - open_p)
-                            lower_wick = min(open_p, close_p) - low_p
-                            
-                            # 1. Rejection (Hammer/Pinbar): الذيل السفلي أكبر من الجسم بـ 1.2 مرة (متوسط)
-                            if lower_wick > (body * 1.2):
-                                candle_analysis['is_rejection'] = True
-                                
-                            # 2. Accumulation: فوليوم عالي (> 1.3) مع تحرك سعري بسيط (< 0.4%)
-                            change_pct = (body / open_p) * 100 if open_p > 0 else 0
-                            if volume_ratio > 1.3 and change_pct < 0.4:
-                                candle_analysis['is_accumulation'] = True
-                    except Exception:
-                        pass
-                    
-                    buy_votes, min_votes_required, market_status = self.dl_client.vote_buy_now(
-                        rsi, macd, volume_ratio, price_momentum, optimized_confidence, 
-                        liquidity_metrics, market_sentiment, candle_analysis
+
+                    # بيانات السوق
+                    market_sentiment_data = {
+                        'btc_change_1h': analysis.get('btc_change_1h', 0),
+                        'eth_change_1h': analysis.get('eth_change_1h', 0)
+                    }
+
+                    # تحليل الشموع
+                    candle_analysis = self._analyze_candle(analysis)
+
+                    # استدعاء دالة التصويت الموحدة
+                    buy_votes, market_status = self.dl_client.vote_buy_now(
+                        rsi, macd, volume_ratio, price_momentum, optimized_confidence,
+                        liquidity_metrics, market_sentiment_data, candle_analysis
                     )
+
                     buy_vote_count = sum(buy_votes.values())
                     total_consultants = len(buy_votes)
+
+                    # تحديد الأصوات المطلوبة ديناميكياً
+                    if market_status == 'strong_bearish':
+                        min_votes_required = total_consultants + 1  # مستحيل للشراء
+                    elif market_status == 'bearish':
+                        min_votes_required = int(total_consultants * 0.7)  # 70% موافقة
+                    else:  # neutral or bullish
+                        min_votes_required = int(total_consultants * 0.4)  # 40% موافقة
                     
                     # الملك يقرر بناءً على min_votes_required (يتغير حسب السوق)
                     buy_percentage = (buy_vote_count / total_consultants * 100) if total_consultants > 0 else 0
@@ -412,6 +394,67 @@ class AIBrain:
             confidence += 5
         
         return confidence
+
+    def _analyze_candle(self, analysis):
+        """تحليل آخر شمعة للكشف عن إشارات القناص (Rejection & Accumulation)"""
+        candle_analysis = {'is_rejection': False, 'is_accumulation': False}
+        try:
+            df = analysis.get('df')
+            if df is not None and not df.empty:
+                last = df.iloc[-1]
+                open_p = float(last['open'])
+                close_p = float(last['close'])
+                low_p = float(last['low'])
+                volume_ratio = analysis.get('volume_ratio', 1.0)
+
+                body = abs(close_p - open_p)
+                lower_wick = min(open_p, close_p) - low_p
+
+                # 1. Rejection (Hammer/Pinbar): الذيل السفلي أكبر من الجسم بـ 1.2 مرة
+                if body > 0 and lower_wick > (body * 1.2):
+                    candle_analysis['is_rejection'] = True
+
+                # 2. Accumulation: فوليوم عالي (> 1.3) مع تحرك سعري بسيط (< 0.4%)
+                change_pct = (body / open_p) * 100 if open_p > 0 else 0
+                if volume_ratio > 1.3 and change_pct < 0.4:
+                    candle_analysis['is_accumulation'] = True
+        except Exception as e:
+            # In case of any error in candle analysis, just return the default
+            # print(f"⚠️ Candle analysis error: {e}") # Optional: for debugging
+            pass
+        return candle_analysis
+            # print(f"⚠️ Candle analysis error: {e}") # Optional: for debugging
+            pass
+        return candle_analysis
+
+    def _analyze_candle(self, analysis):
+        """تحليل آخر شمعة للكشف عن إشارات القناص (Rejection & Accumulation)"""
+        candle_analysis = {'is_rejection': False, 'is_accumulation': False}
+        try:
+            df = analysis.get('df')
+            if df is not None and not df.empty:
+                last = df.iloc[-1]
+                open_p = float(last['open'])
+                close_p = float(last['close'])
+                low_p = float(last['low'])
+                volume_ratio = analysis.get('volume_ratio', 1.0)
+
+                body = abs(close_p - open_p)
+                lower_wick = min(open_p, close_p) - low_p
+
+                # 1. Rejection (Hammer/Pinbar): الذيل السفلي أكبر من الجسم بـ 1.2 مرة
+                if body > 0 and lower_wick > (body * 1.2):
+                    candle_analysis['is_rejection'] = True
+
+                # 2. Accumulation: فوليوم عالي (> 1.3) مع تحرك سعري بسيط (< 0.4%)
+                change_pct = (body / open_p) * 100 if open_p > 0 else 0
+                if volume_ratio > 1.3 and change_pct < 0.4:
+                    candle_analysis['is_accumulation'] = True
+        except Exception as e:
+            # In case of any error in candle analysis, just return the default
+            # print(f"⚠️ Candle analysis error: {e}") # Optional: for debugging
+            pass
+        return candle_analysis
     
     def _is_trap_pattern(self, symbol, analysis):
         """فحص إذا كان النمط يشبه فخ سابق"""
