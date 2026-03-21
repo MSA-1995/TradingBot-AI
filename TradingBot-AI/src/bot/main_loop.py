@@ -50,7 +50,7 @@ def run_main_loop(exchange, ctx):
             print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
 
             # ========== HEARTBEAT — كل 10 ثواني للتجربة ==========
-            if loop_count == 1 or loop_count % 5 == 0:
+            if loop_count == 1 or loop_count % 15 == 0:
                 import os
                 db_url = os.getenv('DATABASE_URL')
                 if db_url:
