@@ -5,9 +5,13 @@ pandas
 ta
 colorama
 psycopg2-binary
+python-dotenv
+flask
+asyncio
+aiohttp
 
 # To install manually:
-# pip install ccxt cryptography requests pandas ta colorama psycopg2-binary
+# pip install ccxt cryptography requests pandas ta colorama psycopg2-binary flask asyncio aiohttp
 #
 # Or use this file:
 # pip install -r requirements.txt
