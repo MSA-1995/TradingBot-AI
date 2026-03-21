@@ -24,24 +24,32 @@ def send_discord_embed(title, fields, color='blue', thumbnail_url=None):
         'purple': 0x800080
     }
     
+    embed = {
+        "title": title,
+        "color": colors.get(color, 0x0000ff),
+        "fields": fields,
+        "footer": {
+            "text": "MSA Trading Bot • AI Powered"
+        },
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    if thumbnail_url:
+        embed["thumbnail"] = {"url": thumbnail_url}
+    
+    data = {"embeds": [embed]}
     try:
-        embed = {
-            "title": title,
-            "color": colors.get(color, 0x0000ff),
-            "fields": fields,
-            "footer": {
-                "text": "MSA Trading Bot • AI Powered"
-            },
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        if thumbnail_url:
-            embed["thumbnail"] = {"url": thumbnail_url}
-        
-        data = {"embeds": [embed]}
-        requests.post(DISCORD_WEBHOOK, json=data, timeout=5)
-    except:
-        pass
+        response = requests.post(DISCORD_WEBHOOK, json=data, timeout=10) # Increased timeout
+        response.raise_for_status()  # Will raise an exception for 4xx/5xx errors
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Discord Error: Failed to send embed '{title}'.")
+        if e.response is not None:
+            print(f"    Status Code: {e.response.status_code}")
+            print(f"    Response: {e.response.text}")
+        else:
+            print(f"    Error: {e}")
+    except Exception as e:
+        print(f"❌ Discord Error: An unexpected error occurred in send_discord_embed: {e}")
 
 def log_trade(action, symbol, amount, price, value, profit_percent=None, reason=""):
     """Log trade to file"""
@@ -130,20 +138,38 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
         {"name": "Available Slots", "value": f"{max_positions - active_count}", "inline": True}
     ]
     
-    # إضافة تفاصيل الصفقات المفتوحة
+    # إضافة تفاصيل الصفقات المفتوحة (مع تقسيم الحقول لتجنب حدود Discord)
     if open_positions and len(open_positions) > 0:
         positions_text = ""
-        for symbol, pos_data in open_positions.items():
+        field_count = 1
+        # Sort positions for consistent reporting
+        sorted_positions = sorted(open_positions.items(), key=lambda item: item[0])
+
+        for i, (symbol, pos_data) in enumerate(sorted_positions):
             buy_price = pos_data.get('buy_price', 0)
             current_price = pos_data.get('current_price', buy_price)
             profit_percent = ((current_price - buy_price) / buy_price * 100) if buy_price > 0 else 0
             profit_sign = "+" if profit_percent >= 0 else ""
             
-            positions_text += f"**{symbol}**\n"
-            positions_text += f"Buy: ${buy_price:.4f} | Now: ${current_price:.4f}\n"
-            positions_text += f"P/L: {profit_sign}{profit_percent:.2f}%\n\n"
-        
-        fields.append({"name": "Open Positions", "value": positions_text.strip(), "inline": False})
+            entry = (
+                f"**{symbol}**\n"
+                f"Buy: ${buy_price:.4f} | Now: ${current_price:.4f}\n"
+                f"P/L: {profit_sign}{profit_percent:.2f}%\n\n"
+            )
+            
+            # Discord embed field value limit is 1024 chars
+            if len(positions_text) + len(entry) > 1024:
+                field_name = f"Open Positions ({field_count})"
+                fields.append({"name": field_name, "value": positions_text.strip(), "inline": False})
+                positions_text = "" # Reset for the next field
+                field_count += 1
+
+            positions_text += entry
+
+        # Add the last or only field
+        if positions_text:
+            field_name = f"Open Positions ({field_count})" if field_count > 1 else "Open Positions"
+            fields.append({"name": field_name, "value": positions_text.strip(), "inline": False})
     
     send_discord_embed("PORTFOLIO REPORT", fields, 'blue')
 
