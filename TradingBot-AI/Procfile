@@ -1,1 +1,1 @@
-worker: python src/trading_bot.py
+worker: cd src && python trading_bot.py
