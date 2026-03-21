@@ -53,95 +53,103 @@ class DatabaseStorage:
         return self.conn
     
     def _create_tables(self):
-        """إنشاء الجداول إذا لم تكن موجودة"""
-        try:
-            conn = self._get_conn()
-            cursor = conn.cursor()
-            
-            # Positions table (نفس البوت القديم)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS positions (
-                    symbol VARCHAR(20) PRIMARY KEY,
-                    buy_price FLOAT NOT NULL,
-                    amount FLOAT NOT NULL,
-                    highest_price FLOAT NOT NULL,
-                    tp_level_1 BOOLEAN DEFAULT FALSE,
-                    tp_level_2 BOOLEAN DEFAULT FALSE,
-                    buy_time TIMESTAMP NOT NULL,
-                    invested FLOAT NOT NULL,
-                    data JSONB
-                )
-            """)
-            
-            # Trades history table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS trades_history (
-                    id SERIAL PRIMARY KEY,
-                    symbol VARCHAR(20),
-                    action VARCHAR(10),
-                    profit_percent FLOAT,
-                    sell_reason TEXT,
-                    tp_target FLOAT,
-                    sl_target FLOAT,
-                    hours_held FLOAT,
-                    data JSONB,
-                    timestamp TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            
-            # Learned patterns table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS learned_patterns (
-                    id SERIAL PRIMARY KEY,
-                    pattern_type VARCHAR(20),
-                    data JSONB,
-                    success_rate FLOAT,
-                    last_updated TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            
-            # AI decisions table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS ai_decisions (
-                    id SERIAL PRIMARY KEY,
-                    symbol VARCHAR(20),
-                    decision VARCHAR(10),
-                    confidence INTEGER,
-                    data JSONB,
-                    timestamp TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            
-            # Trap memory table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS trap_memory (
-                    id SERIAL PRIMARY KEY,
-                    symbol VARCHAR(20),
-                    data JSONB,
-                    timestamp TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            
-            # Consultant votes table (نتائج التصويت)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS consultant_votes (
-                    id SERIAL PRIMARY KEY,
-                    symbol VARCHAR(20),
-                    consultant_name VARCHAR(50),
-                    vote_type VARCHAR(20),
-                    vote_value FLOAT,
-                    actual_result FLOAT,
-                    is_correct BOOLEAN,
-                    profit_percent FLOAT,
-                    timestamp TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            
-            conn.commit()
-            cursor.close()
-        except Exception as e:
-            print(f"⚠️ Table creation error: {e}")
-            self._get_conn().rollback()
+        """إنشاء الجداول إذا لم تكن موجودة (مع إعادة محاولة)"""
+        for attempt in range(3):
+            try:
+                conn = self._get_conn()
+                cursor = conn.cursor()
+                
+                # ... (rest of the table creation queries remain the same)
+                # Positions table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS positions (
+                        symbol VARCHAR(20) PRIMARY KEY,
+                        buy_price FLOAT NOT NULL,
+                        amount FLOAT NOT NULL,
+                        highest_price FLOAT NOT NULL,
+                        tp_level_1 BOOLEAN DEFAULT FALSE,
+                        tp_level_2 BOOLEAN DEFAULT FALSE,
+                        buy_time TIMESTAMP NOT NULL,
+                        invested FLOAT NOT NULL,
+                        data JSONB
+                    )
+                """)
+                
+                # Trades history table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS trades_history (
+                        id SERIAL PRIMARY KEY,
+                        symbol VARCHAR(20),
+                        action VARCHAR(10),
+                        profit_percent FLOAT,
+                        sell_reason TEXT,
+                        tp_target FLOAT,
+                        sl_target FLOAT,
+                        hours_held FLOAT,
+                        data JSONB,
+                        timestamp TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+                
+                # Learned patterns table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS learned_patterns (
+                        id SERIAL PRIMARY KEY,
+                        pattern_type VARCHAR(20),
+                        data JSONB,
+                        success_rate FLOAT,
+                        last_updated TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+                
+                # AI decisions table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS ai_decisions (
+                        id SERIAL PRIMARY KEY,
+                        symbol VARCHAR(20),
+                        decision VARCHAR(10),
+                        confidence INTEGER,
+                        data JSONB,
+                        timestamp TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+                
+                # Trap memory table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS trap_memory (
+                        id SERIAL PRIMARY KEY,
+                        symbol VARCHAR(20),
+                        data JSONB,
+                        timestamp TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+                
+                # Consultant votes table (نتائج التصويت)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS consultant_votes (
+                        id SERIAL PRIMARY KEY,
+                        symbol VARCHAR(20),
+                        consultant_name VARCHAR(50),
+                        vote_type VARCHAR(20),
+                        vote_value FLOAT,
+                        actual_result FLOAT,
+                        is_correct BOOLEAN,
+                        profit_percent FLOAT,
+                        timestamp TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+                
+                conn.commit()
+                cursor.close()
+                return # Success, exit the loop
+
+            except Exception as e:
+                print(f"⚠️ Table creation error (attempt {attempt + 1}/3): {e}")
+                if attempt < 2:
+                    import time
+                    time.sleep(5) # Wait 5 seconds before retrying
+                else:
+                    self._get_conn().rollback()
     
     # ========== Trades ==========
     def save_trade(self, trade_data):
