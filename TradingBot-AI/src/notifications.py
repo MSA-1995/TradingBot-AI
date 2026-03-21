@@ -11,11 +11,12 @@ from config_encrypted import get_discord_webhook, get_critical_webhook
 DISCORD_WEBHOOK = get_discord_webhook()
 CRITICAL_WEBHOOK = get_critical_webhook()
 
-def send_discord_embed(title, fields, color='blue', thumbnail_url=None):
-    """Send embed message to Discord"""
-    if not DISCORD_WEBHOOK:
-        return
-    
+def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_id=None, webhook_url=None):
+    """Send or edit an embed message on Discord."""
+    target_webhook = webhook_url if webhook_url else DISCORD_WEBHOOK
+    if not target_webhook:
+        return None
+
     colors = {
         'green': 0x00ff00,
         'red': 0xff0000,
@@ -23,7 +24,7 @@ def send_discord_embed(title, fields, color='blue', thumbnail_url=None):
         'yellow': 0xffff00,
         'purple': 0x800080
     }
-    
+
     embed = {
         "title": title,
         "color": colors.get(color, 0x0000ff),
@@ -33,16 +34,31 @@ def send_discord_embed(title, fields, color='blue', thumbnail_url=None):
         },
         "timestamp": datetime.utcnow().isoformat()
     }
-    
+
     if thumbnail_url:
         embed["thumbnail"] = {"url": thumbnail_url}
-    
+
     data = {"embeds": [embed]}
+    
+    if message_id:
+        url = f"{target_webhook}/messages/{message_id}"
+        method = 'patch'
+    else:
+        # wait=true is required to get the message object back, which contains the ID.
+        url = f"{target_webhook}?wait=true"
+        method = 'post'
+
     try:
-        response = requests.post(DISCORD_WEBHOOK, json=data, timeout=10) # Increased timeout
-        response.raise_for_status()  # Will raise an exception for 4xx/5xx errors
+        response = requests.request(method, url, json=data, timeout=10)
+        response.raise_for_status()
+
+        # If the response is empty, we can't get an ID from it.
+        if not response.text:
+            return None
+            
+        return response.json()  # Return the JSON response which includes the message ID
     except requests.exceptions.RequestException as e:
-        print(f"❌ Discord Error: Failed to send embed '{title}'.")
+        print(f"❌ Discord Error: Failed to send/edit embed '{title}'.")
         if e.response is not None:
             print(f"    Status Code: {e.response.status_code}")
             print(f"    Response: {e.response.text}")
@@ -50,6 +66,7 @@ def send_discord_embed(title, fields, color='blue', thumbnail_url=None):
             print(f"    Error: {e}")
     except Exception as e:
         print(f"❌ Discord Error: An unexpected error occurred in send_discord_embed: {e}")
+    return None
 
 def log_trade(action, symbol, amount, price, value, profit_percent=None, reason=""):
     """Log trade to file"""
@@ -173,17 +190,53 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
     
     send_discord_embed("PORTFOLIO REPORT", fields, 'blue')
 
+STATUS_MESSAGE_ID_FILE = os.path.join('data', 'bot_status_message_id.txt')
+
 def send_startup_notification():
-    """Send bot startup notification"""
+    """Send or update the bot startup notification."""
+    message_id = None
+    if os.path.exists(STATUS_MESSAGE_ID_FILE):
+        with open(STATUS_MESSAGE_ID_FILE, 'r') as f:
+            message_id = f.read().strip()
+
+    # --- Fields and Title ---
     fields = [
         {"name": "AI Brain", "value": "ACTIVE", "inline": True},
         {"name": "Boost", "value": "$10-$20", "inline": True},
         {"name": "TP / SL", "value": "1% / 2%", "inline": True},
         {"name": "Confidence Range", "value": "60-75/120", "inline": True},
-        {"name": "Status", "value": "Ready to trade!", "inline": False}
     ]
-    
-    send_discord_embed("BOT STARTED", fields, 'blue')
+    title = "BOT STARTED"
+
+    if message_id:
+        title = "BOT RESTARTED"
+        fields.append({"name": "Last Restart", "value": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "inline": False})
+    else:
+        fields.append({"name": "Status", "value": "Ready to trade!", "inline": False})
+
+    # --- Send / Edit Message ---
+    response_data = send_discord_embed(title, fields, 'blue', message_id=message_id, webhook_url=CRITICAL_WEBHOOK)
+
+    # If editing failed (e.g., message deleted or webhook changed), create a new message.
+    if message_id and not response_data:
+        print("ℹ️ Failed to edit status message (it may have been deleted). Creating a new one.")
+        # Reset to a "first start" message
+        title = "BOT STARTED"
+        fields = [
+            {"name": "AI Brain", "value": "ACTIVE", "inline": True},
+            {"name": "Boost", "value": "$10-$20", "inline": True},
+            {"name": "TP / SL", "value": "1% / 2%", "inline": True},
+            {"name": "Confidence Range", "value": "60-75/120", "inline": True},
+            {"name": "Status", "value": "Ready to trade!", "inline": False}
+        ]
+        response_data = send_discord_embed(title, fields, 'blue', message_id=None, webhook_url=CRITICAL_WEBHOOK)
+
+    # --- Save new message ID ---
+    if response_data and 'id' in response_data:
+        new_message_id = response_data['id']
+        os.makedirs('data', exist_ok=True)
+        with open(STATUS_MESSAGE_ID_FILE, 'w') as f:
+            f.write(new_message_id)
 
 
 def send_critical_alert(error_type, message, details=None):
