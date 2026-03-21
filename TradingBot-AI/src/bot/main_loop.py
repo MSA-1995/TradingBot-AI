@@ -10,7 +10,7 @@ from colorama import Fore, Style
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import get_active_positions_count, get_total_invested, should_send_report, format_price
-from notifications import send_positions_report, update_status_online
+from notifications import send_positions_report
 from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRADE, MAX_CAPITAL
 
 from bot.sell_handler import process_sell
@@ -48,9 +48,6 @@ def run_main_loop(exchange, ctx):
             loop_count += 1
             current_time = datetime.now().strftime("%H:%M:%S")
             print(f"\n{'='*60}\n⏰ {current_time}\n{'='*60}")
-
-            # تحديث الحالة كل دورة
-            update_status_online()
 
             # Balance (cached - update every 60 seconds - تحسين السرعة)
             if loop_count == 1 or loop_count % 60 == 0:
