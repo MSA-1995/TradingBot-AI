@@ -631,6 +631,40 @@ ctx = {
     'get_dynamic_symbols_fn': get_dynamic_symbols,
 }
 
+# ========== HEALTH CHECK SERVER ==========
+import threading
+import time
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring"""
+    return jsonify({
+        'status': 'online',
+        'timestamp': time.time(),
+        'bot_type': 'TradingBot-AI',
+        'models_enabled': MODELS_ENABLED,
+        'ai_enabled': ai_brain is not None,
+        'news_enabled': NEWS_ENABLED,
+        'dl_enabled': DL_ENABLED if 'DL_ENABLED' in globals() else False
+    }), 200
+
+def run_health_server():
+    """Run the health check server in a separate thread"""
+    try:
+        # Use host='0.0.0.0' to allow external connections
+        app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)
+    except Exception as e:
+        print(f"❌ Health server error: {e}")
+
+# Start health check server in background thread
+health_thread = threading.Thread(target=run_health_server, daemon=True)
+health_thread.start()
+print("🏥 Health check server started on port 5001")
+
+# ========== MAIN LOOP ==========
 while True:
     try:
         run_main_loop(exchange, ctx)
