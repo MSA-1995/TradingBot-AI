@@ -221,31 +221,3 @@ def send_exchange_error(error_message):
         "Failed to connect to Binance",
         error_message
     )
-
-def send_heartbeat(database_url):
-    """كتابة نبضة الحياة في الداتابيز كل دقيقة"""
-    try:
-        import psycopg2
-        from urllib.parse import urlparse, unquote
-        parsed = urlparse(database_url)
-        conn = psycopg2.connect(
-            host=parsed.hostname,
-            port=parsed.port,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=unquote(parsed.password),
-            sslmode='prefer',
-            connect_timeout=10
-        )
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO bot_heartbeat (id, last_beat, status)
-            VALUES (1, NOW(), 'ONLINE')
-            ON CONFLICT (id) DO UPDATE
-            SET last_beat = NOW(), status = 'ONLINE'
-        """)
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"⚠️ Heartbeat write error: {e}")
