@@ -631,54 +631,6 @@ ctx = {
     'get_dynamic_symbols_fn': get_dynamic_symbols,
 }
 
-# ========== HEALTH CHECK SERVER ==========
-import threading
-import time
-import json
-from http.server import HTTPServer, BaseHTTPRequestHandler
-
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == '/health':
-            # Prepare health check data
-            health_data = {
-                'status': 'online',
-                'timestamp': time.time(),
-                'bot_type': 'TradingBot-AI',
-                'models_enabled': MODELS_ENABLED,
-                'ai_enabled': ai_brain is not None,
-                'news_enabled': NEWS_ENABLED,
-                'dl_enabled': DL_ENABLED if 'DL_ENABLED' in globals() else False
-            }
-            
-            # Send response
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps(health_data).encode())
-        else:
-            self.send_response(404)
-            self.end_headers()
-    
-    def log_message(self, format, *args):
-        # Suppress HTTP server logs
-        pass
-
-def run_health_server():
-    """Run the health check server in a separate thread"""
-    try:
-        server = HTTPServer(('0.0.0.0', 5001), HealthCheckHandler)
-        print("🏥 Health check server started on port 5001")
-        server.serve_forever()
-    except Exception as e:
-        print(f"❌ Health server error: {e}")
-
-# Start health check server in background thread
-health_thread = threading.Thread(target=run_health_server, daemon=True)
-health_thread.start()
-print("🏥 Health check server starting on port 5001...")
-
-# ========== MAIN LOOP ==========
 while True:
     try:
         run_main_loop(exchange, ctx)
