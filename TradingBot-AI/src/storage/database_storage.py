@@ -24,19 +24,21 @@ class DatabaseStorage:
         parsed = urlparse(database_url)
         
         self._db_params = {
-            'host': parsed.hostname,
-            'port': parsed.port,
-            'database': parsed.path[1:],
-            'user': parsed.username,
-            'password': unquote(parsed.password),
-            'sslmode': 'require',
-            'connect_timeout': 10
-        }
+                'host': parsed.hostname,
+                'port': parsed.port,
+                'database': parsed.path[1:],
+                'user': parsed.username,
+                'password': unquote(parsed.password),
+                'sslmode': 'require',  # إضافة هذا السطر
+                'connect_timeout': 10
+            }
         self.conn = psycopg2.connect(**self._db_params)
         self.json = json_module
         self.RealDictCursor = RealDictCursor
         self._psycopg2 = psycopg2
-        self._create_tables()
+        
+        if not self._create_tables():
+            raise Exception("Failed to create database tables after multiple attempts.")
 
     def _get_conn(self):
         """إرجاع connection صالح - يعيد الاتصال إذا انقطع"""
@@ -53,7 +55,7 @@ class DatabaseStorage:
         return self.conn
     
     def _create_tables(self):
-        """إنشاء الجداول إذا لم تكن موجودة (مع إعادة محاولة)"""
+        """إنشاء الجداول إذا لم تكن موجودة (مع إعادة محاولة). Returns True on success, False on failure."""
         for attempt in range(3):
             try:
                 conn = self._get_conn()
@@ -141,7 +143,7 @@ class DatabaseStorage:
                 
                 conn.commit()
                 cursor.close()
-                return # Success, exit the loop
+                return True # Success, exit the loop
 
             except Exception as e:
                 print(f"⚠️ Table creation error (attempt {attempt + 1}/3): {e}")
@@ -149,7 +151,12 @@ class DatabaseStorage:
                     import time
                     time.sleep(5) # Wait 5 seconds before retrying
                 else:
-                    self._get_conn().rollback()
+                    try:
+                        self._get_conn().rollback()
+                    except Exception as rb_e:
+                        print(f"⚠️ Error during rollback: {rb_e}")
+        
+        return False # Failure after all attempts
     
     # ========== Trades ==========
     def save_trade(self, trade_data):
