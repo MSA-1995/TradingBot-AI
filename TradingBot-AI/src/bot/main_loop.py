@@ -102,8 +102,8 @@ def run_main_loop(exchange, ctx):
             buy_results.sort(key=lambda x: x.get('confidence', 0), reverse=True)
             display_results.sort(key=lambda x: x.get('confidence', 0), reverse=True)
 
-            top_buy     = buy_results[:TOP_COINS_TO_TRADE]
-            top_display = display_results[:TOP_COINS_TO_TRADE]
+            top_buy     = buy_results
+            top_display = display_results
 
             results = position_results + top_buy + top_display
 
