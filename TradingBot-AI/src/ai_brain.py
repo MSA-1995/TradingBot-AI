@@ -423,9 +423,6 @@ class AIBrain:
             # print(f"⚠️ Candle analysis error: {e}") # Optional: for debugging
             pass
         return candle_analysis
-            # print(f"⚠️ Candle analysis error: {e}") # Optional: for debugging
-            pass
-        return candle_analysis
 
     def _analyze_candle(self, analysis):
         """تحليل آخر شمعة للكشف عن إشارات القناص (Rejection & Accumulation)"""
