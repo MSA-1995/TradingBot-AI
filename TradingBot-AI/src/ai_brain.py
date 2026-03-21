@@ -83,6 +83,15 @@ class AIBrain:
         # 1. التحليل الأساسي
         base_confidence = self._calculate_base_confidence(analysis, mtf, price_drop)
         
+        # 1.5. شرط تأكيد الانعكاس (جديد)
+        reversal_info = analysis.get('reversal', {})
+        if not reversal_info.get('is_reversing', False):
+            return {
+                'action': 'SKIP',
+                'reason': f"No reversal confirmation (bounce: {reversal_info.get('bounce_percent', 0):.2f}%)",
+                'confidence': 0
+            }
+
         # 2. فحص الفخاخ
         if self._is_trap_pattern(symbol, analysis):
             decision = {
