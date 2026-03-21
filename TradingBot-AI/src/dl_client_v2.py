@@ -793,10 +793,10 @@ class DeepLearningClientV2:
         المستشارين يصوتون: هل نشتري؟ (BUY/SKIP)
         market_sentiment: {'btc_change_1h': float, 'eth_change_1h': float, 'bnb_change_1h': float}
         candle_analysis: {'is_rejection': bool, 'is_accumulation': bool}
-        Returns: buy_votes (dict with each consultant's vote: 1=BUY, 0=SKIP), min_votes_required
+        Returns: buy_votes (dict with each consultant's vote: 1=BUY, 0=SKIP), market_status (str)
         """
         # فحص السوق العام أولاً
-        min_votes_required = 3  # default
+        
         market_status = 'neutral'
         
         # استخراج تحليل الشموع (القناص)
@@ -810,7 +810,7 @@ class DeepLearningClientV2:
             btc_change = market_sentiment.get('btc_change_1h', 0)
             eth_change = market_sentiment.get('eth_change_1h', 0)
             bnb_change = market_sentiment.get('bnb_change_1h', 0)
-            market_status, min_votes_required = self.get_market_sentiment(btc_change, eth_change, bnb_change)
+            market_status, _ = self.get_market_sentiment(btc_change, eth_change, bnb_change)
         
         votes = {}
         
@@ -855,4 +855,4 @@ class DeepLearningClientV2:
             # fallback للطريقة القديمة
             votes['liquidity'] = 1 if confidence >= 60 else 0
         
-        return votes, min_votes_required, market_status
+        return votes, market_status
