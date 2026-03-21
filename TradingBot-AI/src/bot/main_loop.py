@@ -198,17 +198,24 @@ def run_main_loop(exchange, ctx):
                     for sym, data in SYMBOLS_DATA.items():
                         position = data.get('position')
                         if position:
+                            current_price = position.get('buy_price') # Fallback price
                             try:
-                                ticker        = exchange.fetch_ticker(sym)
-                                current_price = ticker['last']
-                            except:
-                                current_price = position['buy_price']
+                                ticker = exchange.fetch_ticker(sym)
+                                # Ensure ticker and last price are valid before using
+                                if ticker and 'last' in ticker and ticker['last'] is not None:
+                                    current_price = ticker['last']
+                            except Exception as e:
+                                print(f"⚠️ Report: Could not fetch ticker for {sym}, using buy_price. Error: {e}")
 
-                            open_positions_data[sym] = {
-                                'buy_price':    position['buy_price'],
-                                'current_price': current_price,
-                                'amount':        position['amount']
-                            }
+                            # Ensure buy_price exists before adding to report
+                            if 'buy_price' in position and 'amount' in position:
+                                open_positions_data[sym] = {
+                                    'buy_price':    position['buy_price'],
+                                    'current_price': current_price,
+                                    'amount':        position['amount']
+                                }
+                            else:
+                                print(f"⚠️ Report: Skipping {sym} due to incomplete position data.")
 
                 send_positions_report(available, invested, active_count, MAX_POSITIONS, open_positions_data)
 
