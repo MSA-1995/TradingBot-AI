@@ -7,7 +7,7 @@
   "max_amount": 20,
   "max_loss_per_trade": 2.0,
   "max_daily_loss": 5.0,
-  "max_positions": 20,
+  "max_positions": 50,
   "min_rsi": 20,
   "max_rsi": 70,
   "min_macd": -30
