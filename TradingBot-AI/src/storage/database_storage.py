@@ -55,6 +55,39 @@ class DatabaseStorage:
             except Exception as e:
                 print(f"❌ DB reconnect error: {e}")
         return self.conn
+
+    # ========== General Settings ==========
+    def save_setting(self, key, value):
+        """Saves a key-value setting to the bot_settings table."""
+        sql = """
+            INSERT INTO bot_settings (key, value)
+            VALUES (%s, %s)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+        """
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute(sql, (key, str(value)))
+            conn.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"❌ DB Error saving setting {key}: {e}")
+            return False
+
+    def load_setting(self, key):
+        """Loads a value from the bot_settings table."""
+        sql = "SELECT value FROM bot_settings WHERE key = %s;"
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute(sql, (key,))
+            result = cursor.fetchone()
+            cursor.close()
+            return result[0] if result else None
+        except Exception as e:
+            print(f"❌ DB Error loading setting {key}: {e}")
+            return None
     
     def _create_tables(self):
         """إنشاء الجداول إذا لم تكن موجودة (مع إعادة محاولة). Returns True on success, False on failure."""
@@ -93,6 +126,14 @@ class DatabaseStorage:
                         data JSONB,
                         timestamp TIMESTAMP DEFAULT NOW()
                     )
+                """)
+
+                # General settings table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS bot_settings (
+                        key VARCHAR(255) PRIMARY KEY,
+                        value TEXT
+                    );
                 """)
                 
                 # Learned patterns table
