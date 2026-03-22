@@ -4,7 +4,7 @@ Handles Discord messages and file logging
 """
 
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from storage.storage_manager import StorageManager
 from config_encrypted import get_discord_webhook, get_critical_webhook
@@ -63,7 +63,7 @@ def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_
         "footer": {
             "text": "MSA Trading Bot • AI Powered"
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
     if thumbnail_url:
