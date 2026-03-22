@@ -2,6 +2,7 @@
 ⚙️ Configuration Module
 All bot settings and constants
 """
+import os
 
 # Trading Parameters
 MIN_CONFIDENCE = 55
