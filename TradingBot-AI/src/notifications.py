@@ -7,7 +7,7 @@ import requests
 from datetime import datetime
 import os
 from storage.storage_manager import StorageManager
-from .config_encrypted import get_discord_webhook, get_critical_webhook
+from config_encrypted import get_discord_webhook, get_critical_webhook
 
 DISCORD_WEBHOOK = get_discord_webhook()
 CRITICAL_WEBHOOK = get_critical_webhook()
