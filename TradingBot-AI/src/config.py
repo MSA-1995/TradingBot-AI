@@ -28,6 +28,12 @@ BASE_AMOUNT = 12
 LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
 REPORT_INTERVAL = 30
 
+# Notifications
+# Choose where to store the Discord status message ID: 'database' or 'file'
+# 'database' is recommended for production (uses bot_settings table)
+# 'file' is for local/testing (uses data/bot_status_message_id.txt)
+STATUS_STORAGE_METHOD = 'file' # or 'database'
+
 # قائمة العملات الثابتة (Top 50 by Market Cap - March 2026)
 SYMBOLS = [
     # Top 10 - Giants
