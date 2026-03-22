@@ -6,7 +6,6 @@ Handles Discord messages and file logging
 import requests
 from datetime import datetime
 import os
-from config import STATUS_STORAGE_METHOD
 from config_encrypted import get_discord_webhook, get_critical_webhook
 
 DISCORD_WEBHOOK = get_discord_webhook()
@@ -15,60 +14,37 @@ STATUS_MESSAGE_ID = None # Global variable to hold the message ID
 STATUS_MESSAGE_ID_FILE = os.path.join('data', 'bot_status_message_id.txt')
 
 def load_status_message_id():
-    """Load the status message ID from the configured storage (db or file)."""
+    """Load the status message ID from file."""
     global STATUS_MESSAGE_ID
-    if STATUS_STORAGE_METHOD == 'database':
-        from database import get_db_connection # Conditional import
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM bot_settings WHERE key = 'status_message_id'")
-            row = cursor.fetchone()
-            conn.close()
-            if row:
-                STATUS_MESSAGE_ID = row[0]
-                print(f"✅ Loaded status message ID from database: {STATUS_MESSAGE_ID}")
-            else:
-                print("🤔 No status message ID found in database. A new one will be created.")
-        except Exception as e:
-            print(f"❌ Error loading status message ID from database: {e}")
-            STATUS_MESSAGE_ID = None
-    else: # file method
-        try:
-            if os.path.exists(STATUS_MESSAGE_ID_FILE):
-                with open(STATUS_MESSAGE_ID_FILE, 'r') as f:
-                    STATUS_MESSAGE_ID = f.read().strip()
+    try:
+        if os.path.exists(STATUS_MESSAGE_ID_FILE):
+            with open(STATUS_MESSAGE_ID_FILE, 'r') as f:
+                STATUS_MESSAGE_ID = f.read().strip()
+                if STATUS_MESSAGE_ID:
                     print(f"✅ Loaded status message ID from file: {STATUS_MESSAGE_ID}")
-            else:
-                print("🤔 No status message ID file found. A new one will be created.")
-        except Exception as e:
-            print(f"❌ Error loading status message ID from file: {e}")
+                else:
+                    print("🤔 Status message ID file is empty. A new one will be created.")
+        else:
+            print("🤔 No status message ID file found. A new one will be created.")
             STATUS_MESSAGE_ID = None
+    except Exception as e:
+        print(f"❌ Error loading status message ID from file: {e}")
+        STATUS_MESSAGE_ID = None
 
 def save_status_message_id(message_id):
-    """Save the status message ID to the configured storage (db or file)."""
+    """Save the status message ID to file."""
     global STATUS_MESSAGE_ID
-    if STATUS_STORAGE_METHOD == 'database':
-        from database import get_db_connection # Conditional import
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)", ('status_message_id', message_id))
-            conn.commit()
-            conn.close()
-            STATUS_MESSAGE_ID = message_id
-            print(f"💾 Saved status message ID to database: {message_id}")
-        except Exception as e:
-            print(f"❌ Error saving status message ID to database: {e}")
-    else: # file method
-        try:
-            os.makedirs('data', exist_ok=True)
-            with open(STATUS_MESSAGE_ID_FILE, 'w') as f:
-                f.write(str(message_id))
-            STATUS_MESSAGE_ID = str(message_id)
+    try:
+        os.makedirs('data', exist_ok=True)
+        with open(STATUS_MESSAGE_ID_FILE, 'w') as f:
+            f.write(str(message_id) if message_id else '')
+        STATUS_MESSAGE_ID = str(message_id) if message_id else None
+        if message_id:
             print(f"💾 Saved status message ID to file: {message_id}")
-        except Exception as e:
-            print(f"❌ Error saving status message ID to file: {e}")
+        else:
+            print("📝 Cleared status message ID file.")
+    except Exception as e:
+        print(f"❌ Error saving status message ID to file: {e}")
 
 def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_id=None, webhook_url=None):
     """Send or edit an embed message on Discord."""
