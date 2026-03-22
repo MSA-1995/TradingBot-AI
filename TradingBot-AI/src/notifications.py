@@ -6,7 +6,7 @@ Handles Discord messages and file logging
 import requests
 from datetime import datetime
 import os
-from .storage.storage_manager import StorageManager
+from storage.storage_manager import StorageManager
 from .config_encrypted import get_discord_webhook, get_critical_webhook
 
 DISCORD_WEBHOOK = get_discord_webhook()
