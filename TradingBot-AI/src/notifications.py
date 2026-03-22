@@ -6,45 +6,41 @@ Handles Discord messages and file logging
 import requests
 from datetime import datetime
 import os
-from config_encrypted import get_discord_webhook, get_critical_webhook
+from .storage.storage_manager import StorageManager
+from .config_encrypted import get_discord_webhook, get_critical_webhook
 
 DISCORD_WEBHOOK = get_discord_webhook()
 CRITICAL_WEBHOOK = get_critical_webhook()
+
+# Initialize the smart storage manager
+storage = StorageManager()
+
 STATUS_MESSAGE_ID = None # Global variable to hold the message ID
-STATUS_MESSAGE_ID_FILE = os.path.join('data', 'bot_status_message_id.txt')
+STATUS_MESSAGE_ID_KEY = 'bot_status_message_id' # Key for the setting
 
 def load_status_message_id():
-    """Load the status message ID from file."""
+    """Load the status message ID using the StorageManager."""
     global STATUS_MESSAGE_ID
-    try:
-        if os.path.exists(STATUS_MESSAGE_ID_FILE):
-            with open(STATUS_MESSAGE_ID_FILE, 'r') as f:
-                STATUS_MESSAGE_ID = f.read().strip()
-                if STATUS_MESSAGE_ID:
-                    print(f"✅ Loaded status message ID from file: {STATUS_MESSAGE_ID}")
-                else:
-                    print("🤔 Status message ID file is empty. A new one will be created.")
-        else:
-            print("🤔 No status message ID file found. A new one will be created.")
-            STATUS_MESSAGE_ID = None
-    except Exception as e:
-        print(f"❌ Error loading status message ID from file: {e}")
+    loaded_id = storage.load_setting(STATUS_MESSAGE_ID_KEY)
+    if loaded_id:
+        STATUS_MESSAGE_ID = loaded_id
+        print(f"✅ Loaded status message ID via StorageManager: {STATUS_MESSAGE_ID} (Mode: {storage.mode})")
+    else:
+        print(f"🤔 No status message ID found via StorageManager. A new one will be created. (Mode: {storage.mode})")
         STATUS_MESSAGE_ID = None
 
 def save_status_message_id(message_id):
-    """Save the status message ID to file."""
+    """Save the status message ID using the StorageManager."""
     global STATUS_MESSAGE_ID
-    try:
-        os.makedirs('data', exist_ok=True)
-        with open(STATUS_MESSAGE_ID_FILE, 'w') as f:
-            f.write(str(message_id) if message_id else '')
+    success = storage.save_setting(STATUS_MESSAGE_ID_KEY, message_id)
+    if success:
         STATUS_MESSAGE_ID = str(message_id) if message_id else None
         if message_id:
-            print(f"💾 Saved status message ID to file: {message_id}")
+            print(f"💾 Saved status message ID via StorageManager: {message_id} (Mode: {storage.mode})")
         else:
-            print("📝 Cleared status message ID file.")
-    except Exception as e:
-        print(f"❌ Error saving status message ID to file: {e}")
+            print(f"📝 Cleared status message ID via StorageManager. (Mode: {storage.mode})")
+    else:
+        print(f"❌ Failed to save status message ID via StorageManager. (Mode: {storage.mode})")
 
 def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_id=None, webhook_url=None):
     """Send or edit an embed message on Discord."""
