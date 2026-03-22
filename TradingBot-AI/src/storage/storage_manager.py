@@ -56,6 +56,20 @@ class StorageManager:
     def load_ai_decisions(self, limit=10):
         """تحميل قرارات AI"""
         return self.storage.load_ai_decisions(limit)
+
+    # ========== General Settings (like Discord message ID) ==========
+    def save_setting(self, key, value):
+        """حفظ إعداد عام"""
+        if hasattr(self.storage, 'save_setting'):
+            return self.storage.save_setting(key, value)
+        return False
+
+    def load_setting(self, key):
+        """تحميل إعداد عام"""
+        if hasattr(self.storage, 'load_setting'):
+            return self.storage.load_setting(key)
+        return None
+
     
     # ========== Performance Metrics ==========
     def save_performance(self, metrics_data):
