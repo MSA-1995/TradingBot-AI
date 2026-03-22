@@ -7,9 +7,44 @@ import requests
 from datetime import datetime
 import os
 from config_encrypted import get_discord_webhook, get_critical_webhook
+from database import get_db_connection
 
 DISCORD_WEBHOOK = get_discord_webhook()
 CRITICAL_WEBHOOK = get_critical_webhook()
+STATUS_MESSAGE_ID = None # Global variable to hold the message ID
+
+def load_status_message_id():
+    """Load the status message ID from the database."""
+    global STATUS_MESSAGE_ID
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM bot_settings WHERE key = 'status_message_id'")
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            STATUS_MESSAGE_ID = row[0]
+            print(f"✅ Loaded status message ID: {STATUS_MESSAGE_ID}")
+        else:
+            print("🤔 No status message ID found in the database. A new one will be created.")
+    except Exception as e:
+        print(f"❌ Error loading status message ID from database: {e}")
+        STATUS_MESSAGE_ID = None
+
+def save_status_message_id(message_id):
+    """Save the status message ID to the database."""
+    global STATUS_MESSAGE_ID
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        # Use INSERT OR REPLACE to either insert a new row or update the existing one
+        cursor.execute("INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)", ('status_message_id', message_id))
+        conn.commit()
+        conn.close()
+        STATUS_MESSAGE_ID = message_id
+        print(f"💾 Saved status message ID to database: {message_id}")
+    except Exception as e:
+        print(f"❌ Error saving status message ID to database: {e}")
 
 def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_id=None, webhook_url=None):
     """Send or edit an embed message on Discord."""
@@ -58,15 +93,15 @@ def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_
             
         return response.json()  # Return the JSON response which includes the message ID
     except requests.exceptions.RequestException as e:
-        print(f"❌ Discord Error: Failed to send/edit embed '{title}'.")
-        if e.response is not None:
-            print(f"    Status Code: {e.response.status_code}")
-            print(f"    Response: {e.response.text}")
+        # If the message is not found, it's a 404 error.
+        if e.response and e.response.status_code == 404:
+            print(f"ℹ️ Discord message {message_id} not found. It might have been deleted.")
         else:
-            print(f"    Error: {e}")
+            print(f"❌ Discord API Error: {e}")
+        return None # Return None on failure
     except Exception as e:
-        print(f"❌ Discord Error: An unexpected error occurred in send_discord_embed: {e}")
-    return None
+        print(f"❌ An unexpected error occurred while sending to Discord: {e}")
+        return None
 
 def log_trade(action, symbol, amount, price, value, profit_percent=None, reason=""):
     """Log trade to file"""
@@ -190,16 +225,13 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
     
     send_discord_embed("PORTFOLIO REPORT", fields, 'blue')
 
-STATUS_MESSAGE_ID_FILE = os.path.join('data', 'bot_status_message_id.txt')
+
+# Global variable to hold the startup time
 STARTUP_TIME = None
 
 def send_startup_notification():
     """Send or update the bot status message."""
-    global STARTUP_TIME
-    message_id = None
-    if os.path.exists(STATUS_MESSAGE_ID_FILE):
-        with open(STATUS_MESSAGE_ID_FILE, 'r') as f:
-            message_id = f.read().strip()
+    global STARTUP_TIME, STATUS_MESSAGE_ID
 
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     STARTUP_TIME = now_str
@@ -210,38 +242,32 @@ def send_startup_notification():
         {"name": "Last Restart", "value": now_str, "inline": False}
     ]
 
+    response_data = None
     # Always try to edit first if we have an ID
-    if message_id:
-        response_data = send_discord_embed(title, fields, 'blue', message_id=message_id, webhook_url=CRITICAL_WEBHOOK)
-    else:
-        response_data = None # Ensure it's None so we create a new one below
+    if STATUS_MESSAGE_ID:
+        response_data = send_discord_embed(title, fields, 'blue', message_id=STATUS_MESSAGE_ID, webhook_url=CRITICAL_WEBHOOK)
 
     # If editing failed or no ID existed, create a new message.
     if not response_data:
-        if message_id:
+        if STATUS_MESSAGE_ID:
              print("ℹ️ Failed to edit status message (it may have been deleted). Creating a new one.")
         response_data = send_discord_embed(title, fields, 'blue', message_id=None, webhook_url=CRITICAL_WEBHOOK)
 
     # --- Save new message ID ---
     if response_data and 'id' in response_data:
         new_message_id = response_data['id']
-        os.makedirs('data', exist_ok=True)
-        with open(STATUS_MESSAGE_ID_FILE, 'w') as f:
-            f.write(new_message_id)
+        save_status_message_id(new_message_id)
         return new_message_id
-    return message_id
+        
+    return STATUS_MESSAGE_ID
 
-def send_heartbeat_notification(message_id=None):
+def send_heartbeat_notification():
     """Update the heartbeat timestamp on the status message."""
-    if not message_id:
-        if os.path.exists(STATUS_MESSAGE_ID_FILE):
-            with open(STATUS_MESSAGE_ID_FILE, 'r') as f:
-                message_id = f.read().strip()
+    global STARTUP_TIME, STATUS_MESSAGE_ID
     
-    if not message_id:
+    if not STATUS_MESSAGE_ID:
         return
 
-    global STARTUP_TIME
     restart_time = STARTUP_TIME if STARTUP_TIME else "Unknown"
 
     title = "BOT RESTARTED"
@@ -251,7 +277,7 @@ def send_heartbeat_notification(message_id=None):
         {"name": "Last Restart", "value": restart_time, "inline": False}
     ]
     
-    send_discord_embed(title, fields, 'blue', message_id=message_id, webhook_url=CRITICAL_WEBHOOK)
+    send_discord_embed(title, fields, 'blue', message_id=STATUS_MESSAGE_ID, webhook_url=CRITICAL_WEBHOOK)
 
 
 
