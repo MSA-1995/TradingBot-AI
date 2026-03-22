@@ -188,6 +188,24 @@ class AIBrain:
 
             if self.dl_client:
                 try:
+                    # 🚨 حماية صارمة: منع الشراء نهائياً إذا لم يكن هناك مستشارين
+                    if not self.dl_client.is_available():
+                        decision = {
+                            'action': 'SKIP',
+                            'reason': 'No consultants available (DL Client offline) - Safety Block',
+                            'confidence': optimized_confidence
+                        }
+                        self.storage.save_ai_decision({
+                            'symbol': symbol,
+                            'decision': 'SKIP',
+                            'reason': 'Safety Block: DL Client offline',
+                            'confidence': optimized_confidence
+                        })
+                        # إرسال إشعار
+                        from notifications import send_safety_block_notification
+                        send_safety_block_notification(symbol, 'DL Client is offline')
+                        return decision
+
                     # تجميع البيانات اللازمة للتصويت
                     rsi = analysis.get('rsi', 50)
                     macd = analysis.get('macd_diff', 0)
