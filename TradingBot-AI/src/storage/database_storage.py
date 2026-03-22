@@ -43,12 +43,14 @@ class DatabaseStorage:
     def _get_conn(self):
         """إرجاع connection صالح - يعيد الاتصال إذا انقطع"""
         try:
-            if self.conn.closed:
-                raise Exception("closed")
-            # اختبار الاتصال
-            self.conn.cursor().execute("SELECT 1")
-        except Exception:
+            # اختبار الاتصال عبر استعلام بسيط
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.close()
+        except (self._psycopg2.OperationalError, self._psycopg2.InterfaceError):
+            # إذا فشل الاختبار، أعد الاتصال
             try:
+                print("🔄 DB connection lost. Reconnecting...")
                 self.conn = self._psycopg2.connect(**self._db_params)
             except Exception as e:
                 print(f"❌ DB reconnect error: {e}")
