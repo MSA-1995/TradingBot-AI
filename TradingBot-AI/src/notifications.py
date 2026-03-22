@@ -191,44 +191,35 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
     send_discord_embed("PORTFOLIO REPORT", fields, 'blue')
 
 STATUS_MESSAGE_ID_FILE = os.path.join('data', 'bot_status_message_id.txt')
+STARTUP_TIME = None
 
 def send_startup_notification():
-    """Send or update the bot startup notification."""
+    """Send or update the bot status message."""
+    global STARTUP_TIME
     message_id = None
     if os.path.exists(STATUS_MESSAGE_ID_FILE):
         with open(STATUS_MESSAGE_ID_FILE, 'r') as f:
             message_id = f.read().strip()
 
-    # --- Fields and Title ---
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    STARTUP_TIME = now_str
+    title = "BOT RESTARTED"
     fields = [
-        {"name": "AI Brain", "value": "ACTIVE", "inline": True},
-        {"name": "Boost", "value": "$10-$20", "inline": True},
-        {"name": "TP / SL", "value": "1% / 2%", "inline": True},
-        {"name": "Confidence Range", "value": "60-75/120", "inline": True},
+        {"name": "AI Brain", "value": "ACTIVE", "inline": False},
+        {"name": "Last update", "value": datetime.now().strftime('%H:%M:%S'), "inline": False},
+        {"name": "Last Restart", "value": now_str, "inline": False}
     ]
-    title = "BOT STARTED"
 
+    # Always try to edit first if we have an ID
     if message_id:
-        title = "BOT RESTARTED"
-        fields.append({"name": "Last Restart", "value": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "inline": False})
+        response_data = send_discord_embed(title, fields, 'blue', message_id=message_id, webhook_url=CRITICAL_WEBHOOK)
     else:
-        fields.append({"name": "Status", "value": "Ready to trade!", "inline": False})
+        response_data = None # Ensure it's None so we create a new one below
 
-    # --- Send / Edit Message ---
-    response_data = send_discord_embed(title, fields, 'blue', message_id=message_id, webhook_url=CRITICAL_WEBHOOK)
-
-    # If editing failed (e.g., message deleted or webhook changed), create a new message.
-    if message_id and not response_data:
-        print("ℹ️ Failed to edit status message (it may have been deleted). Creating a new one.")
-        # Reset to a "first start" message
-        title = "BOT STARTED"
-        fields = [
-            {"name": "AI Brain", "value": "ACTIVE", "inline": True},
-            {"name": "Boost", "value": "$10-$20", "inline": True},
-            {"name": "TP / SL", "value": "1% / 2%", "inline": True},
-            {"name": "Confidence Range", "value": "60-75/120", "inline": True},
-            {"name": "Status", "value": "Ready to trade!", "inline": False}
-        ]
+    # If editing failed or no ID existed, create a new message.
+    if not response_data:
+        if message_id:
+             print("ℹ️ Failed to edit status message (it may have been deleted). Creating a new one.")
         response_data = send_discord_embed(title, fields, 'blue', message_id=None, webhook_url=CRITICAL_WEBHOOK)
 
     # --- Save new message ID ---
@@ -237,6 +228,32 @@ def send_startup_notification():
         os.makedirs('data', exist_ok=True)
         with open(STATUS_MESSAGE_ID_FILE, 'w') as f:
             f.write(new_message_id)
+        return new_message_id
+    return message_id
+
+def send_heartbeat_notification(message_id=None):
+    """Update the heartbeat timestamp on the status message."""
+    if not message_id:
+        if os.path.exists(STATUS_MESSAGE_ID_FILE):
+            with open(STATUS_MESSAGE_ID_FILE, 'r') as f:
+                message_id = f.read().strip()
+    
+    if not message_id:
+        return
+
+    global STARTUP_TIME
+    restart_time = STARTUP_TIME if STARTUP_TIME else "Unknown"
+
+    title = "BOT RESTARTED"
+    fields = [
+        {"name": "AI Brain", "value": "ACTIVE", "inline": False},
+        {"name": "Last update", "value": datetime.now().strftime('%H:%M:%S'), "inline": False},
+        {"name": "Last Restart", "value": restart_time, "inline": False}
+    ]
+    
+    send_discord_embed(title, fields, 'blue', message_id=message_id, webhook_url=CRITICAL_WEBHOOK)
+
+
 
 
 def send_critical_alert(error_type, message, details=None):
