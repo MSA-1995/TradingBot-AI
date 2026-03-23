@@ -77,19 +77,19 @@ class AIBrain:
             self.trap_memory = []
 
     def load_meta_learner(self):
-        """تحميل عقل الملك الجديد المدرب"""
+        """تحميل عقل الملك الجديد المدرب من قاعدة البيانات"""
         try:
-            # المسار المتوقع لملف تدريب الملك الجديد
-            model_path = os.path.join(project_root, '..', 'MSA-DeepLearning-Trainer', 'meta_learner_model.pkl')
-            if os.path.exists(model_path):
-                with open(model_path, 'rb') as f:
-                    self.meta_learner = pickle.load(f)
-                print("👑🧠 New King's Brain (Meta-Learner) loaded successfully!")
+            # محاولة تحميل النموذج من قاعدة البيانات
+            model_data = self.storage.load_model_from_db('meta_learner_model.pkl')
+            if model_data:
+                # استخدام pickle.loads لتحميل النموذج من البيانات الثنائية
+                self.meta_learner = pickle.loads(model_data)
+                print("👑🧠 New King's Brain (Meta-Learner) loaded successfully from DB!")
             else:
-                print("⚠️ Meta-Learner model not found. The old king will rule.")
+                print("⚠️ Meta-Learner model not found in DB. The old king will rule.")
                 self.meta_learner = None
         except Exception as e:
-            print(f"❌ Error loading Meta-Learner model: {e}")
+            print(f"❌ Error loading Meta-Learner model from DB: {e}")
             self.meta_learner = None
 
     def is_meta_learner_active(self):
