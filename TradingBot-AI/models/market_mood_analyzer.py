@@ -5,53 +5,74 @@
 - مؤشر الخوف والطمع (Fear & Greed Index).
 - هيمنة البيتكوين (BTC Dominance).
 - يعطي دفعة ثقة (Confidence Boost) أو تحذير بناءً على مزاج السوق.
+- يستخدم نظام كاش (Cache) لتقليل طلبات API.
 """
-import requests # سنحتاج هذه المكتبة لجلب البيانات من الإنترنت
+import requests
+import time
 
 class MarketMoodAnalyzer:
-    def __init__(self):
+    def __init__(self, cache_duration=300): # 5 دقائق كاش
         """
-        تهيئة المحلل
+        تهيئة المحلل مع نظام الكاش
         """
         print("🧠 Market Mood Analyzer initialized")
-        # روابط API لجلب البيانات الحية
+        # روابط API
         self.fear_and_greed_api = "https://api.alternative.me/fng/?limit=1"
-        # لهيمنة البيتكوين، سنستخدم API مثل CoinGecko (هذا مثال)
         self.btc_dominance_api = "https://api.coingecko.com/api/v3/global"
+
+        # إعدادات الكاش
+        self.cache_duration = cache_duration
+        self.last_fetch_time = 0
+        self.cached_fng = None
+        self.cached_btc_dominance = None
+
+    def _is_cache_valid(self):
+        """فحص صلاحية الكاش"""
+        return (time.time() - self.last_fetch_time) < self.cache_duration
 
     def get_fear_and_greed_index(self):
         """
-        جلب مؤشر الخوف والطمع
-        - أقل من 25 (خوف شديد) -> فرصة شراء عكسية
-        - أعلى من 75 (طمع شديد) -> خطر وتصحيح محتمل
+        جلب مؤشر الخوف والطمع (مع كاش)
         """
+        if self._is_cache_valid() and self.cached_fng is not None:
+            return self.cached_fng # إرجاع البيانات من الكاش
+
         try:
-            # استخدام timeout لتجنب الانتظار الطويل
             response = requests.get(self.fear_and_greed_api, timeout=10)
-            response.raise_for_status() # التأكد من نجاح الطلب
+            response.raise_for_status()
             data = response.json()['data'][0]
             value = int(data['value'])
             classification = data['value_classification']
-            return {'value': value, 'classification': classification}
+            
+            result = {'value': value, 'classification': classification}
+            self.cached_fng = result # تخزين النتيجة في الكاش
+            self.last_fetch_time = time.time() # تحديث وقت الجلب
+            return result
         except Exception as e:
             print(f"⚠️ MarketMood: خطأ في جلب مؤشر الخوف والطمع: {e}")
-            return None # في حالة الفشل، لا نؤثر على القرار
+            # في حالة الخطأ، نرجع آخر بيانات ناجحة إذا كانت موجودة
+            return self.cached_fng if self.cached_fng else None
 
     def get_btc_dominance(self):
         """
-        جلب نسبة هيمنة البيتكوين
-        - إذا كانت الهيمنة ترتفع، تسحب السيولة من العملات البديلة (سلبي).
-        - إذا كانت الهيمنة تنخفض، تذهب السيولة للعملات البديلة (إيجابي).
+        جلب نسبة هيمنة البيتكوين (مع كاش)
         """
+        if self._is_cache_valid() and self.cached_btc_dominance is not None:
+            return self.cached_btc_dominance
+
         try:
             response = requests.get(self.btc_dominance_api, timeout=10)
             response.raise_for_status()
             data = response.json()['data']
             btc_dominance = data['market_cap_percentage']['btc']
+            
+            self.cached_btc_dominance = btc_dominance
+            # لا نحدث وقت الجلب هنا لنسمح لدالة الخوف والطمع بتحديثه
+            # هذا يضمن أن كلا الطلبين يحدثان في نفس الدورة عند انتهاء صلاحية الكاش
             return btc_dominance
         except Exception as e:
             print(f"⚠️ MarketMood: خطأ في جلب هيمنة البيتكوين: {e}")
-            return None
+            return self.cached_btc_dominance if self.cached_btc_dominance else None
 
     def get_mood_adjustment(self, symbol):
         """
