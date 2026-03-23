@@ -1,5 +1,5 @@
 ccxt
-lightgbm
+lightgbm\nscikit-learn
 cryptography
 requests
 pandas
