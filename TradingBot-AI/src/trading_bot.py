@@ -17,31 +17,15 @@ try:
 except Exception as e:
     print(f"⚠️ pip update skipped: {e}")
 
-# ========== LOAD ENV FILE ==========
-import os
-for _env_file in [
-    '/home/container/TradingBot-AI/.env',
-    '/home/container/TradingBot/.env',
-    '/home/container/.env',
-]:
-    try:
-        with open(_env_file) as _f:
-            for _line in _f:
-                _line = _line.strip()
-                if _line and not _line.startswith('#') and '=' in _line:
-                    _k, _v = _line.split('=', 1)
-                    os.environ.setdefault(_k.strip(), _v.strip())
-        break
-    except:
-        pass
-
 # ========== AUTO-INSTALL ==========
 def install_dependencies():
     import sys
-    required = ['ccxt', 'cryptography', 'requests', 'pandas', 'ta', 'colorama']
+    required = ['ccxt', 'cryptography', 'requests', 'pandas', 'ta', 'colorama', 'python-dotenv']
     for package in required:
         try:
-            __import__(package)
+            # Check if the package is importable. For python-dotenv, the module is dotenv.
+            module_name = 'dotenv' if package == 'python-dotenv' else package
+            __import__(module_name)
         except ImportError:
             print(f"📦 Installing {package}...")
             import subprocess
@@ -49,6 +33,20 @@ def install_dependencies():
                          shell=False, capture_output=True)
 
 install_dependencies()
+
+# ========== LOAD ENV FILE ==========
+from dotenv import load_dotenv
+import os
+
+# ابحث عن ملف .env في المجلد الحالي أو المجلدات الأعلى
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path=dotenv_path)
+    print("✅ Environment variables loaded from root .env file")
+else:
+    # إذا لم يتم العثور عليه، جرب تحميله بالطريقة الافتراضية
+    load_dotenv()
+    print("✅ Environment variables loaded")
 
 # ========== IMPORTS ==========
 import ccxt
@@ -120,7 +118,7 @@ try:
         dl_client = DeepLearningClientV2(database_url)
         DL_ENABLED = dl_client.is_available()
         if DL_ENABLED:
-            print("🧠 Deep Learning: ACTIVE (6 Models)")
+            print("🧠 Deep Learning: ACTIVE")
             models_status = dl_client.get_models_status()
             for model_name, status in models_status.items():
                 print(f"   {model_name}: {status['accuracy']*100:.1f}%")
@@ -216,7 +214,9 @@ print("  ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝\n")
 print("  ✦•······················•✦•······················•✦")
 print("        🚀 MSA Smart Trading Bot")
 print("        💰 Binance Testnet - AI Powered")
-print("        👑 8 Deep Learning Models (LightGBM)")
+if ai_brain and ai_brain.is_meta_learner_active():
+    print("        👑 New King: ACTIVE")
+print("        👑 Deep Learning Models (LightGBM)")
 print("        📊 Multi-Timeframe + Risk Manager + Chart CNN")
 print("        🏆 Coin Ranking + Anomaly Detection")
 print("        🎯 Exit Strategy + Pattern Recognition")
@@ -256,6 +256,8 @@ for symbol, pos in loaded.items():
 print(f"\n🤖 Bot started!")
 if ai_brain:
     print(f"🧠 AI Brain: ACTIVE")
+    if ai_brain.is_meta_learner_active():
+        print(f"👑 New King: ACTIVE")
 else:
     print(f"⚙️ AI Brain: DISABLED")
 
