@@ -134,8 +134,6 @@ class StorageManager:
         print("⚠️ Model saving is only supported in cloud mode.")
         return False
 
-    def load_model_from_db(self, model_name):
-        """تحميل نموذج من قاعدة البيانات"""
-        if self.mode == 'cloud' and hasattr(self.storage, 'load_model'):
-            return self.storage.load_model(model_name)
-        return None
+    def load_model(self, model_name):
+        """تحميل نموذج (مثل Meta-Learner) من قاعدة البيانات أو ملف محلي"""
+        return self.storage.load_model(model_name)
