@@ -81,7 +81,16 @@ class AIBrain:
         try:
             # نطلب الموديل باسمه المسجل في قاعدة البيانات (بدون .pkl)
             # الدالة في database_storage هي load_model
-            model_data = self.storage.load_model('meta_learner')
+            if hasattr(self.storage, 'load_model'):
+                model_data = self.storage.load_model('meta_learner')
+            else:
+                # Fallback: Direct DB access if StorageManager wrapper is missing the method
+                from storage.database_storage import DatabaseStorage
+                temp_db = DatabaseStorage()
+                model_data = temp_db.load_model('meta_learner')
+                try: temp_db.conn.close()
+                except: pass
+
             if model_data:
                 # استخدام pickle.loads لتحميل النموذج من البيانات الثنائية
                 self.meta_learner = pickle.loads(model_data)
