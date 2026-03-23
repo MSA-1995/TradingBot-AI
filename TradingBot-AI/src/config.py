@@ -2,7 +2,6 @@
 ⚙️ Configuration Module
 All bot settings and constants
 """
-import os
 
 # Trading Parameters
 MIN_CONFIDENCE = 55
@@ -33,11 +32,7 @@ REPORT_INTERVAL = 30
 # Choose where to store the Discord status message ID: 'database' or 'file'
 # 'database' is recommended for production (uses bot_settings table)
 # 'file' is for local/testing (uses data/bot_status_message_id.txt)
-STATUS_STORAGE_METHOD = 'database' # or 'database'
-
-# Environment detection (determines which database to use)
-# Automatically detects if running on Koyeb or locally
-IS_PRODUCTION = 'KOYEB_APP_NAME' in os.environ
+STATUS_STORAGE_METHOD = 'file' # or 'database'
 
 # قائمة العملات الثابتة (Top 50 by Market Cap - March 2026)
 SYMBOLS = [
