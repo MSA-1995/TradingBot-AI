@@ -1,0 +1,42 @@
+[
+  {
+    "type": "TRAP",
+    "conditions": {
+      "confidence": 60,
+      "rsi": 26.021373460764508,
+      "volume_ratio": null,
+      "macd_diff": NaN,
+      "momentum": null,
+      "trend": null
+    },
+    "result": {
+      "profit_percent": -2.0083335886516154,
+      "symbol": "BNB/USDT"
+    },
+    "success_rate": 0.0,
+    "trades_count": 1,
+    "summary": "BNB/USDT: Confidence 60.0 → -2.01% (TRAP)",
+    "last_updated": "2026-03-21T00:00:10.104764",
+    "timestamp": "2026-03-21T00:00:10.106774"
+  },
+  {
+    "type": "TRAP",
+    "conditions": {
+      "confidence": 60,
+      "rsi": 32.61965360814001,
+      "volume_ratio": null,
+      "macd_diff": NaN,
+      "momentum": null,
+      "trend": null
+    },
+    "result": {
+      "profit_percent": -3.4043842812405245,
+      "symbol": "SUI/USDT"
+    },
+    "success_rate": 0.0,
+    "trades_count": 1,
+    "summary": "SUI/USDT: Confidence 60.0 → -3.40% (TRAP)",
+    "last_updated": "2026-03-21T00:00:17.680174",
+    "timestamp": "2026-03-21T00:00:17.687084"
+  }
+]

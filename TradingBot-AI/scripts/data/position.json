@@ -1,0 +1,25 @@
+{
+  "RENDER/USDT": {
+    "buy_price": 1.681,
+    "amount": 7.138607971445568,
+    "highest_price": 1.681,
+    "buy_time": "2026-03-21T00:15:10.056117",
+    "tp_target": 0,
+    "sl_target": 0,
+    "max_wait_hours": 72,
+    "ai_data": {
+      "confidence": 75,
+      "rsi": 37.455070882407405,
+      "volume": 16021.0,
+      "macd_diff": -0.0001014596661437911,
+      "mtf_score": 0,
+      "risk_score": 0,
+      "anomaly_score": 3,
+      "exit_score": 0,
+      "pattern_score": 2,
+      "ranking_score": 0,
+      "smart_money_score": 15,
+      "liquidity_score": 8
+    }
+  }
+}
