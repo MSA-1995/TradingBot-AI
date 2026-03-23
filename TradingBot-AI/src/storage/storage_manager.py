@@ -125,3 +125,17 @@ class StorageManager:
         if hasattr(self.storage, 'cleanup_old_data'):
             return self.storage.cleanup_old_data()
         return False
+
+    # ========== Model Storage (DB Only) ==========
+    def save_model_to_db(self, model_name, model_data):
+        """حفظ نموذج (مثل Meta-Learner) في قاعدة البيانات"""
+        if self.mode == 'cloud' and hasattr(self.storage, 'save_model'):
+            return self.storage.save_model(model_name, model_data)
+        print("⚠️ Model saving is only supported in cloud mode.")
+        return False
+
+    def load_model_from_db(self, model_name):
+        """تحميل نموذج من قاعدة البيانات"""
+        if self.mode == 'cloud' and hasattr(self.storage, 'load_model'):
+            return self.storage.load_model(model_name)
+        return None
