@@ -193,6 +193,7 @@ if MODELS_ENABLED:
     fibonacci_analyzer = FibonacciAnalyzer()
     smart_money_tracker = SmartMoneyTracker(exchange)
     liquidity_analyzer = LiquidityAnalyzer(exchange)
+    market_mood_analyzer = MarketMoodAnalyzer() # <<< إضافة الخبير الجديد
 else:
     risk_manager = None
     anomaly_detector = None
@@ -201,6 +202,7 @@ else:
     fibonacci_analyzer = None
     smart_money_tracker = None
     liquidity_analyzer = None
+    market_mood_analyzer = None # <<< وإضافته هنا أيضاً
 
 # ========== BANNER ==========
 print("=" * 60)
@@ -436,6 +438,15 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                 except Exception as e:
                     fibonacci_boost = 0
             
+            # Market Mood Analysis (الخبير الاستراتيجي)
+            mood_adjustment = 0
+            if market_mood_analyzer:
+                try:
+                    mood_result = market_mood_analyzer.get_mood_adjustment(symbol)
+                    mood_adjustment = mood_result.get('adjustment', 0)
+                except Exception as e:
+                    mood_adjustment = 0
+            
             # Calculate price drop
             price_drop = {'drop_percent': 0, 'confirmed': False}
             try:
@@ -526,7 +537,8 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     'anomaly': 0,  # Already checked above
                     'exit': 0,
                     'pattern': pattern_adjustment,
-                    'liquidity': liquidity_adjustment
+                    'liquidity': liquidity_adjustment,
+                    'market_mood': mood_adjustment # <<< إضافة نتيجة الخبير
                 }
                 
                 decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop, models_scores, risk_manager)
