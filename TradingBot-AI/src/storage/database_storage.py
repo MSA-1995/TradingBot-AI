@@ -29,7 +29,7 @@ class DatabaseStorage:
                 'database': parsed.path[1:],
                 'user': parsed.username,
                 'password': unquote(parsed.password),
-                'sslmode': 'require',  # إضافة هذا السطر
+                'sslmode': 'prefer',  # استخدام 'prefer' لمرونة أكبر في الاتصال
                 'connect_timeout': 10
             }
         self.conn = psycopg2.connect(**self._db_params)
