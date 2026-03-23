@@ -153,11 +153,6 @@ class DatabaseStorage:
             profit_percent FLOAT,
             timestamp TIMESTAMP DEFAULT NOW()
         );
-        CREATE TABLE IF NOT EXISTS ml_models (
-            model_name VARCHAR(50) PRIMARY KEY,
-            model_data BYTEA NOT NULL,
-            trained_at TIMESTAMP DEFAULT NOW()
-        );
         """
         for attempt in range(3):
             try:
@@ -458,47 +453,27 @@ class DatabaseStorage:
             return []
     
     # ========== Model Storage (King's Brain) ==========
-    def save_model(self, model_name, model_data):
-        """حفظ نموذج (مثل Meta-Learner) في قاعدة البيانات"""
+    def load_model(self, name):
+        """تحميل ملف الموديل"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
         try:
-            conn = self._get_conn()
-            cursor = conn.cursor()
-
-            # استخدام ON CONFLICT للتعامل مع التحديثات
-            cursor.execute("""
-                INSERT INTO ml_models (model_name, model_data, trained_at)
-                VALUES (%s, %s, NOW())
-                ON CONFLICT (model_name) 
-                DO UPDATE SET 
-                    model_data = EXCLUDED.model_data,
-                    trained_at = NOW()
-            """, (model_name, model_data))
-
-            conn.commit()
-            cursor.close()
-            return True
-        except Exception as e:
-            print(f"❌ DB Error saving model {model_name}: {e}")
-            self._get_conn().rollback()
-            return False
-
-    def load_model(self, model_name):
-        """تحميل نموذج من قاعدة البيانات"""
-        try:
-            conn = self._get_conn()
-            cursor = conn.cursor()
-
-            cursor.execute("SELECT model_data FROM ml_models WHERE model_name = %s", (model_name,))
+            cursor.execute("SELECT model_data FROM dl_models_v2 WHERE model_name = %s ORDER BY trained_at DESC LIMIT 1", (name,))
             result = cursor.fetchone()
-
-            cursor.close()
-
             if result and result[0] is not None:
                 return bytes(result[0])
             return None
-        except Exception as e:
-            print(f"❌ DB Error loading model {model_name}: {e}")
+        except self._psycopg2.errors.UndefinedTable:
+            # This happens if dl_models_v2 doesn't exist yet. It's not an error.
+            conn.rollback()
+            print(f"INFO: Table 'dl_models_v2' not found for model '{name}'. This is expected before the first training cycle.")
             return None
+        except Exception as e:
+            print(f"❌ DB Error loading model {name}: {e}")
+            return None
+        finally:
+            if cursor:
+                cursor.close()
     
     # ========== Positions ==========
     def save_positions(self, positions):
