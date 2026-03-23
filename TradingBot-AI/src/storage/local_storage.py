@@ -81,30 +81,6 @@ class LocalStorage:
         filepath = os.path.join(self.base_path, 'learning', 'ai_decisions.json')
         decisions = self._load_json(filepath, [])
         return decisions[-limit:]
-
-    # ========== General Settings ==========
-    def save_setting(self, key, value):
-        """حفظ إعداد في ملف نصي بسيط"""
-        filepath = os.path.join(self.base_path, f"{key}.txt")
-        try:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(str(value))
-            return True
-        except Exception as e:
-            print(f"❌ Error saving setting {key}: {e}")
-            return False
-
-    def load_setting(self, key):
-        """تحميل إعداد من ملف نصي"""
-        filepath = os.path.join(self.base_path, f"{key}.txt")
-        try:
-            if os.path.exists(filepath):
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    return f.read().strip()
-        except Exception as e:
-            print(f"❌ Error loading setting {key}: {e}")
-        return None
-
     
     # ========== Performance ==========
     def save_performance(self, metrics_data):
