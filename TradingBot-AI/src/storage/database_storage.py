@@ -152,6 +152,11 @@ class DatabaseStorage:
             profit_percent FLOAT,
             timestamp TIMESTAMP DEFAULT NOW()
         );
+        CREATE TABLE IF NOT EXISTS learned_models (
+            name VARCHAR(50) PRIMARY KEY,
+            data BYTEA,
+            timestamp TIMESTAMP DEFAULT NOW()
+        );
         """
         for attempt in range(3):
             try:
@@ -437,6 +442,41 @@ class DatabaseStorage:
         except:
             return []
     
+    # ========== Models (Meta-Learner / The King) ==========
+    def save_model(self, name, model_data):
+        """حفظ ملف الموديل (binary)"""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            # model_data should be bytes
+            cursor.execute("""
+                INSERT INTO learned_models (name, data, timestamp)
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (name) DO UPDATE 
+                SET data = EXCLUDED.data, timestamp = NOW();
+            """, (name, self._psycopg2.Binary(model_data)))
+            conn.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"❌ DB save model error: {e}")
+            self._get_conn().rollback()
+            return False
+
+    def load_model(self, name):
+        """تحميل ملف الموديل"""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("SELECT data FROM learned_models WHERE name = %s", (name,))
+            result = cursor.fetchone()
+            cursor.close()
+            if result:
+                return bytes(result[0])
+            return None
+        except Exception as e:
+            print(f"❌ DB load model error: {e}")
+            return None
     
     # ========== Positions ==========
     def save_positions(self, positions):
