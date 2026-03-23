@@ -267,6 +267,7 @@ if MODELS_ENABLED:
     print(f"📊 Fibonacci Analyzer: ACTIVE")
     print(f"🐋 Smart Money Tracker: ACTIVE")
     print(f"💧 Liquidity Analyzer: ACTIVE")
+    print(f"🧐 Market Mood: ACTIVE")
 
 if NEWS_ENABLED:
     print(f"📰 News Sentiment Analyzer: ACTIVE")
