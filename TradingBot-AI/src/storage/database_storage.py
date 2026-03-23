@@ -2,7 +2,6 @@
 التخزين السحابي - Supabase Database
 """
 import os
-import requests
 from datetime import datetime
 try:
     from supabase import create_client, Client
@@ -11,7 +10,6 @@ except:
 
 class DatabaseStorage:
     def __init__(self):
-        self._ensure_ssl_cert()
         database_url = os.getenv('DATABASE_URL')
         
         if not database_url:
@@ -31,8 +29,7 @@ class DatabaseStorage:
                 'database': parsed.path[1:],
                 'user': parsed.username,
                 'password': unquote(parsed.password),
-                'sslmode': 'verify-full',
-                'sslrootcert': 'prod-supabase.cer',
+                'sslmode': 'require',
                 'connect_timeout': 10
             }
         self.conn = psycopg2.connect(**self._db_params)
@@ -92,27 +89,6 @@ class DatabaseStorage:
             print(f"❌ DB Error loading setting {key}: {e}")
             return None
 
-    def _ensure_ssl_cert(self):
-        """Downloads the Supabase SSL certificate if it doesn't exist."""
-        cert_file = 'prod-supabase.cer'
-        if not os.path.exists(cert_file):
-            print("📜 Downloading Supabase SSL certificate...")
-            try:
-                url = 'https://supabase.com/docs/guides/database/connecting-to-postgres#ssl-connection'
-                # This is a placeholder URL. In a real scenario, you'd get the correct cert URL.
-                # For this example, we'll create a dummy file as the actual download is complex.
-                # In a real implementation, you would fetch the actual certificate content.
-                response = requests.get('https://raw.githubusercontent.com/supabase/cli/main/apps/studio/certs/prod-ca-2024.cer')
-                response.raise_for_status()
-                with open(cert_file, 'wb') as f:
-                    f.write(response.content)
-                print("✅ SSL certificate downloaded.")
-            except Exception as e:
-                print(f"❌ Failed to download SSL certificate: {e}")
-                # Depending on the desired behavior, you might want to raise an exception here
-                # or allow the connection to proceed without the certificate.
-                pass
-    
     def _create_tables(self):
         """إنشاء الجداول إذا لم تكن موجودة (مع إعادة محاولة). Returns True on success, False on failure."""
         for attempt in range(3):
