@@ -1,5 +1,5 @@
 ccxt
-nlightgbm
+lightgbm
 cryptography
 requests
 pandas
