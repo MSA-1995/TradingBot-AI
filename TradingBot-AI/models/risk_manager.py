@@ -38,7 +38,13 @@ class RiskManager:
                 avg_loss = 1
             
             b = avg_win / avg_loss
-            kelly_fraction = (win_rate * b - (1 - win_rate)) / b
+
+            # حماية من القسمة على صفر في حال عدم وجود صفقات رابحة تاريخياً
+            if b == 0:
+                # إذا كانت نسبة الربح/الخسارة صفراً، فهذا يعني عدم توقع ربح. جزء كيلي يجب أن يكون صفراً.
+                kelly_fraction = 0
+            else:
+                kelly_fraction = (win_rate * b - (1 - win_rate)) / b
             
             # Kelly محافظ (نصف Kelly)
             kelly_fraction = max(0, min(kelly_fraction * 0.5, 1.0))
