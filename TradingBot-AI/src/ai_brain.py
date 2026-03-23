@@ -82,6 +82,10 @@ class AIBrain:
         
         # 1. التحليل الأساسي
         base_confidence = self._calculate_base_confidence(analysis, mtf, price_drop)
+
+        # Add market mood score to confidence
+        if models_scores and 'market_mood' in models_scores:
+            base_confidence += models_scores.get('market_mood', 0)
         
         # 1.5. شرط تأكيد الانعكاس (جديد)
         reversal_info = analysis.get('reversal', {})
@@ -310,6 +314,7 @@ class AIBrain:
                     'exit_score': models_scores.get('exit', 0) if models_scores else 0,
                     'pattern_score': models_scores.get('pattern', 0) if models_scores else 0,
                     'ranking_score': models_scores.get('ranking', 0) if models_scores else 0,
+                    'market_mood_score': models_scores.get('market_mood', 0) if models_scores else 0,
                     'predicted_tp': 0,
                     'predicted_sl': 0,
                     'predicted_amount': amount,
