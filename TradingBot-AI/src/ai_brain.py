@@ -5,6 +5,8 @@ AI Brain - العقل المفكر
 from datetime import datetime
 import sys
 import os
+import pickle # <<< لاستيراد عقل الملك
+import pandas as pd
 
 # إضافة المسار الصحيح
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -19,6 +21,7 @@ class AIBrain:
         self.boundaries = boundaries
         self.learned_patterns = []
         self.trap_memory = []
+        self.meta_learner = None # <<< الملك الجديد
         
         # إضافة الخبل (Rescue Scalper)
         try:
@@ -30,6 +33,7 @@ class AIBrain:
         
         # تحميل المعرفة السابقة
         self.load_knowledge()
+        self.load_meta_learner() # <<< تحميل عقل الملك
         
         # Smart Money Tracker (optional)
         try:
@@ -71,8 +75,88 @@ class AIBrain:
             print(f"⚠️ Error loading knowledge: {e}")
             self.learned_patterns = []
             self.trap_memory = []
+
+    def load_meta_learner(self):
+        """تحميل عقل الملك الجديد المدرب"""
+        try:
+            # المسار المتوقع لملف تدريب الملك الجديد
+            model_path = os.path.join(project_root, '..', 'MSA-DeepLearning-Trainer', 'meta_learner_model.pkl')
+            if os.path.exists(model_path):
+                with open(model_path, 'rb') as f:
+                    self.meta_learner = pickle.load(f)
+                print("👑🧠 New King's Brain (Meta-Learner) loaded successfully!")
+            else:
+                print("⚠️ Meta-Learner model not found. The old king will rule.")
+                self.meta_learner = None
+        except Exception as e:
+            print(f"❌ Error loading Meta-Learner model: {e}")
+            self.meta_learner = None
+
+    def is_meta_learner_active(self):
+        """Check if the new king is ruling"""
+        return self.meta_learner is not None
     
     def should_buy(self, symbol, analysis, mtf, price_drop, models_scores=None, risk_manager=None):
+        """
+        القرار الذكي: هل نشتري؟ (باستخدام الملك الجديد)
+        """
+        # إذا كان الملك الجديد موجوداً، استخدمه. وإلا، استخدم النظام القديم.
+        if self.meta_learner:
+            return self.should_buy_with_meta_learner(symbol, analysis, models_scores, risk_manager)
+        else:
+            return self.should_buy_old_system(symbol, analysis, mtf, price_drop, models_scores, risk_manager)
+
+    def should_buy_with_meta_learner(self, symbol, analysis, models_scores, risk_manager):
+        """القرار باستخدام الملك الجديد (Meta-Learner)"""
+        
+        models_scores = models_scores or {}
+        
+        # 1. جمع آراء المستشارين (المدخلات للملك)
+        # يجب أن يكون ترتيبهم بنفس ترتيب التدريب بالضبط
+        feature_names = [
+            'ai_brain', 'smart_money', 'risk', 'anomaly', 'exit', 
+            'pattern', 'liquidity', 'chart_cnn', 'rescue'
+        ]
+        consultant_opinions = [models_scores.get(name, 0) for name in feature_names]
+
+        # 2. استشارة الملك الجديد
+        try:
+            # تحويل الآراء إلى تنسيق مناسب للملك (DataFrame with feature names)
+            opinions_df = pd.DataFrame([consultant_opinions], columns=feature_names)
+            
+            # الحصول على القرار ونسبة الثقة
+            prediction = self.meta_learner.predict(opinions_df)[0]
+            probability = self.meta_learner.predict_proba(opinions_df)[0]
+            
+            confidence = int(probability[1] * 100) # الثقة هي احتمالية الشراء
+
+        except Exception as e:
+            print(f"❌ Meta-Learner prediction error: {e}")
+            return {'action': 'SKIP', 'reason': 'Meta-Learner error', 'confidence': 0}
+
+        # 3. القرار النهائي بناءً على رأي الملك
+        if prediction == 1 and confidence >= 55:
+            amount = self._calculate_smart_amount(symbol, confidence, analysis, risk_manager=risk_manager)
+            decision = {
+                'action': 'BUY',
+                'confidence': confidence,
+                'amount': amount,
+                'reason': f'Meta-Learner approved with {confidence}% confidence',
+                # ... (يمكن إضافة بيانات أخرى هنا إذا لزم الأمر)
+            }
+            # لا داعي لحفظ القرار هنا، سيتم حفظه في trading_bot
+            return decision
+        else:
+            reason = f'Meta-Learner rejected with {confidence}% confidence'
+            if prediction == 0:
+                reason = f'Meta-Learner voted SKIP'
+            elif confidence < 55:
+                reason = f'Meta-Learner confidence {confidence}% < 55%'
+
+            return {'action': 'SKIP', 'reason': reason, 'confidence': confidence}
+
+
+    def should_buy_old_system(self, symbol, analysis, mtf, price_drop, models_scores=None, risk_manager=None):
         """
         القرار الذكي: هل نشتري؟
         models_scores: dict with scores from all models (optional)
