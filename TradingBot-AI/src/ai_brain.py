@@ -79,17 +79,8 @@ class AIBrain:
     def load_meta_learner(self):
         """تحميل عقل الملك الجديد المدرب من قاعدة البيانات"""
         try:
-            # نطلب الموديل باسمه المسجل في قاعدة البيانات (بدون .pkl)
-            # الدالة في database_storage هي load_model
-            if hasattr(self.storage, 'load_model'):
-                model_data = self.storage.load_model('meta_learner')
-            else:
-                # Fallback: Direct DB access if StorageManager wrapper is missing the method
-                from storage.database_storage import DatabaseStorage
-                temp_db = DatabaseStorage()
-                model_data = temp_db.load_model('meta_learner')
-                try: temp_db.conn.close()
-                except: pass
+            # Use the correct function `load_model` and the correct model name `meta_learner`
+            model_data = self.storage.load_model('meta_learner')
 
             if model_data:
                 # استخدام pickle.loads لتحميل النموذج من البيانات الثنائية
