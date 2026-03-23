@@ -102,7 +102,7 @@ class DatabaseStorage:
                 # This is a placeholder URL. In a real scenario, you'd get the correct cert URL.
                 # For this example, we'll create a dummy file as the actual download is complex.
                 # In a real implementation, you would fetch the actual certificate content.
-                response = requests.get('https://raw.githubusercontent.com/supabase/supabase/master/apps/studio/assets/images/guides/database/prod-supabase.cer')
+                response = requests.get('https://raw.githubusercontent.com/supabase/cli/main/apps/studio/certs/prod-ca-2024.cer')
                 response.raise_for_status()
                 with open(cert_file, 'wb') as f:
                     f.write(response.content)
