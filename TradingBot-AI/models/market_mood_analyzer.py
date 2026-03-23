@@ -14,7 +14,7 @@ class MarketMoodAnalyzer:
         """
         تهيئة المحلل مع نظام الكاش المشترك والقفل
         """
-        print("🧠 Market Mood Analyzer v3 (Locking) initialized")
+        # print("🧠 Market Mood Analyzer v3 (Locking) initialized")
         self.fear_and_greed_api = "https://api.alternative.me/fng/?limit=1"
         self.btc_dominance_api = "https://api.coingecko.com/api/v3/global"
         self.cache_duration = cache_duration
@@ -43,7 +43,8 @@ class MarketMoodAnalyzer:
             if os.path.exists(self.lock_file_path):
                 os.remove(self.lock_file_path)
         except OSError as e:
-            print(f"⚠️ MarketMood: خطأ في تحرير القفل: {e}")
+            # print(f"⚠️ MarketMood: خطأ في تحرير القفل: {e}")
+            pass
 
     def _read_cache(self):
         """قراءة البيانات من ملف الكاش"""
@@ -62,12 +63,13 @@ class MarketMoodAnalyzer:
             with open(self.cache_file_path, 'w') as f:
                 json.dump(data, f, indent=4)
         except IOError as e:
-            print(f"⚠️ MarketMood: خطأ في كتابة ملف الكاش: {e}")
+            # print(f"⚠️ MarketMood: خطأ في كتابة ملف الكاش: {e}")
+            pass
 
     def _fetch_all_data(self):
         """جلب جميع بيانات السوق وتحديث الكاش بأمان"""
         if not self._acquire_lock():
-            print("⚠️ MarketMood: فشل في الحصول على القفل، سيتم إعادة محاولة القراءة.")
+            # print("⚠️ MarketMood: فشل في الحصول على القفل، سيتم إعادة محاولة القراءة.")
             time.sleep(1)
             return self._read_cache()
         
@@ -75,10 +77,10 @@ class MarketMoodAnalyzer:
             # إعادة فحص الكاش بعد الحصول على القفل (قد يكون خيط آخر قد قام بالتحديث)
             cache = self._read_cache()
             if cache and (time.time() - cache.get('last_fetch_time', 0)) <= self.cache_duration:
-                print("ℹ️ MarketMood: الكاش تم تحديثه بواسطة عملية أخرى أثناء الانتظار.")
+                # print("ℹ️ MarketMood: الكاش تم تحديثه بواسطة عملية أخرى أثناء الانتظار.")
                 return cache
 
-            print("🔄 MarketMood: تحديث بيانات مزاج السوق من API...")
+            # print("🔄 MarketMood: تحديث بيانات مزاج السوق من API...")
             fng_data = None
             btc_dominance = None
 
@@ -89,14 +91,16 @@ class MarketMoodAnalyzer:
                 data = response.json()['data'][0]
                 fng_data = {'value': int(data['value']), 'classification': data['value_classification']}
             except Exception as e:
-                print(f"⚠️ MarketMood: فشل جلب مؤشر الخوف والطمع: {e}")
+                # print(f"⚠️ MarketMood: فشل جلب مؤشر الخوف والطمع: {e}")
+                pass
 
             try:
                 response = requests.get(self.btc_dominance_api, timeout=10)
                 response.raise_for_status()
                 btc_dominance = response.json()['data']['market_cap_percentage']['btc']
             except Exception as e:
-                print(f"⚠️ MarketMood: فشل جلب هيمنة البيتكوين: {e}")
+                # print(f"⚠️ MarketMood: فشل جلب هيمنة البيتكوين: {e}")
+                pass
 
             # تحديث الكاش بالبيانات الجديدة
             new_cache_data = self._read_cache() or {}
