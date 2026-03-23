@@ -14,7 +14,7 @@ class MarketMoodAnalyzer:
         """
         تهيئة المحلل مع نظام الكاش المشترك والقفل
         """
-        # print("🧠 Market Mood Analyzer v3 (Locking) initialized")
+        print("🧐 Market Mood Analyzer initialized")
         self.fear_and_greed_api = "https://api.alternative.me/fng/?limit=1"
         self.btc_dominance_api = "https://api.coingecko.com/api/v3/global"
         self.cache_duration = cache_duration
