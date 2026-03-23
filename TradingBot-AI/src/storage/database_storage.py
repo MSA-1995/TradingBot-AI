@@ -468,7 +468,8 @@ class DatabaseStorage:
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
-            cursor.execute("SELECT data FROM learned_models WHERE name = %s", (name,))
+            # القراءة من الجدول الموحد dl_models_v2
+            cursor.execute("SELECT model_data FROM dl_models_v2 WHERE model_name = %s ORDER BY trained_at DESC LIMIT 1", (name,))
             result = cursor.fetchone()
             cursor.close()
             if result:
