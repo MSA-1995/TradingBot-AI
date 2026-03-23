@@ -105,6 +105,7 @@ try:
     from models.fibonacci_analyzer import FibonacciAnalyzer
     from models.smart_money_tracker import SmartMoneyTracker
     from models.liquidity_analyzer import LiquidityAnalyzer
+    from models.market_mood_analyzer import MarketMoodAnalyzer # <<< استيراد الخبير الجديد
     
     MODELS_ENABLED = True
 except Exception as e:
