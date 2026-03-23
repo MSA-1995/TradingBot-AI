@@ -153,10 +153,10 @@ class DatabaseStorage:
             profit_percent FLOAT,
             timestamp TIMESTAMP DEFAULT NOW()
         );
-        CREATE TABLE IF NOT EXISTS learned_models (
-            name VARCHAR(50) PRIMARY KEY,
-            data BYTEA,
-            timestamp TIMESTAMP DEFAULT NOW()
+        CREATE TABLE IF NOT EXISTS ml_models (
+            model_name VARCHAR(50) PRIMARY KEY,
+            model_data BYTEA NOT NULL,
+            trained_at TIMESTAMP DEFAULT NOW()
         );
         """
         for attempt in range(3):
@@ -457,53 +457,48 @@ class DatabaseStorage:
         except:
             return []
     
-    # ========== Models (Meta-Learner / The King) ==========
-    def save_model(self, name, model_data):
-        """حفظ ملف الموديل (binary)"""
+    # ========== Model Storage (King's Brain) ==========
+    def save_model(self, model_name, model_data):
+        """حفظ نموذج (مثل Meta-Learner) في قاعدة البيانات"""
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
-            # model_data should be bytes
+
+            # استخدام ON CONFLICT للتعامل مع التحديثات
             cursor.execute("""
-                INSERT INTO learned_models (name, data, timestamp)
+                INSERT INTO ml_models (model_name, model_data, trained_at)
                 VALUES (%s, %s, NOW())
-                ON CONFLICT (name) DO UPDATE 
-                SET data = EXCLUDED.data, timestamp = NOW();
-            """, (name, self._psycopg2.Binary(model_data)))
+                ON CONFLICT (model_name) 
+                DO UPDATE SET 
+                    model_data = EXCLUDED.model_data,
+                    trained_at = NOW()
+            """, (model_name, model_data))
+
             conn.commit()
             cursor.close()
             return True
         except Exception as e:
-            print(f"❌ DB save model error: {e}")
+            print(f"❌ DB Error saving model {model_name}: {e}")
             self._get_conn().rollback()
             return False
 
-    def load_model(self, name):
-        """تحميل ملف الموديل"""
-        conn = self._get_conn()
-        cursor = conn.cursor()
+    def load_model(self, model_name):
+        """تحميل نموذج من قاعدة البيانات"""
         try:
-            # First, try to load from the new table dl_models_v2
-            cursor.execute("SELECT model_data FROM dl_models_v2 WHERE model_name = %s ORDER BY trained_at DESC LIMIT 1", (name,))
-            result = cursor.fetchone()
-            if result and result[0] is not None:
-                return bytes(result[0])
-            
-            # If not found, fall back to the old table 'learned_models' for compatibility
-            print(f"⚠️ Model '{name}' not found in dl_models_v2, falling back to learned_models.")
-            cursor.execute("SELECT data FROM learned_models WHERE name = %s ORDER BY timestamp DESC LIMIT 1", (name,))
-            result = cursor.fetchone()
-            if result and result[0] is not None:
-                return bytes(result[0])
+            conn = self._get_conn()
+            cursor = conn.cursor()
 
+            cursor.execute("SELECT model_data FROM ml_models WHERE model_name = %s", (model_name,))
+            result = cursor.fetchone()
+
+            cursor.close()
+
+            if result and result[0] is not None:
+                return bytes(result[0])
             return None
         except Exception as e:
-            print(f"❌ DB load model error for '{name}': {e}")
+            print(f"❌ DB Error loading model {model_name}: {e}")
             return None
-        finally:
-            # Ensure the cursor is always closed to prevent resource leaks
-            if cursor:
-                cursor.close()
     
     # ========== Positions ==========
     def save_positions(self, positions):
@@ -569,62 +564,3 @@ class DatabaseStorage:
             print(f"❌ DB load positions error: {e}")
             self._get_conn().rollback()
             return {}
-    
-    # ========== Performance ==========
-    def save_performance(self, metrics_data):
-        return True
-    
-    def load_performance(self, days=7):
-        return []
-
-    # ========== Model Storage (King's Brain) ==========
-    def save_model(self, model_name, model_data):
-        """حفظ نموذج (مثل Meta-Learner) في قاعدة البيانات"""
-        try:
-            conn = self._get_conn()
-            cursor = conn.cursor()
-            
-            # التأكد من وجود الجدول
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS ml_models (
-                    model_name VARCHAR(50) PRIMARY KEY,
-                    model_data BYTEA NOT NULL,
-                    trained_at TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            
-            # استخدام ON CONFLICT للتعامل مع التحديثات
-            cursor.execute("""
-                INSERT INTO ml_models (model_name, model_data)
-                VALUES (%s, %s)
-                ON CONFLICT (model_name) 
-                DO UPDATE SET 
-                    model_data = EXCLUDED.model_data,
-                    trained_at = NOW()
-            """, (model_name, model_data))
-            
-            conn.commit()
-            cursor.close()
-            return True
-        except Exception as e:
-            print(f"❌ DB Error saving model {model_name}: {e}")
-            self._get_conn().rollback()
-            return False
-
-    def load_model(self, model_name):
-        """تحميل نموذج من قاعدة البيانات"""
-        try:
-            conn = self._get_conn()
-            cursor = conn.cursor()
-            
-            cursor.execute("SELECT model_data FROM ml_models WHERE model_name = %s", (model_name,))
-            result = cursor.fetchone()
-            
-            cursor.close()
-            
-            if result:
-                return result[0]
-            return None
-        except Exception as e:
-            print(f"❌ DB Error loading model {model_name}: {e}")
-            return None
