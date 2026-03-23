@@ -79,8 +79,9 @@ class AIBrain:
     def load_meta_learner(self):
         """تحميل عقل الملك الجديد المدرب من قاعدة البيانات"""
         try:
-            # محاولة تحميل النموذج من قاعدة البيانات
-            model_data = self.storage.load_model_from_db('meta_learner_model.pkl')
+            # نطلب الموديل باسمه المسجل في قاعدة البيانات (بدون .pkl)
+            # الدالة في database_storage هي load_model
+            model_data = self.storage.load_model('meta_learner')
             if model_data:
                 # استخدام pickle.loads لتحميل النموذج من البيانات الثنائية
                 self.meta_learner = pickle.loads(model_data)
