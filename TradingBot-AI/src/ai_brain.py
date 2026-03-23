@@ -79,7 +79,6 @@ class AIBrain:
     def load_meta_learner(self):
         """تحميل عقل الملك الجديد المدرب من قاعدة البيانات"""
         try:
-            # Use the correct function `load_model` and the correct model name `meta_learner`
             model_data = self.storage.load_model('meta_learner')
 
             if model_data:
