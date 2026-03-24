@@ -69,7 +69,7 @@ from utils import calculate_dynamic_confidence, get_active_positions_count, get_
 from storage import StorageManager
 from capital_manager import CapitalManager  # إدارة رأس المال
 
-# AI Brain
+# Meta Brain
 AI_BOUNDARIES = {
     'min_confidence': 30,  # Very low for testing only!
     'max_confidence': 75,
@@ -81,11 +81,12 @@ AI_BOUNDARIES = {
     'max_daily_loss': 5.0
 }
 
+# Meta (The King)
 try:
-    from ai_brain import AIBrain
+    from meta import Meta
     AI_ENABLED = True
 except Exception as e:
-    print(f"⚠️ AI Brain not loaded: {e}")
+    print(f"⚠️ Meta not loaded: {e}")
     AI_ENABLED = False
 
 # Advanced Models
@@ -121,6 +122,8 @@ try:
             print("🧠 Deep Learning: ACTIVE")
             models_status = dl_client.get_models_status()
             for model_name, status in models_status.items():
+                if model_name == 'ai_brain':
+                    continue
                 print(f"   {model_name}: {status['accuracy']*100:.1f}%")
         else:
             print("⚠️ Deep Learning: Models not trained yet")
@@ -180,8 +183,13 @@ except Exception as e:
 # Capital Manager
 capital_manager = CapitalManager(max_capital=MAX_CAPITAL, profit_reserve=PROFIT_RESERVE)
 
-# AI Brain
-ai_brain = AIBrain(AI_BOUNDARIES) if AI_ENABLED else None
+# Rescue Scalper (الخبل)
+try:
+    from models.rescue_scalper import RescueScalper
+    rescue_scalper = RescueScalper()
+except Exception as e:
+    print(f"⚠️ Rescue Scalper not loaded: {e}")
+    rescue_scalper = None
 
 # Advanced Models
 if MODELS_ENABLED:
@@ -203,6 +211,9 @@ else:
     liquidity_analyzer = None
     market_mood_analyzer = None # <<< وإضافته هنا أيضاً
 
+# Meta (The King)
+meta = Meta(dl_client=dl_client, risk_manager=risk_manager, rescue_scalper=rescue_scalper, storage=storage) if AI_ENABLED else None
+
 # ========== BANNER ==========
 print("=" * 60)
 print("\n  ███╗   ███╗███████╗ █████╗ ")
@@ -214,8 +225,8 @@ print("  ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝\n")
 print("  ✦•······················•✦•······················•✦")
 print("        🚀 MSA Smart Trading Bot")
 print("        💰 Binance Testnet - AI Powered")
-if ai_brain and ai_brain.is_meta_learner_active():
-    print("        👑 New King: ACTIVE")
+if meta and meta.is_active():
+    print("        👑 The King (Meta): ACTIVE")
 print("        👑 Deep Learning Models (LightGBM)")
 print("        📊 Multi-Timeframe + Risk Manager + Chart CNN")
 print("        🏆 Coin Ranking + Anomaly Detection")
@@ -254,12 +265,10 @@ for symbol, pos in loaded.items():
         print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f}")
 
 print(f"\n🤖 Bot started!")
-if ai_brain:
-    print(f"🧠 AI Brain: ACTIVE")
-    if ai_brain.is_meta_learner_active():
-        print(f"👑 New King: ACTIVE")
+if meta:
+    print(f"👑 Meta King: ACTIVE")
 else:
-    print(f"⚙️ AI Brain: DISABLED")
+    print(f"⚙️ Meta King: DISABLED")
 
 if MODELS_ENABLED:
     print(f"🛡️ Risk Manager: ACTIVE")
@@ -334,18 +343,19 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             # Get MTF from analysis (cache) - تحسين السرعة
             mtf = analysis.get('mtf') if analysis else None
             
-            # AI Brain (الملك) - المسؤول الوحيد عن البيع
-            if ai_brain:
+            # Meta (The King) - The Ultimate Decision Maker
+            sell_decision = {'action': 'HOLD', 'reason': 'AI not enabled'}
+            if meta:
                 if mtf is None:
                     mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
                 
-                # الملك يقرر (بالتصويت فقط)
-                sell_decision = ai_brain.should_sell(
+                # The King decides
+                sell_decision = meta.should_sell(
                     symbol, position, current_price, analysis, mtf
                 )
                 
                 if sell_decision and sell_decision.get('action') == 'SELL':
-                    sell_reason = sell_decision.get('reason', 'AI Sell')
+                    sell_reason = sell_decision.get('reason', 'Meta Sell')
                     profit_percent = sell_decision.get('profit', profit_percent)
                 elif sell_decision and sell_decision.get('action') == 'HOLD':
                     return {
@@ -358,15 +368,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'reason': sell_decision.get('reason', 'Hold')
                     }
             else:
-                # Fallback: لو AI Brain مو موجود (نادر جداً)
-                # Trailing Stop -2% هو الحماية الوحيدة
-                if mtf is None:
-                    mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
-                
-                # ما في stop loss ثابت - الحماية عبر:
-                # 1. تصويت المستشارين (-0.8% إلى -1.2%)
-                # 2. Trailing Stop -2% (جدار نهائي)
-                
+                # Fallback: if Meta is not enabled
                 return {
                     'symbol': symbol,
                     'action': 'HOLD',
@@ -374,7 +376,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     'profit': profit_percent,
                     'buy_price': buy_price,
                     'highest': highest_price,
-                    'reason': 'Hold - waiting for consultants vote'
+                    'reason': 'Hold - Meta is disabled'
                 }
             
             # Execute sell
@@ -531,53 +533,30 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                 except Exception as e:
                     pattern_adjustment = 0
             
-            # AI Decision
-            if ai_brain:
+            # Meta (The King) Decision
+            if meta:
                 # Collect all models scores
                 models_scores = {
+                    'risk': risk_manager.get_risk_score(symbol, analysis) if risk_manager else 0,
+                    'anomaly': anomaly_adjustment,
+                    'exit': exit_strategy.get_exit_score(symbol, analysis) if exit_strategy else 0,
+                    'pattern': pattern_recognizer.get_pattern_score(symbol, analysis) if pattern_recognizer else 0,
                     'smart_money': smart_money_boost,
                     'fibonacci': fibonacci_boost,
-                    'risk': 0,  # Will be calculated below
-                    'anomaly': 0,  # Already checked above
-                    'exit': 0,
-                    'pattern': pattern_adjustment,
                     'liquidity': liquidity_adjustment,
-                    'market_mood': mood_adjustment # <<< إضافة نتيجة الخبير
+                    'market_mood': mood_adjustment,
+                    'news': news_adjustment,
+                    'mtf': mtf.get('score', 0) if mtf else 0,
+                    'chart_cnn': 0, # Placeholder
+                    'rescue': 0, # Placeholder
+                    'base_confidence': confidence # The base score from the old brain logic
                 }
                 
-                decision = ai_brain.should_buy(symbol, analysis, mtf, price_drop, models_scores, risk_manager)
-                
-                # Apply all adjustments
-                try:
-                    smart_money_boost = 0 if smart_money_boost is None else smart_money_boost
-                    fibonacci_boost = 0 if fibonacci_boost is None else fibonacci_boost
-                    liquidity_adjustment = 0 if liquidity_adjustment is None else liquidity_adjustment
-                    pattern_adjustment = 0 if pattern_adjustment is None else pattern_adjustment
-                    news_adjustment = 0 if news_adjustment is None else news_adjustment
-                    
-                    # Deep Learning adjustment (6 Models)
-                    dl_adjustment = 0
-                    if dl_client and DL_ENABLED:
-                        try:
-                            dl_decision = dl_client.get_buy_decision(symbol, analysis)
-                            if dl_decision['action'] == 'SKIP':
-                                return {
-                                    'symbol': symbol,
-                                    'action': 'SKIP',
-                                    'reason': f"DL: {dl_decision['reason']}"
-                                }
-                            dl_adjustment = dl_decision.get('confidence_adjustment', 0)
-                        except:
-                            dl_adjustment = 0
-                    
-                    total_adjustment = smart_money_boost + fibonacci_boost + liquidity_adjustment + pattern_adjustment + news_adjustment + anomaly_adjustment + dl_adjustment
-                    if total_adjustment != 0:
-                        decision['confidence'] = min(75, max(60, decision['confidence'] + total_adjustment))
-                except Exception as e:
-                    total_adjustment = 0
-                
+                # The King decides
+                decision = meta.should_buy(symbol, analysis, models_scores)
+
                 if decision['action'] == 'BUY':
-                    # Amount already calculated by AI Brain with Risk Manager voting
+                    # Amount already calculated by Meta with Risk Manager voting
                     amount_usd = decision['amount']
                     
                     return {
@@ -637,7 +616,6 @@ ctx = {
     'sell_cooldown':        sell_cooldown,
     'storage':              storage,
     'capital_manager':      capital_manager,
-    'ai_brain':             ai_brain,
     'risk_manager':         risk_manager,
     'anomaly_detector':     anomaly_detector,
     'exit_strategy':        exit_strategy,
