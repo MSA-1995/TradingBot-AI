@@ -51,7 +51,7 @@ class Meta:
             return {'action': 'SKIP', 'reason': 'Catastrophic news detected', 'confidence': 0}
 
         if not self.is_active():
-            return {'action': 'SKIP', 'reason': 'Meta-Learner is not active', 'confidence': 0}
+            return {'action': 'DISPLAY', 'reason': 'Meta-Learner NOT ACTIVE', 'confidence': 0}
 
         models_scores = models_scores or {}
         
@@ -119,7 +119,8 @@ class Meta:
             elif confidence < 55:
                 reason = f'Meta confidence {confidence}% < 55%'
 
-            return {'action': 'SKIP', 'reason': reason, 'confidence': confidence}
+            # THIS IS THE FIX: Return 'DISPLAY' instead of 'SKIP'
+            return {'action': 'DISPLAY', 'reason': reason, 'confidence': confidence}
 
     def should_sell(self, symbol, position, current_price, analysis, mtf):
         """القرار الذكي: هل نبيع؟ (الملك يقرر مع استشارة المستشارين)"""
