@@ -33,15 +33,11 @@ def process_buy(result, exchange, ctx):
     news_display = f" | {result['news_summary']}" if result.get('news_summary') else ""
 
     voting_display = ""
-    if 'decision' in result:
-        decision = result['decision']
-        buy_vote_percentage = decision.get('buy_vote_percentage', 0)
+    buy_vote_percentage = result.get('buy_vote_percentage')
+    if buy_vote_percentage is not None:
         voting_display = f" | 🗳️ Buy:{buy_vote_percentage:.0f}% Amount:${result['amount']:.0f}"
 
-    if 'decision' in result:
-        print(f"{Fore.GREEN}🟢 BUY {symbol} | Meta Confidence:{result['confidence']}{voting_display}{news_display}{Style.RESET_ALL}")
-    else:
-        print(f"{Fore.GREEN}🟢 BUY {symbol} | Confidence:{result['confidence']}/120 | ${result['amount']}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}🟢 BUY {symbol} | Meta Confidence:{result['confidence']}{voting_display}{news_display}{Style.RESET_ALL}")
 
     buy_result = execute_buy(exchange, symbol, result['amount'], result['price'], result['confidence'])
     if not buy_result['success']:
@@ -50,16 +46,9 @@ def process_buy(result, exchange, ctx):
     # Extract voting results if available
     tp_target = None
     sl_target = None
-    buy_vote_percentage = None
-    buy_vote_count = None
-    total_consultants = None
-
-    if 'decision' in result:
-        tp_target          = None
-        sl_target          = None
-        buy_vote_percentage = result['decision'].get('buy_vote_percentage')
-        buy_vote_count     = result['decision'].get('buy_vote_count')
-        total_consultants  = result['decision'].get('total_consultants')
+    buy_vote_percentage = result.get('buy_vote_percentage')
+    buy_vote_count = result.get('buy_vote_count')
+    total_consultants = result.get('total_consultants')
 
     send_buy_notification(
         symbol, buy_result['amount'], result['price'], result['amount'],
