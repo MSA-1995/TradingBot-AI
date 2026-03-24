@@ -212,7 +212,7 @@ else:
     market_mood_analyzer = None # <<< وإضافته هنا أيضاً
 
 # Meta (The King)
-meta = Meta(dl_client=dl_client, risk_manager=risk_manager, rescue_scalper=rescue_scalper, storage=storage) if AI_ENABLED else None
+meta = Meta(dl_client=dl_client, risk_manager=risk_manager, rescue_scalper=rescue_scalper, storage=storage, news_analyzer=news_analyzer) if AI_ENABLED else None
 
 # ========== BANNER ==========
 print("=" * 60)
