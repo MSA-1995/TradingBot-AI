@@ -10,7 +10,7 @@ from colorama import Fore, Style
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import get_active_positions_count, get_total_invested, should_send_report, format_price
-from notifications import send_positions_report, send_heartbeat_notification
+from notifications import send_positions_report
 from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRADE, MAX_CAPITAL
 
 from bot.sell_handler import process_sell
@@ -42,7 +42,6 @@ def run_main_loop(exchange, ctx):
         loop_count = 0
         available  = 0
         last_report_time = datetime.now()
-        last_heartbeat_time = time.time()
 
         while True:
             loop_count += 1
@@ -284,15 +283,6 @@ def run_main_loop(exchange, ctx):
                         print(f"⚠️ Pattern stats error: {e}")
 
                 last_report_time = datetime.now()
-
-            # Heartbeat (every 60 seconds)
-            # Heartbeat (every 10 minutes)
-            if time.time() - last_heartbeat_time >= 600: # 600 seconds = 10 minutes
-                try:
-                    send_heartbeat_notification()
-                except Exception:
-                    pass
-                last_heartbeat_time = time.time()
 
             # Cleanup
             gc.collect()
