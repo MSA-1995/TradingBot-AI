@@ -76,7 +76,11 @@ def get_market_analysis(exchange, symbol, limit=60):
         # ========== الإضافات الجديدة (5 مؤشرات) ==========
         
         # 1. ATR (Average True Range) - للمخاطرة
-        df['atr'] = ta.volatility.AverageTrueRange(high=df['high'], low=df['low'], close=df['close'], window=14).average_true_range()
+        df['high_low'] = df['high'] - df['low']
+        df['high_close'] = abs(df['high'] - df['close'].shift())
+        df['low_close'] = abs(df['low'] - df['close'].shift())
+        df['true_range'] = df[['high_low', 'high_close', 'low_close']].max(axis=1)
+        df['atr'] = df['true_range'].rolling(window=14).mean()
         df['atr'] = df['atr'].fillna(1.0)
         
         # 2. EMA 9/21 Crossover - للأنماط
@@ -178,7 +182,7 @@ def get_market_analysis(exchange, symbol, limit=60):
             'df': df,
             'mtf': mtf_analysis,  # إضافة تحليل multi-timeframe
             # الإضافات الجديدة
-            'atr': latest['atr'] if 'atr' in latest and not pd.isna(latest['atr']) else 0,
+            'atr': latest['atr'],
             'ema_9': latest['ema_9'],
             'ema_21': latest['ema_21'],
             'ema_crossover': latest['ema_crossover'],
