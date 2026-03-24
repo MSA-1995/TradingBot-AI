@@ -261,7 +261,7 @@ def send_startup_notification():
     STARTUP_TIME = now_str
     title = "BOT RESTARTED"
     fields = [
-        {"name": "Meta", "value": "ACTIVE", "inline": False},
+        {"name": "TradingBot-AI Script", "value": "ACTIVE", "inline": False},
         {"name": "Last update", "value": datetime.now().strftime('%H:%M:%S'), "inline": False},
         {"name": "Last Restart", "value": now_str, "inline": False}
     ]
@@ -296,7 +296,7 @@ def send_heartbeat_notification():
 
     title = "BOT RESTARTED"
     fields = [
-        {"name": "Meta", "value": "ACTIVE", "inline": False},
+        {"name": "TradingBot-AI Script", "value": "ACTIVE", "inline": False},
         {"name": "Last update", "value": datetime.now().strftime('%H:%M:%S'), "inline": False},
         {"name": "Last Restart", "value": restart_time, "inline": False}
     ]
