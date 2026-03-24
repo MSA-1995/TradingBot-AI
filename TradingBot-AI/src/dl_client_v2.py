@@ -41,20 +41,20 @@ class DeepLearningClientV2:
             print(f"⚠️ DL Client V2 reconnect error: {e}")
         return self.conn
     
-    def get_model_accuracy(self, model_name):
-        """الحصول على دقة موديل معين"""
+    def get_model_data(self, model_name):
+        """يجلب البيانات الثنائية (binary data) لنموذج معين من قاعدة البيانات."""
         try:
             conn = self._get_conn()
             if not conn:
-                return 0
+                print(f"⚠️ DL Client: No DB connection to get model data for {model_name}.")
+                return None
             
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             
             cursor.execute("""
-                SELECT accuracy
+                SELECT model_data
                 FROM dl_models_v2
                 WHERE model_name = %s
-                AND status = 'active'
                 ORDER BY trained_at DESC
                 LIMIT 1
             """, (model_name,))
@@ -62,12 +62,17 @@ class DeepLearningClientV2:
             result = cursor.fetchone()
             cursor.close()
             
-            if result:
-                return result.get('accuracy', 0)
-            return 0
+            if result and result.get('model_data'):
+                # The data is returned as a memoryview, which is what pickle.loads expects
+                return result['model_data']
+            else:
+                print(f"⚠️ DL Client: Model data for '{model_name}' not found in the database.")
+                return None
         
         except Exception as e:
-            return 0
+            print(f"❌ DL Client: Error getting model data for {model_name}: {e}")
+            return None
+
     
     def get_mtf_prediction(self, rsi, macd, volume_ratio, price_momentum):
         """
@@ -457,48 +462,7 @@ class DeepLearningClientV2:
             votes[key] = max(-2.0, min(-0.1, votes[key]))
         
         return votes
-    
-    def get_ai_brain_prediction(self, rsi, macd, volume_ratio, price_momentum, confidence, 
-                                mtf_score=0, risk_score=0, anomaly_score=0, 
-                                exit_score=0, pattern_score=0, ranking_score=0, cnn_score=0):
-        """
-        👑 AI Brain: القرار النهائي (يستشير 7 مستشارين)
-        Returns: should_buy (bool), confidence_boost
-        """
-        accuracy = self.get_model_accuracy('ai_brain')
-        
-        if accuracy < 0.55:
-            return {'should_buy': True, 'confidence_boost': 0}  # neutral
-        
-        # الملك يحلل كل شي
-        brain_score = 0
-        
-        # تحليل المؤشرات الأساسية
-        if rsi < 30 and macd > 0:
-            brain_score += 3
-        if volume_ratio > 1.5:
-            brain_score += 2
-        if confidence >= 70:
-            brain_score += 2
-        
-        # تحليل المستشارين
-        if mtf_score > 5:
-            brain_score += 2
-        if risk_score < 0:  # مخاطر عالية
-            brain_score -= 3
-        if anomaly_score > 0:  # شذوذ
-            brain_score -= 2
-        if pattern_score > 0:
-            brain_score += 2
-        
-        # القرار النهائي
-        if brain_score >= 5:
-            boost = int(10 * (accuracy - 0.5))  # كلما زادت الدقة، زاد التأثير
-            return {'should_buy': True, 'confidence_boost': boost}
-        elif brain_score <= -3:
-            return {'should_buy': False, 'confidence_boost': -10}
-        else:
-            return {'should_buy': True, 'confidence_boost': 0}
+
     
     def get_buy_decision(self, symbol, analysis):
         """
