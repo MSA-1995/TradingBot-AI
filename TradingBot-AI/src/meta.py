@@ -9,11 +9,12 @@ import os
 from datetime import datetime
 
 class Meta:
-    def __init__(self, dl_client=None, risk_manager=None, rescue_scalper=None, storage=None):
+    def __init__(self, dl_client=None, risk_manager=None, rescue_scalper=None, storage=None, news_analyzer=None):
         self.dl_client = dl_client
         self.risk_manager = risk_manager
         self.rescue_scalper = rescue_scalper
         self.storage = storage
+        self.news_analyzer = news_analyzer
         self.meta_learner = None
         self.load_meta_learner()
         print("👑 Meta (The King) is initialized and ready to rule.")
@@ -44,6 +45,10 @@ class Meta:
 
     def should_buy(self, symbol, analysis, models_scores):
         """القرار باستخدام الملك الجديد (Meta-Learner)"""
+        # First, check for catastrophic news
+        if self.news_analyzer and self.news_analyzer.should_avoid_coin(symbol):
+            return {'action': 'SKIP', 'reason': 'Catastrophic news detected', 'confidence': 0}
+
         if not self.is_active():
             return {'action': 'SKIP', 'reason': 'Meta-Learner is not active', 'confidence': 0}
 
@@ -80,6 +85,12 @@ class Meta:
             prediction = self.meta_learner.predict(opinions_df)[0]
             probability = self.meta_learner.predict_proba(opinions_df)[0]
             confidence = int(probability[1] * 100)
+
+            # Add news confidence boost
+            if self.news_analyzer:
+                news_boost = self.news_analyzer.get_news_confidence_boost(symbol)
+                confidence += news_boost
+                confidence = max(0, min(100, confidence)) # Ensure confidence is between 0 and 100
 
         except Exception as e:
             print(f"❌ Meta-Learner prediction error: {e}")
