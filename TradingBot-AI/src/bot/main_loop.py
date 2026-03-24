@@ -286,7 +286,8 @@ def run_main_loop(exchange, ctx):
                 last_report_time = datetime.now()
 
             # Heartbeat (every 60 seconds)
-            if time.time() - last_heartbeat_time >= 60:
+            # Heartbeat (every 5 minutes)
+            if time.time() - last_heartbeat_time >= 300: # 300 seconds = 5 minutes
                 try:
                     send_heartbeat_notification()
                 except Exception:
