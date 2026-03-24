@@ -261,7 +261,7 @@ def send_startup_notification():
     STARTUP_TIME = now_str
     title = "BOT RESTARTED"
     fields = [
-        {"name": "AI Brain", "value": "ACTIVE", "inline": False},
+        {"name": "Meta", "value": "ACTIVE", "inline": False},
         {"name": "Last update", "value": datetime.now().strftime('%H:%M:%S'), "inline": False},
         {"name": "Last Restart", "value": now_str, "inline": False}
     ]
