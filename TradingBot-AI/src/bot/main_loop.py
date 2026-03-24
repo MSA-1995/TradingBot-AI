@@ -93,6 +93,8 @@ def run_main_loop(exchange, ctx):
                         symbol = future_to_symbol[future]
                         print(f"⚠️ {symbol}: Thread error - {e}")
 
+
+
             # ========== PROCESS RESULTS ==========
             # اختيار أفضل 10 عملات للتداول (الأعلى confidence)
             display_results  = [r for r in results if r and r.get('action') == 'DISPLAY']
@@ -124,9 +126,16 @@ def run_main_loop(exchange, ctx):
                     continue
 
                 if action == 'DISPLAY':
-                    if result.get('confidence', 0) >= 55:
-                        active_results.append(result)
+                    active_results.append(result)
                     continue
+                
+                # إظهار الأخطاء للمساعدة في التشخيص
+                if action == 'ERROR':
+                    active_results.append(result)
+                    continue
+
+            # عداد العملات التي تم فحصها ولكن تم تجاهلها
+            skipped_count = len(results) - len(active_results)
 
             # Process and display active results
             for result in active_results:
@@ -134,6 +143,7 @@ def run_main_loop(exchange, ctx):
                 action = result['action']
 
                 if action == 'ERROR':
+                    print(f"❌ {symbol}: {result.get('message', 'Unknown error')}")
                     continue
 
                 if action == 'SKIP':
@@ -187,6 +197,10 @@ def run_main_loop(exchange, ctx):
                     news_display = f" | {result['news_summary']}" if result.get('news_summary') else ""
                     print(f"📊 {symbol:12} ${result['price']:>8.2f} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {result['volume']:.1f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']}/120{news_display} | {result.get('reason', '')}")
                     continue
+            
+            # طباعة ملخص المسح إذا لم يتم عرض أي عملة جديدة
+            if len(active_results) <= active_count and skipped_count > 0:
+                print(f"{Fore.CYAN}ℹ️  Scanned {skipped_count} other coins... (No opportunities found){Style.RESET_ALL}")
 
             # Report
             if should_send_report(last_report_time, REPORT_INTERVAL):
