@@ -9,12 +9,13 @@ import os
 from datetime import datetime
 
 class Meta:
-    def __init__(self, dl_client=None, risk_manager=None, rescue_scalper=None, storage=None, news_analyzer=None):
+    def __init__(self, dl_client=None, risk_manager=None, rescue_scalper=None, storage=None, news_analyzer=None, fibonacci_analyzer=None):
         self.dl_client = dl_client
         self.risk_manager = risk_manager
         self.rescue_scalper = rescue_scalper
         self.storage = storage
         self.news_analyzer = news_analyzer
+        self.fibonacci_analyzer = fibonacci_analyzer
         self.meta_learner = None
         self.load_meta_learner()
         print("👑 Meta (The King) is initialized and ready to rule.")
@@ -90,7 +91,13 @@ class Meta:
             if self.news_analyzer:
                 news_boost = self.news_analyzer.get_news_confidence_boost(symbol)
                 confidence += news_boost
-                confidence = max(0, min(100, confidence)) # Ensure confidence is between 0 and 100
+
+            # Add fibonacci confidence boost
+            if self.fibonacci_analyzer and analysis.get('df') is not None:
+                fibo_boost = self.fibonacci_analyzer.get_confidence_boost(analysis['df']['close'].iloc[-1], analysis['df'], analysis.get('volume_ratio', 1.0), symbol)
+                confidence += fibo_boost
+
+            confidence = max(0, min(100, confidence)) # Ensure confidence is between 0 and 100
 
         except Exception as e:
             print(f"❌ Meta-Learner prediction error: {e}")
