@@ -261,60 +261,6 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
     last_report_sent_time = datetime.now()
 
 
-# Global variable to hold the startup time
-STARTUP_TIME = None
-
-def send_startup_notification():
-    """Send or update the bot status message."""
-    global STARTUP_TIME, STATUS_MESSAGE_ID
-
-    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    STARTUP_TIME = now_str
-    title = "BOT RESTARTED"
-    fields = [
-        {"name": "TradingBot-AI Script", "value": "ACTIVE", "inline": False},
-        {"name": "Last update", "value": datetime.now().strftime('%H:%M:%S'), "inline": False},
-        {"name": "Last Restart", "value": now_str, "inline": False}
-    ]
-
-    response_data = None
-    # Always try to edit first if we have an ID
-    if STATUS_MESSAGE_ID:
-        response_data = send_discord_embed(title, fields, 'blue', message_id=STATUS_MESSAGE_ID, webhook_url=CRITICAL_WEBHOOK)
-
-    # If editing failed or no ID existed, create a new message.
-    if not response_data:
-        if STATUS_MESSAGE_ID:
-             print("ℹ️ Failed to edit status message (it may have been deleted). Creating a new one.")
-        response_data = send_discord_embed(title, fields, 'blue', message_id=None, webhook_url=CRITICAL_WEBHOOK)
-
-    # --- Save new message ID ---
-    if response_data and 'id' in response_data:
-        new_message_id = response_data['id']
-        save_status_message_id(new_message_id)
-        return new_message_id
-        
-    return STATUS_MESSAGE_ID
-
-def send_heartbeat_notification():
-    """Update the heartbeat timestamp on the status message."""
-    global STARTUP_TIME, STATUS_MESSAGE_ID
-    
-    if not STATUS_MESSAGE_ID:
-        return
-
-    restart_time = STARTUP_TIME if STARTUP_TIME else "Unknown"
-
-    title = "BOT RESTARTED"
-    fields = [
-        {"name": "TradingBot-AI Script", "value": "ACTIVE", "inline": False},
-        {"name": "Last update", "value": datetime.now().strftime('%H:%M:%S'), "inline": False},
-        {"name": "Last Restart", "value": restart_time, "inline": False}
-    ]
-    
-    send_discord_embed(title, fields, 'blue', message_id=STATUS_MESSAGE_ID, webhook_url=CRITICAL_WEBHOOK)
-
-
 
 
 def send_critical_alert(error_type, message, details=None):
