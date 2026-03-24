@@ -105,11 +105,40 @@ class Meta:
 
         if prediction == 1 and confidence >= 55:
             amount = self._calculate_smart_amount(symbol, confidence, analysis)
+            
+            # --- Consultant Buy Voting ---
+            buy_vote_percentage = 0
+            buy_vote_count = 0
+            total_consultants = 0
+            if self.dl_client:
+                try:
+                    rsi = analysis.get('rsi', 50)
+                    macd = analysis.get('macd_diff', 0)
+                    volume_ratio = analysis.get('volume_ratio', 1.0)
+                    price_momentum = analysis.get('price_momentum', 0)
+                    
+                    # Get votes from consultants
+                    votes = self.dl_client.vote_buy_now(
+                        rsi, macd, volume_ratio, price_momentum, confidence
+                    )
+                    
+                    if votes:
+                        buy_vote_count = sum(votes.values())
+                        total_consultants = len(votes)
+                        if total_consultants > 0:
+                            buy_vote_percentage = (buy_vote_count / total_consultants) * 100
+                except Exception as e:
+                    print(f"⚠️ Consultant buy voting error: {e}")
+            # --- End Consultant Buy Voting ---
+
             decision = {
                 'action': 'BUY',
                 'confidence': confidence,
                 'amount': amount,
                 'reason': f'Meta approved with {confidence}% confidence',
+                'buy_vote_percentage': buy_vote_percentage,
+                'buy_vote_count': buy_vote_count,
+                'total_consultants': total_consultants
             }
             return decision
         else:
