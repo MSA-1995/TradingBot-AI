@@ -2,7 +2,7 @@
 Meta (The King) - The Ultimate Decision Maker
 """
 import pandas as pd
-from config import MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT
+from config import MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT, USE_DYNAMIC_TRAILING_STOP, ATR_MULTIPLIER
 from datetime import datetime
 import pickle
 import os
@@ -165,14 +165,25 @@ class Meta:
                     'profit': profit_percent
                 }
 
-        # 1. Trailing Stop Loss (من أعلى سعر - الحد الأقصى -2%)
+        # 1. Dynamic Trailing Stop Loss
+        stop_loss_percent = 2.0  # Default static 2%
+        reason_prefix = "TRAILING STOP"
+
+        if USE_DYNAMIC_TRAILING_STOP and analysis and analysis.get('atr', 0) > 0:
+            atr = analysis.get('atr')
+            # Calculate stop-loss based on ATR, relative to current price
+            dynamic_stop_loss = (atr / current_price) * 100 * ATR_MULTIPLIER
+            # Use the dynamic value, but keep it within reasonable bounds (e.g., 1.5% to 5.0%)
+            stop_loss_percent = max(1.5, min(dynamic_stop_loss, 5.0))
+            reason_prefix = "DYNAMIC TSL"
+
         drop_from_high = ((highest_price - current_price) / highest_price) * 100
         
-        if drop_from_high >= 2.0:
-            print(f"🛑 {symbol}: Trailing Stop triggered (dropped {drop_from_high:.2f}% from peak)")
+        if drop_from_high >= stop_loss_percent:
+            print(f"🛑 {symbol}: {reason_prefix} triggered (dropped {drop_from_high:.2f}% from peak, limit {stop_loss_percent:.2f}%)")
             return {
                 'action': 'SELL',
-                'reason': 'TRAILING STOP -2%',
+                'reason': f'{reason_prefix} -{stop_loss_percent:.1f}%',
                 'profit': profit_percent
             }
         
