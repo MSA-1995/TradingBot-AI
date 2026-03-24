@@ -283,10 +283,9 @@ if MODELS_ENABLED:
 if NEWS_ENABLED:
     print(f"📰 News Sentiment Analyzer: ACTIVE")
 
-print(f"💰 Amount: $12-$23 (Dynamic Voting)")
-print(f"🎯 TP: 0.5%-11% | SL: -0.1% to -2.3% (Dynamic Voting)")
-print(f"🎯 Min Confidence: {MIN_CONFIDENCE}/120")
-print(f"🔺 Max Confidence: {AI_BOUNDARIES['max_confidence']}/120\n")
+print(f"💰 Amount: ~$15 (Dynamic)")
+print(f"🎯 TP: Dynamic | SL: Dynamic TSL (ATR Based, 1%-5%)")
+print(f"🎯 Min Buy Confidence: {MIN_CONFIDENCE}/100\n")
 
 # Send startup notification to Discord
 load_status_message_id()
@@ -365,7 +364,8 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'profit': profit_percent,
                         'buy_price': buy_price,
                         'highest': highest_price,
-                        'reason': sell_decision.get('reason', 'Hold')
+                        'reason': sell_decision.get('reason', 'Hold'),
+                        'dynamic_tsl': sell_decision.get('dynamic_tsl')
                     }
             else:
                 # Fallback: if Meta is not enabled
