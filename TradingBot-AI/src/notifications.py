@@ -4,7 +4,7 @@ Handles Discord messages and file logging
 """
 
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import os
 from config import STATUS_STORAGE_METHOD
 from config_encrypted import get_discord_webhook, get_critical_webhook
@@ -91,7 +91,7 @@ def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_
         "footer": {
             "text": "MSA Trading Bot • AI Powered"
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
     if thumbnail_url:
@@ -205,8 +205,18 @@ def send_sell_notification(symbol, amount, price, value, profit_percent, reason)
     # Log
     log_trade('SELL', symbol, amount, price, value, profit_percent, reason)
 
+# Cooldown for the report to avoid rate limiting
+last_report_sent_time = None
+REPORT_COOLDOWN = timedelta(seconds=60)
+
 def send_positions_report(balance, invested, active_count, max_positions, open_positions=None):
-    """Send positions report with open positions details"""
+    """Send positions report with open positions details, respecting a cooldown."""
+    global last_report_sent_time
+
+    # Check cooldown
+    if last_report_sent_time and (datetime.now() - last_report_sent_time) < REPORT_COOLDOWN:
+        return # Exit if we are in the cooldown period
+
     fields = [
         {"name": "Balance", "value": f"${balance:.2f}", "inline": True},
         {"name": "Invested", "value": f"${invested:.2f}", "inline": True},
@@ -247,7 +257,8 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
             field_name = f"Open Positions ({field_count})" if field_count > 1 else "Open Positions"
             fields.append({"name": field_name, "value": positions_text.strip(), "inline": False})
     
-    send_discord_embed("PORTFOLIO REPORT", fields, 'blue')
+    # Update the last sent time at the end of the function
+    last_report_sent_time = datetime.now()
 
 
 # Global variable to hold the startup time
@@ -328,7 +339,7 @@ def send_critical_alert(error_type, message, details=None):
         "footer": {
             "text": "MSA Trading Bot • System Alerts"
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
     
     try:
