@@ -296,7 +296,7 @@ def send_heartbeat_notification():
 
     title = "BOT RESTARTED"
     fields = [
-        {"name": "AI Brain", "value": "ACTIVE", "inline": False},
+        {"name": "Meta", "value": "ACTIVE", "inline": False},
         {"name": "Last update", "value": datetime.now().strftime('%H:%M:%S'), "inline": False},
         {"name": "Last Restart", "value": restart_time, "inline": False}
     ]
