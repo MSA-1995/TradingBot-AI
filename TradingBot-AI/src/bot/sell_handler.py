@@ -13,7 +13,7 @@ from notifications import send_sell_notification
 def process_sell(result, exchange, ctx):
     """
     Process a SELL action result.
-    ctx keys: SYMBOLS_DATA, symbols_data_lock, storage, ai_brain,
+    ctx keys: SYMBOLS_DATA, symbols_data_lock, storage,
               exit_strategy, pattern_recognizer, sell_cooldown
     Returns: True if sell executed successfully, False otherwise.
     """
@@ -21,7 +21,6 @@ def process_sell(result, exchange, ctx):
     SYMBOLS_DATA    = ctx['SYMBOLS_DATA']
     symbols_data_lock = ctx['symbols_data_lock']
     storage         = ctx['storage']
-    ai_brain        = ctx['ai_brain']
     exit_strategy   = ctx['exit_strategy']
     pattern_recognizer = ctx['pattern_recognizer']
     sell_cooldown   = ctx['sell_cooldown']
@@ -43,36 +42,8 @@ def process_sell(result, exchange, ctx):
 
     position = result['position']
 
-    # AI Learning
-    if ai_brain:
-        try:
-            safe_profit = float(result['profit']) if result['profit'] is not None else 0
-            hours_held = 24
-            try:
-                buy_time_str = position.get('buy_time')
-                if buy_time_str:
-                    buy_time = datetime.fromisoformat(buy_time_str)
-                    hours_held = (datetime.now() - buy_time).total_seconds() / 3600
-            except:
-                pass
-
-            trade_result = {
-                'symbol': symbol,
-                'action': 'SELL',
-                'profit_percent': safe_profit,
-                'sell_reason': result['reason'],
-                'tp_target': position.get('tp_target', 1.0),
-                'sl_target': position.get('sl_target', 2.0),
-                'max_wait_hours': position.get('max_wait_hours', 48),
-                'hours_held': hours_held
-            }
-
-            if 'ai_data' in position:
-                trade_result.update(position['ai_data'])
-
-            ai_brain.learn_from_trade(trade_result)
-        except Exception as e:
-            pass
+    # AI Learning is now handled by the trainer based on trades_history.
+    # The old ai_brain.learn_from_trade call is removed.
 
     # Exit Strategy Learning
     if exit_strategy:
