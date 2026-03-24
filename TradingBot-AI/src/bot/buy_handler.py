@@ -103,13 +103,13 @@ def process_buy(result, exchange, ctx):
                 pass
 
         # Get Risk score
-        if risk_manager:
+        if risk_manager and isinstance(result.get('analysis'), dict):
             try:
-                risk_assessment = risk_manager.assess_risk(symbol, result['analysis'])
-                if risk_assessment:
-                    advisor_scores['risk_score'] = risk_assessment.get('risk_score', 0) or 0
-            except:
-                pass
+                risk_score = risk_manager.get_risk_score(result['analysis'], result.get('confidence', 50))
+                if risk_score is not None:
+                    advisor_scores['risk_score'] = risk_score
+            except Exception as e:
+                print(f"Error getting risk score for {symbol}: {e}")
 
         # Get Anomaly score
         if anomaly_detector:
