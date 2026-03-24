@@ -118,9 +118,12 @@ class Meta:
                     price_momentum = analysis.get('price_momentum', 0)
                     
                     # Get votes from consultants
-                    votes = self.dl_client.vote_buy_now(
+                    vote_result = self.dl_client.vote_buy_now(
                         rsi, macd, volume_ratio, price_momentum, confidence
                     )
+                    
+                    # Handle tuple return (votes_dict, market_status)
+                    votes = vote_result[0] if isinstance(vote_result, tuple) else vote_result
                     
                     if votes:
                         buy_vote_count = sum(votes.values())
