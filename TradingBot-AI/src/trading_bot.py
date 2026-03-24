@@ -69,25 +69,11 @@ from utils import calculate_dynamic_confidence, get_active_positions_count, get_
 from storage import StorageManager
 from capital_manager import CapitalManager  # إدارة رأس المال
 
-# Meta Brain
-AI_BOUNDARIES = {
-    'min_confidence': 30,  # Very low for testing only!
-    'max_confidence': 75,
-    'min_volume': 0.8,
-    'max_volume': 3.0,
-    'min_amount': 10,
-    'max_amount': 20,
-    'max_loss_per_trade': 2.0,
-    'max_daily_loss': 5.0
-}
+# AI Brain
+AI_BOUNDARIES = {}
 
-# Meta (The King)
-try:
-    from meta import Meta
-    AI_ENABLED = True
-except Exception as e:
-    print(f"⚠️ Meta not loaded: {e}")
-    AI_ENABLED = False
+# AI Brain has been replaced by Meta.
+AI_ENABLED = False
 
 # Advanced Models
 try:
@@ -145,6 +131,17 @@ except Exception as e:
     print(f"⚠️ News Analyzer not loaded: {e}")
     news_analyzer = None
     NEWS_ENABLED = False
+
+# Meta (The King)
+try:
+    from meta import Meta
+    # سيتم تهيئته لاحقاً بعد تهيئة باقي الكائنات
+    META_CLASS = Meta
+    META_ENABLED = True
+except Exception as e:
+    print(f"⚠️ Meta module not loaded: {e}")
+    META_CLASS = None
+    META_ENABLED = False
 
 init(autoreset=True)
 
@@ -211,8 +208,20 @@ else:
     liquidity_analyzer = None
     market_mood_analyzer = None # <<< وإضافته هنا أيضاً
 
-# Meta (The King)
-meta = Meta(dl_client=dl_client, risk_manager=risk_manager, rescue_scalper=rescue_scalper, storage=storage, news_analyzer=news_analyzer, fibonacci_analyzer=fibonacci_analyzer) if AI_ENABLED else None
+# AI Brain
+ai_brain = None
+
+# Initialize Meta (The King)
+meta = None
+if META_ENABLED:
+    meta = META_CLASS(
+        dl_client=dl_client,
+        risk_manager=risk_manager,
+        rescue_scalper=rescue_scalper,
+        storage=storage,
+        news_analyzer=news_analyzer,
+        fibonacci_analyzer=fibonacci_analyzer
+    )
 
 # ========== BANNER ==========
 print("=" * 60)
@@ -225,7 +234,7 @@ print("  ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝\n")
 print("  ✦•······················•✦•······················•✦")
 print("        🚀 MSA Smart Trading Bot")
 print("        💰 Binance Testnet - AI Powered")
-if meta and meta.is_active():
+if meta:
     print("        👑 The King (Meta): ACTIVE")
 print("        👑 Deep Learning Models (LightGBM)")
 print("        📊 Multi-Timeframe + Risk Manager + Chart CNN")
@@ -265,10 +274,7 @@ for symbol, pos in loaded.items():
         print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f}")
 
 print(f"\n🤖 Bot started!")
-if meta:
-    print(f"👑 Meta King: ACTIVE")
-else:
-    print(f"⚙️ Meta King: DISABLED")
+# AI Brain logic removed.
 
 if MODELS_ENABLED:
     print(f"🛡️ Risk Manager: ACTIVE")
@@ -342,42 +348,17 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             # Get MTF from analysis (cache) - تحسين السرعة
             mtf = analysis.get('mtf') if analysis else None
             
-            # Meta (The King) - The Ultimate Decision Maker
-            sell_decision = {'action': 'HOLD', 'reason': 'AI not enabled'}
+            # Meta (الملك الجديد) - المسؤول عن البيع
             if meta:
                 if mtf is None:
                     mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
                 
-                # The King decides
                 sell_decision = meta.should_sell(
                     symbol, position, current_price, analysis, mtf
                 )
                 
                 if sell_decision and sell_decision.get('action') == 'SELL':
-                    sell_reason = sell_decision.get('reason', 'Meta Sell')
-                    profit_percent = sell_decision.get('profit', profit_percent)
-                elif sell_decision and sell_decision.get('action') == 'HOLD':
-                    return {
-                        'symbol': symbol,
-                        'action': 'HOLD',
-                        'price': current_price,
-                        'profit': profit_percent,
-                        'buy_price': buy_price,
-                        'highest': highest_price,
-                        'reason': sell_decision.get('reason', 'Hold'),
-                        'dynamic_tsl': sell_decision.get('dynamic_tsl')
-                    }
-            else:
-                # Fallback: if Meta is not enabled
-                return {
-                    'symbol': symbol,
-                    'action': 'HOLD',
-                    'price': current_price,
-                    'profit': profit_percent,
-                    'buy_price': buy_price,
-                    'highest': highest_price,
-                    'reason': 'Hold - Meta is disabled'
-                }
+                    sell_reason = sell_decision.get('reason')
             
             # Execute sell
             if sell_reason:
@@ -400,6 +381,18 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'reason': sell_reason,
                         'position': position
                     }
+            else:
+                # HOLD position
+                hold_reason = sell_decision.get('reason', 'Holding position') if sell_decision else 'Holding position'
+                return {
+                    'symbol': symbol,
+                    'action': 'HOLD',
+                    'price': current_price,
+                    'profit': profit_percent,
+                    'buy_price': buy_price,
+                    'highest': highest_price,
+                    'reason': hold_reason
+                }
         
         # ========== BUY LOGIC ==========
         else:
@@ -492,29 +485,27 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             liquidity_adjustment = 0
             if liquidity_analyzer:
                 try:
-                    should_trade = liquidity_analyzer.should_trade_coin(symbol, analysis)
-                    if not should_trade['trade']:
-                        return {'symbol': symbol, 'action': 'SKIP', 'reason': should_trade['reason']}
-                    liquidity_adjustment = should_trade.get('confidence_adjustment', 0) or 0
+                    liquidity_result = liquidity_analyzer.should_trade_coin(symbol, analysis)
+                    if not liquidity_result['trade']:
+                        return {'symbol': symbol, 'action': 'SKIP', 'reason': liquidity_result['reason']}
+                    liquidity_adjustment = liquidity_result.get('confidence_adjustment', 0) or 0
                 except Exception as e:
                     liquidity_adjustment = 0
             
             # Anomaly Detection - نظام نقاط متوازن
             anomaly_adjustment = 0
+            anomaly_score = 0
             if anomaly_detector:
                 try:
                     anomaly_result = anomaly_detector.detect_anomalies(symbol, analysis)
                     
                     # فقط CRITICAL يرفض الشراء (نقاط >= 5)
-                    if not anomaly_result['safe_to_trade']:
-                        return {'symbol': symbol, 'action': 'SKIP', 'reason': f"ANOMALY: {anomaly_result['severity']}"}
+                    if not anomaly_result.get('safe_to_trade', True):
+                        return {'symbol': symbol, 'action': 'SKIP', 'reason': f"ANOMALY: {anomaly_result.get('severity', 'HIGH')}"}
                     
-                    # HIGH و MEDIUM يعطون تحذير (تقليل confidence)
+                    # تحويل النقاط إلى خصم (كل نقطة = -5 ثقة)
                     anomaly_score = anomaly_result.get('anomaly_score', 0)
-                    if anomaly_score >= 3:
-                        anomaly_adjustment = -10  # تحذير قوي
-                    elif anomaly_score >= 1:
-                        anomaly_adjustment = -5   # تحذير متوسط
+                    anomaly_adjustment = -5 * anomaly_score
                     
                 except Exception as e:
                     anomaly_adjustment = 0
@@ -532,15 +523,32 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         pattern_adjustment = pattern_analysis.get('confidence_adjustment', 0) or 0
                 except Exception as e:
                     pattern_adjustment = 0
+
+            # Add scores to reasons for clarity
+            reasons.append(f"News: {news_adjustment:.1f}")
+            reasons.append(f"SmartMoney: {smart_money_boost:.1f}")
+            reasons.append(f"Fibonacci: {fibonacci_boost:.1f}")
+            reasons.append(f"Liquidity: {liquidity_adjustment:.1f}")
+            reasons.append(f"Mood: {mood_adjustment:.1f}")
+            reasons.append(f"Pattern: {pattern_adjustment:.1f}")
+            reasons.append(f"Anomaly: {anomaly_adjustment:.1f}")
+
+            # حساب الثقة النهائية مع كل التعديلات
+            final_confidence = confidence + news_adjustment + smart_money_boost + fibonacci_boost + liquidity_adjustment + mood_adjustment + pattern_adjustment + anomaly_adjustment
+            final_confidence = max(0, min(100, int(final_confidence)))
             
             # Meta (The King) Decision
             if meta:
-                # Collect all models scores
+                # In the BUY logic, there is no existing position, so exit_score is 0.
+                # The logic to calculate it based on a position is only relevant for selling.
+                exit_score = 0
+
+                # Get all models scores
                 models_scores = {
-                    'risk': risk_manager.get_risk_score(symbol, analysis) if risk_manager else 0,
-                    'anomaly': anomaly_adjustment,
-                    'exit': exit_strategy.get_exit_score(symbol, analysis) if exit_strategy else 0,
-                    'pattern': pattern_recognizer.get_pattern_score(symbol, analysis) if pattern_recognizer else 0,
+                    'risk': risk_manager.get_risk_score(analysis, final_confidence) if risk_manager else 0,
+                    'anomaly': anomaly_score, # استخدام النقاط مباشرة
+                    'exit': exit_score,
+                    'pattern': pattern_adjustment,
                     'smart_money': smart_money_boost,
                     'fibonacci': fibonacci_boost,
                     'liquidity': liquidity_adjustment,
@@ -570,6 +578,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'news_summary': news_summary if news_adjustment != 0 else None
                     }
                 else:
+                    # إذا رفض الملك الشراء، نعرضها كفرصة محتملة بدلاً من تجاهلها
                     return {
                         'symbol': symbol,
                         'action': 'DISPLAY',
@@ -583,13 +592,13 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     }
             else:
                 # Manual mode
-                if confidence >= MIN_CONFIDENCE:
+                if final_confidence >= MIN_CONFIDENCE:
                     return {
                         'symbol': symbol,
                         'action': 'BUY',
                         'amount': BASE_AMOUNT,
                         'price': current_price,
-                        'confidence': confidence,
+                        'confidence': final_confidence,
                         'analysis': analysis
                     }
                 else:
@@ -600,7 +609,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'rsi': analysis.get('rsi', 0),
                         'volume': analysis.get('volume_ratio', 0),
                         'macd': analysis.get('macd_diff', 0),
-                        'confidence': confidence
+                        'confidence': final_confidence
                     }
     
     except Exception as e:
