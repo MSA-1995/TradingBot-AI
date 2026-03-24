@@ -21,7 +21,7 @@ def run_main_loop(exchange, ctx):
     """
     Main trading loop.
     ctx keys: SYMBOLS_DATA, symbols_data_lock, balance_lock, sell_cooldown,
-              storage, capital_manager, ai_brain, risk_manager, anomaly_detector,
+              storage, capital_manager, risk_manager, anomaly_detector,
               exit_strategy, pattern_recognizer, smart_money_tracker, liquidity_analyzer,
               analyze_fn, get_dynamic_symbols_fn
     """
@@ -31,7 +31,6 @@ def run_main_loop(exchange, ctx):
     sell_cooldown      = ctx['sell_cooldown']
     storage            = ctx['storage']
     capital_manager    = ctx['capital_manager']
-    ai_brain           = ctx['ai_brain']
     risk_manager       = ctx['risk_manager']
     anomaly_detector   = ctx['anomaly_detector']
     exit_strategy      = ctx['exit_strategy']
@@ -157,7 +156,6 @@ def run_main_loop(exchange, ctx):
                         'SYMBOLS_DATA':    SYMBOLS_DATA,
                         'symbols_data_lock': symbols_data_lock,
                         'storage':         storage,
-                        'ai_brain':        ai_brain,
                         'exit_strategy':   exit_strategy,
                         'pattern_recognizer': pattern_recognizer,
                         'sell_cooldown':   sell_cooldown,
@@ -170,7 +168,6 @@ def run_main_loop(exchange, ctx):
                         'SYMBOLS_DATA':    SYMBOLS_DATA,
                         'symbols_data_lock': symbols_data_lock,
                         'storage':         storage,
-                        'ai_brain':        ai_brain,
                         'smart_money_tracker': ctx['smart_money_tracker'],
                         'risk_manager':    risk_manager,
                         'anomaly_detector': anomaly_detector,
