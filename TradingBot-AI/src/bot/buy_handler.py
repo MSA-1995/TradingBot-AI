@@ -13,7 +13,7 @@ from notifications import send_buy_notification
 def process_buy(result, exchange, ctx):
     """
     Process a BUY action result.
-    ctx keys: SYMBOLS_DATA, symbols_data_lock, storage, ai_brain,
+    ctx keys: SYMBOLS_DATA, symbols_data_lock, storage,
               smart_money_tracker, risk_manager, anomaly_detector,
               exit_strategy, pattern_recognizer, liquidity_analyzer
     Returns: True if buy executed successfully, False otherwise.
@@ -23,7 +23,6 @@ def process_buy(result, exchange, ctx):
     SYMBOLS_DATA       = ctx['SYMBOLS_DATA']
     symbols_data_lock  = ctx['symbols_data_lock']
     storage            = ctx['storage']
-    ai_brain           = ctx['ai_brain']
     smart_money_tracker = ctx['smart_money_tracker']
     risk_manager       = ctx['risk_manager']
     anomaly_detector   = ctx['anomaly_detector']
@@ -40,7 +39,7 @@ def process_buy(result, exchange, ctx):
         voting_display = f" | 🗳️ Buy:{buy_vote_percentage:.0f}% Amount:${result['amount']:.0f}"
 
     if 'decision' in result:
-        print(f"{Fore.GREEN}🟢 BUY {symbol} 🧠 | AI Confidence:{result['confidence']}/120{voting_display}{news_display}{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}🟢 BUY {symbol} | Meta Confidence:{result['confidence']}{voting_display}{news_display}{Style.RESET_ALL}")
     else:
         print(f"{Fore.GREEN}🟢 BUY {symbol} | Confidence:{result['confidence']}/120 | ${result['amount']}{Style.RESET_ALL}")
 
@@ -68,11 +67,8 @@ def process_buy(result, exchange, ctx):
         buy_vote_percentage, buy_vote_count, total_consultants
     )
 
-    # Save buy voting results for learning
-    if ai_brain and 'decision' in result:
-        buy_votes = result['decision'].get('buy_votes', {})
-        if buy_votes:
-            ai_brain.save_buy_voting_results(symbol, buy_votes)
+    # The learning process is now handled by the trainer, not the bot.
+    # The old ai_brain.save_buy_voting_results call is removed.
 
     position_data = {
         'buy_price':    buy_result['price'],
