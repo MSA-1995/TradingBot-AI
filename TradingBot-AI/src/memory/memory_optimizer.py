@@ -6,10 +6,13 @@ from memory_cleaner import MemoryCleaner
 class MemoryOptimizer:
     """يدير كل نظام تحسين الذاكرة"""
     
-    def __init__(self):
-        self.cache = MemoryCache()
+    def __init__(self, max_memory_percent=75, cleanup_interval=5):
+        self.cache = MemoryCache(max_items=50)  # تقليل العناصر
         self.compressor = MemoryCompressor()
         self.cleaner = MemoryCleaner()
+        self.max_memory_percent = max_memory_percent  # نسبة الذاكرة القصوى
+        self.cleanup_interval = cleanup_interval  # فاصل التنظيف
+        self.last_aggressive_cleanup = time.time()
         self.context = {
             'memory_cache': self.cache,
             'memory_compressor': self.compressor,
