@@ -3,9 +3,10 @@ import time
 import gc
 
 class MemoryCache:
-    def __init__(self, default_expiry=300):
+    def __init__(self, default_expiry=300, max_items=100):
         self.cache = {}
         self.default_expiry = default_expiry
+        self.max_items = max_items  # حد أقصى للعناصر
         self.hits = 0
         self.misses = 0
     
@@ -14,10 +15,15 @@ class MemoryCache:
         if expiry_seconds is None:
             expiry_seconds = self.default_expiry
         
+        # تنظيف ذكي إذا وصلنا للحد الأقصى
+        if len(self.cache) >= self.max_items:
+            self._cleanup_least_used()
+        
         self.cache[key] = {
             'value': value,
             'expiry': time.time() + expiry_seconds,
-            'size': self._get_size(value)
+            'size': self._get_size(value),
+            'last_access': time.time()  # لتتبع أقل العناصر استخداماً
         }
         
         # تنظيف تلقائي للقديم
@@ -52,6 +58,23 @@ class MemoryCache:
         
         if expired_keys:
             gc.collect()  # تنظيف الذاكرة بعد الحذف
+    
+    def _cleanup_least_used(self):
+        """ينظف أقل العناصر استخداماً للحفاظ على الحد الأقصى"""
+        if len(self.cache) < self.max_items:
+            return
+        
+        # نرتب حسب آخر وصول ونحذف 20% من الأقدم
+        sorted_items = sorted(
+            self.cache.items(), 
+            key=lambda x: x[1].get('last_access', 0)
+        )
+        
+        items_to_remove = int(self.max_items * 0.2)  # حذف 20%
+        for i, (key, _) in enumerate(sorted_items[:items_to_remove]):
+            del self.cache[key]
+        
+        gc.collect()
     
     def _get_size(self, obj):
         """يحسب حجم العنصر في الذاكرة"""
