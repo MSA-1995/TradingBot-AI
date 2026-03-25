@@ -38,6 +38,20 @@ from utils import calculate_dynamic_confidence, get_active_positions_count, get_
 from storage import StorageManager
 from capital_manager import CapitalManager  # إدارة رأس المال
 
+# Memory Optimization System
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'memory'))
+try:
+    from memory.memory_optimizer import MemoryOptimizer
+    memory_optimizer = MemoryOptimizer()
+    MEMORY_OPTIMIZATION_ENABLED = True
+    print("🧠 Memory Optimizer: ACTIVE")
+except Exception as e:
+    print(f"⚠️ Memory Optimizer not loaded: {e}")
+    memory_optimizer = None
+    MEMORY_OPTIMIZATION_ENABLED = False
+
 # AI Brain
 AI_BOUNDARIES = {}
 
@@ -279,8 +293,11 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             symbol_data = SYMBOLS_DATA[symbol]
             position = symbol_data['position']
         
-        # Get analysis
+        # Get analysis with memory optimization
         analysis = get_market_analysis(exchange_instance, symbol)
+        if MEMORY_OPTIMIZATION_ENABLED and memory_optimizer and analysis:
+            analysis = memory_optimizer.optimize_analysis_data(symbol, analysis)
+        
         if not analysis:
             if position:
                 return {'symbol': symbol, 'action': 'ERROR', 'message': 'Analysis failed (has position)'}
@@ -585,9 +602,21 @@ ctx = {
     'get_dynamic_symbols_fn': get_dynamic_symbols,
 }
 
+# عداد لتنظيف الذاكرة الدوري
+cleanup_counter = 0
+
 while True:
     try:
         run_main_loop(exchange, ctx)
+        
+        # تنظيف الذاكرة كل 10 دورات
+        cleanup_counter += 1
+        if cleanup_counter >= 10 and MEMORY_OPTIMIZATION_ENABLED and memory_optimizer:
+            cleanup_result = memory_optimizer.periodic_cleanup()
+            if isinstance(cleanup_result, dict):
+                print(f"🧠 Memory cleanup: {cleanup_result.get('memory_saved_mb', 'Unknown')}")
+            cleanup_counter = 0
+            
     except Exception as e:
         print(f"❌ Critical error: {e}")
         print(f"🔄 Restarting in 5 seconds...")
