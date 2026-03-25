@@ -11,10 +11,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import get_active_positions_count, get_total_invested, should_send_report, format_price
 from notifications import send_positions_report
-from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRADE, MAX_CAPITAL
+from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRADE, MAX_CAPITAL, BATCH_SIZE, MAX_WORKERS
 
 from bot.sell_handler import process_sell
 from bot.buy_handler import process_buy
+
+
+def chunker(seq, size):
+    """Yield successive n-sized chunks from a sequence."""
+    return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
 
 def run_main_loop(exchange, ctx):
@@ -75,22 +80,28 @@ def run_main_loop(exchange, ctx):
             # الحصول على القائمة الديناميكية
             current_symbols = get_dynamic_symbols_fn()
 
-            # ========== PARALLEL PROCESSING ==========
+            # ========== PARALLEL PROCESSING (IN BATCHES) ==========
             results = []
-            with ThreadPoolExecutor(max_workers=25) as executor:
-                future_to_symbol = {
-                    executor.submit(analyze_fn, symbol, exchange, active_count, available, invested): symbol
-                    for symbol in current_symbols
-                }
+            # Process symbols in batches to conserve memory
+            for symbol_batch in chunker(current_symbols, BATCH_SIZE):
+                with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                    future_to_symbol = {
+                        executor.submit(analyze_fn, symbol, exchange, active_count, available, invested): symbol
+                        for symbol in symbol_batch
+                    }
 
-                for future in as_completed(future_to_symbol):
-                    try:
-                        result = future.result()
-                        if result:
-                            results.append(result)
-                    except Exception as e:
-                        symbol = future_to_symbol[future]
-                        print(f"⚠️ {symbol}: Thread error - {e}")
+                    for future in as_completed(future_to_symbol):
+                        try:
+                            result = future.result()
+                            if result:
+                                results.append(result)
+                        except Exception as e:
+                            symbol = future_to_symbol[future]
+                            print(f"⚠️ {symbol}: Thread error - {e}")
+                
+                # A short sleep to prevent overwhelming the API and to allow memory to be freed
+                time.sleep(0.1)
+                gc.collect()
 
 
 
