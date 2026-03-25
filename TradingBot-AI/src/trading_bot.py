@@ -293,8 +293,17 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             symbol_data = SYMBOLS_DATA[symbol]
             position = symbol_data['position']
         
-        # Get analysis with memory optimization
-        analysis = get_market_analysis(exchange_instance, symbol)
+        # Get analysis with memory optimization (reduce candles if memory high)
+        if MEMORY_OPTIMIZATION_ENABLED and memory_optimizer:
+            mem_stats = memory_optimizer.get_stats()
+            if mem_stats['memory_status']['used_percent'] > 70:
+                # Reduce candle count for analysis
+                analysis = get_market_analysis(exchange_instance, symbol, candle_limit=50)
+            else:
+                analysis = get_market_analysis(exchange_instance, symbol)
+        else:
+            analysis = get_market_analysis(exchange_instance, symbol)
+        
         if MEMORY_OPTIMIZATION_ENABLED and memory_optimizer and analysis:
             analysis = memory_optimizer.optimize_analysis_data(symbol, analysis)
         
@@ -324,6 +333,15 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             
             # Get MTF from analysis (cache) - تحسين السرعة
             mtf = analysis.get('mtf') if analysis else None
+            # If memory usage high, skip heavy MTF recalculation
+            if not mtf and MEMORY_OPTIMIZATION_ENABLED and memory_optimizer:
+                mem_stats = memory_optimizer.get_stats()
+                if mem_stats['memory_status']['used_percent'] > 75:
+                    mtf = {'score': 0}  # Fallback to avoid heavy computation
+                else:
+                    mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
+            elif not mtf:
+                mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
             
             # Meta (الملك الجديد) - المسؤول عن البيع
             if meta:
@@ -387,8 +405,18 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             if not can_trade:
                 return None
             
-            # Get MTF and calculate confidence
-            mtf = analysis.get('mtf') or get_multi_timeframe_analysis(exchange_instance, symbol)
+            # Get MTF and calculate confidence (memory-aware)
+            mtf = analysis.get('mtf')
+            if not mtf:
+                if MEMORY_OPTIMIZATION_ENABLED and memory_optimizer:
+                    mem_stats = memory_optimizer.get_stats()
+                    if mem_stats['memory_status']['used_percent'] > 75:
+                        # Use lighter MTF or fallback
+                        mtf = get_multi_timeframe_analysis(exchange_instance, symbol, timeframes=['15m', '1h'])
+                    else:
+                        mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
+                else:
+                    mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
             
             # Smart Money Analysis (بديل MTF)
             smart_money_boost = 0
@@ -604,9 +632,28 @@ ctx = {
 
 # عداد لتنظيف الذاكرة الدوري
 cleanup_counter = 0
+memory_check_interval = 3  # فحص الذاكرة كل 3 دورات
 
 while True:
     try:
+        # فحص الذاكرة قبل كل دورة كبيرة
+        if cleanup_counter % memory_check_interval == 0 and MEMORY_OPTIMIZATION_ENABLED and memory_optimizer:
+            memory_status = memory_optimizer.get_stats()
+            memory_percent = memory_status['memory_status']['used_percent']
+            
+            if memory_percent > 85:
+                print(f"⚠️ High memory usage: {memory_percent:.1f}% - Running aggressive cleanup")
+                # تنظيف عدواني إذا كانت الذاكرة مرتفعة جداً
+                gc.collect()
+                memory_optimizer.periodic_cleanup()
+                # نأخذ وقفة صغيرة للسماح بتنظيف الذاكرة
+                time.sleep(1)
+            elif memory_percent > 75:
+                print(f"🧠 Memory usage: {memory_percent:.1f}% - Optimizing operations")
+                # نقلل من عدد الرموز في الدورة التالية
+                if 'symbols_batch_size' in ctx:
+                    ctx['symbols_batch_size'] = min(ctx.get('symbols_batch_size', 10), 5)
+        
         run_main_loop(exchange, ctx)
         
         # تنظيف الذاكرة كل 10 دورات
