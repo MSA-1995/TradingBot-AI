@@ -175,24 +175,32 @@ class DatabaseStorage:
             try:
                 conn = self._get_conn()
                 cursor = conn.cursor()
-                cursor.execute(create_sql) # تنفيذ كل الأوامر دفعة واحدة
+                cursor.execute(create_sql)
                 conn.commit()
                 cursor.close()
+                self._put_conn(conn) # --- إرجاع الاتصال السليم إلى المجمع
                 print("✅ Database tables created/verified successfully.")
-                return True # Success, exit the loop
+                return True # --- نجاح، خروج
 
-            except Exception as e:
-                print(f"⚠️ Table creation error (attempt {attempt + 1}/3): {e}")
-                if conn: 
-                    try: conn.rollback()
-                    except Exception as rb_e: print(f"⚠️ Error during rollback: {rb_e}")
-                
+            except self._psycopg2.Error as e: # --- التعامل مع أخطاء قاعدة البيانات فقط
+                print(f"⚠️ Table creation DB error (attempt {attempt + 1}/3): {e}")
+                if conn:
+                    # --- الخطوة الأهم: تخلص من الاتصال الفاشل ولا تعيده للمجمع
+                    self.pool.putconn(conn, close=True)
+                    print("🔥 Discarded faulty DB connection. Will retry with a new one.")
+
                 if attempt < 2:
                     import time
-                    time.sleep(5) # Wait 5 seconds before retrying
-            finally:
-                if conn: self._put_conn(conn)
-        
+                    time.sleep(5) # --- انتظار قبل المحاولة التالية
+                else:
+                    print("❌ Final attempt to create tables failed.")
+            except Exception as e:
+                print(f"⚠️ An unexpected error occurred during table creation: {e}")
+                if conn: # تخلص من الاتصال عند حدوث أي خطأ غير متوقع أيضًا
+                    self.pool.putconn(conn, close=True)
+                # لا تعيد المحاولة في الأخطاء العامة غير المتوقعة
+                break
+
         return False # فشل بعد كل المحاولات
     
     def _check_schema_updates(self):
