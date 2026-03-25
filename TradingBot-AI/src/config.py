@@ -33,6 +33,12 @@ ATR_MULTIPLIER = 2.0  # Multiplier for ATR to set stop-loss. Higher value = wide
 BATCH_SIZE = 5          # Number of symbols to process in a single batch to conserve memory
 MAX_WORKERS = 5         # Max number of threads for parallel processing, should be <= BATCH_SIZE
 
+# Memory Optimization Settings
+MEMORY_MAX_USAGE_PERCENT = 75  # نسبة الذاكرة القصوى قبل التحسين
+MEMORY_CLEANUP_INTERVAL = 10   # عدد الدورات بين تنظيف الذاكرة
+MEMORY_CACHE_MAX_ITEMS = 50    # الحد الأقصى لعناصر الكاش
+MEMORY_AGGRESSIVE_CLEANUP = 85 # نسبة الذاكرة لتنظيف العدواني
+
 # Timing
 LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
 REPORT_INTERVAL = 30
