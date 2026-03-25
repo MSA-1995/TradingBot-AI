@@ -6,7 +6,7 @@ All bot settings and constants
 # Trading Parameters
 MIN_CONFIDENCE = 55
 MAX_POSITIONS = 50  # الحد الأقصى للصفقات المفتوحة (كل العملات)
-TOTAL_COINS_TO_SCAN = 50
+TOTAL_COINS_TO_SCAN = 20
 
 # Capital Management
 MAX_CAPITAL = 1000
@@ -43,22 +43,13 @@ REPORT_INTERVAL = 30
 # 'file' is for local/testing (uses data/bot_status_message_id.txt)
 STATUS_STORAGE_METHOD = 'file' # or 'database'
 
-# قائمة العملات الثابتة (Top 50 by Market Cap - March 2026)
+# قائمة العملات الثابتة (Top 20 by Market Cap - March 2026)
 SYMBOLS = [
     # Top 10 - Giants
     'BTC/USDT', 'ETH/USDT', 'XRP/USDT', 'BNB/USDT', 'SOL/USDT', 'DOGE/USDT', 'ADA/USDT', 'TRX/USDT', 'AVAX/USDT', 'TON/USDT', 
     # 11-20 - Major Alts
     'LINK/USDT', 'DOT/USDT', 'BCH/USDT', 'NEAR/USDT', 'LTC/USDT',
     'UNI/USDT', 'ATOM/USDT', 'XLM/USDT', 'HBAR/USDT', 'ICP/USDT',
-    # 21-30 - Strong Layer 1 & Layer 2
-    'APT/USDT', 'ARB/USDT', 'OP/USDT', 'SUI/USDT', 'INJ/USDT',
-    'TIA/USDT', 'SEI/USDT', 'POL/USDT', 'ALGO/USDT', 'VET/USDT',
-    # 31-40 - DeFi & Infrastructure
-    'AAVE/USDT', 'FIL/USDT', 'RENDER/USDT', 'NEO/USDT', 'RUNE/USDT', 
-    'LDO/USDT', 'CRV/USDT', 'SNX/USDT', 'COMP/USDT', 'ETC/USDT', 
-    # 41-50 - Meme, Gaming & Others
-    'SHIB/USDT', 'PEPE/USDT', 'WIF/USDT', 'FLOKI/USDT', 'BONK/USDT',
-    'IMX/USDT', 'SAND/USDT', 'MANA/USDT', 'AXS/USDT', 'GALA/USDT',
 ]
 
 # عدد العملات النشطة للتداول (الأقوى من القائمة)
