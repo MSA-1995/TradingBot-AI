@@ -227,6 +227,9 @@ class DatabaseStorage:
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
+
+            # --- FIX: Increase statement timeout for this session to prevent DDL timeouts ---
+            cursor.execute("SET statement_timeout = '60s';")
             
             # --- ADD 'invested' to 'positions' ---
             try:
