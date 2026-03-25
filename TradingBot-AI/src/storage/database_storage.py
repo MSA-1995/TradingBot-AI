@@ -3,6 +3,13 @@
 """
 import os
 from datetime import datetime
+
+# --- DATABASE CONNECTION POOL ---
+# To make the bot stable, we use a connection pool.
+# This avoids connection drops and manages reconnections automatically.
+from psycopg2.pool import ThreadedConnectionPool
+# --- END --- 
+
 try:
     from supabase import create_client, Client
 except:
@@ -32,7 +39,12 @@ class DatabaseStorage:
                 'sslmode': 'require',
                 'connect_timeout': 10
             }
-        self.conn = psycopg2.connect(**self._db_params)
+        
+        # --- Initialize Connection Pool ---
+        # minconn=1, maxconn=5
+        self.pool = ThreadedConnectionPool(1, 5, **self._db_params)
+        # --- END ---
+
         self.json = json_module
         self.RealDictCursor = RealDictCursor
         self._psycopg2 = psycopg2
@@ -42,20 +54,12 @@ class DatabaseStorage:
         self._check_schema_updates()
 
     def _get_conn(self):
-        """إرجاع connection صالح - يعيد الاتصال إذا انقطع"""
-        try:
-            # اختبار الاتصال عبر استعلام بسيط
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT 1")
-            cursor.close()
-        except (self._psycopg2.OperationalError, self._psycopg2.InterfaceError):
-            # إذا فشل الاختبار، أعد الاتصال
-            try:
-                print("🔄 DB connection lost. Reconnecting...")
-                self.conn = self._psycopg2.connect(**self._db_params)
-            except Exception as e:
-                print(f"❌ DB reconnect error: {e}")
-        return self.conn
+        """Get a connection from the pool."""
+        return self.pool.getconn()
+
+    def _put_conn(self, conn):
+        """Return a connection to the pool."""
+        self.pool.putconn(conn)
 
     # ========== General Settings ==========
     def save_setting(self, key, value):
@@ -65,6 +69,7 @@ class DatabaseStorage:
             VALUES (%s, %s)
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
         """
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
@@ -74,11 +79,15 @@ class DatabaseStorage:
             return True
         except Exception as e:
             print(f"❌ DB Error saving setting {key}: {e}")
+            if conn: conn.rollback()
             return False
+        finally:
+            if conn: self._put_conn(conn)
 
     def load_setting(self, key):
         """Loads a value from the bot_settings table."""
         sql = "SELECT value FROM bot_settings WHERE key = %s;"
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
@@ -89,6 +98,8 @@ class DatabaseStorage:
         except Exception as e:
             print(f"❌ DB Error loading setting {key}: {e}")
             return None
+        finally:
+            if conn: self._put_conn(conn)
 
     def _create_tables(self):
         """إنشاء الجداول إذا لم تكن موجودة (مع إعادة محاولة). Returns True on success, False on failure."""
@@ -155,6 +166,7 @@ class DatabaseStorage:
         );
         """
         for attempt in range(3):
+            conn = None
             try:
                 conn = self._get_conn()
                 cursor = conn.cursor()
@@ -166,36 +178,63 @@ class DatabaseStorage:
 
             except Exception as e:
                 print(f"⚠️ Table creation error (attempt {attempt + 1}/3): {e}")
-                try:
-                    # التراجع عن المعاملة عند حدوث خطأ
-                    conn.rollback()
-                except Exception as rb_e:
-                    print(f"⚠️ Error during rollback: {rb_e}")
+                if conn: 
+                    try: conn.rollback()
+                    except Exception as rb_e: print(f"⚠️ Error during rollback: {rb_e}")
                 
                 if attempt < 2:
                     import time
                     time.sleep(5) # Wait 5 seconds before retrying
+            finally:
+                if conn: self._put_conn(conn)
         
         return False # فشل بعد كل المحاولات
-        
-        return False # Failure after all attempts
     
     def _check_schema_updates(self):
         """التحقق من تحديثات المخطط وإصلاحها تلقائياً (Self-Healing)"""
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
             
+            # --- ADD 'invested' to 'positions' ---
+            try:
+                cursor.execute("ALTER TABLE positions ADD COLUMN invested FLOAT NOT NULL DEFAULT 0;")
+                conn.commit()
+                print("🔧 Schema Update: Added 'invested' column to 'positions' table.")
+            except self._psycopg2.errors.DuplicateColumn:
+                conn.rollback() # Ignore if column already exists
+            except Exception as e:
+                print(f"⚠️ Schema update error (invested): {e}")
+                conn.rollback()
 
+            # --- ADD 'dl_models_v2' table ---
+            try:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS dl_models_v2 (
+                        model_name VARCHAR(50) PRIMARY KEY,
+                        model_data BYTEA NOT NULL,
+                        trained_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                conn.commit()
+                print("🔧 Schema Update: Ensured 'dl_models_v2' table exists.")
+            except Exception as e:
+                print(f"⚠️ Schema update error (dl_models_v2): {e}")
+                conn.rollback()
             
             cursor.close()
         except Exception as e:
             print(f"⚠️ Schema update check failed: {e}")
-            try: self._get_conn().rollback()
-            except: pass
+            if conn: 
+                try: conn.rollback()
+                except: pass
+        finally:
+            if conn: self._put_conn(conn)
 
     # ========== Trades ==========
     def save_trade(self, trade_data):
+        conn = None
         try:
             def convert_value(val):
                 if val is None:
@@ -224,10 +263,13 @@ class DatabaseStorage:
             return True
         except Exception as e:
             print(f"❌ DB save trade error: {e}")
-            self._get_conn().rollback()
+            if conn: conn.rollback()
             return False
+        finally:
+            if conn: self._put_conn(conn)
     
     def load_trades(self, limit=None):
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor(cursor_factory=self.RealDictCursor)
@@ -238,11 +280,15 @@ class DatabaseStorage:
             result = cursor.fetchall()
             cursor.close()
             return [dict(row) for row in result]
-        except:
+        except Exception as e:
+            print(f"❌ DB load trades error: {e}")
             return []
+        finally:
+            if conn: self._put_conn(conn)
     
     # ========== Patterns ==========
     def save_pattern(self, pattern_data):
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
@@ -259,10 +305,13 @@ class DatabaseStorage:
             return True
         except Exception as e:
             print(f"❌ DB save pattern error: {e}")
-            self._get_conn().rollback()
+            if conn: conn.rollback()
             return False
+        finally:
+            if conn: self._put_conn(conn)
     
     def load_patterns(self):
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor(cursor_factory=self.RealDictCursor)
@@ -270,8 +319,11 @@ class DatabaseStorage:
             result = cursor.fetchall()
             cursor.close()
             return [dict(row) for row in result]
-        except:
+        except Exception as e:
+            print(f"❌ DB load patterns error: {e}")
             return []
+        finally:
+            if conn: self._put_conn(conn)
     
     # ========== AI Decisions ==========
     def save_ai_decision(self, decision_data):
