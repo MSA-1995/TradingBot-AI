@@ -59,12 +59,30 @@ class DatabaseStorage:
         self._check_schema_updates()
 
     def _get_conn(self):
-        """Get a connection from the pool."""
-        return self.pool.getconn()
+        """Get a healthy connection from the pool, implementing a manual pre-ping."""
+        for attempt in range(3): # Try up to 3 times to get a healthy connection
+            conn = self.pool.getconn()
+            try:
+                # --- Pre-ping: Test the connection before returning it ---
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1")
+                cursor.close()
+                # --- Connection is healthy, return it ---
+                return conn
+            except self._psycopg2.Error as e:
+                print(f"⚠️ Pre-ping failed (attempt {attempt+1}): {e}. Discarding connection.")
+                # --- Connection is dead, discard it and get a new one ---
+                self.pool.putconn(conn, close=True)
+                if attempt == 2:
+                    print("❌ Failed to get a healthy DB connection after multiple attempts.")
+                    raise # Re-raise the last exception
 
     def _put_conn(self, conn):
         """Return a connection to the pool."""
-        self.pool.putconn(conn)
+        if conn and not conn.closed:
+            self.pool.putconn(conn)
+        else:
+            print("ℹ️ Attempted to return a closed connection to the pool. It was ignored.")
 
     # ========== General Settings ==========
     def save_setting(self, key, value):
