@@ -344,38 +344,33 @@ class DatabaseStorage:
     
     # ========== AI Decisions ==========
     def save_ai_decision(self, decision_data):
-        for attempt in range(3):
-            try:
-                conn = self._get_conn()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO ai_decisions (symbol, decision, confidence, data)
-                    VALUES (%s, %s, %s, %s)
-                """, (
-                    decision_data.get('symbol'),
-                    decision_data.get('decision'),
-                    decision_data.get('confidence'),
-                    self.json.dumps(decision_data)
-                ))
-                conn.commit()
-                cursor.close()
-                return True
-            except Exception as e:
-                print(f"❌ DB save decision error (attempt {attempt+1}/3): {e}")
-                try:
-                    self._get_conn().rollback()
-                except:
-                    pass
-                
-                if attempt < 2:
-                    import time
-                    time.sleep(1)
-                else:
-                    return False
-        
-        return False
+        """Saves an AI decision, ensuring the connection is always returned."""
+        conn = None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO ai_decisions (symbol, decision, confidence, data)
+                VALUES (%s, %s, %s, %s)
+            """, (
+                decision_data.get('symbol'),
+                decision_data.get('decision'),
+                decision_data.get('confidence'),
+                self.json.dumps(decision_data)
+            ))
+            conn.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"❌ DB save decision error: {e}")
+            if conn: conn.rollback()
+            return False
+        finally:
+            if conn: self._put_conn(conn)
     
     def load_ai_decisions(self, limit=10):
+        """Loads AI decisions, ensuring the connection is always returned."""
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor(cursor_factory=self.RealDictCursor)
@@ -383,29 +378,27 @@ class DatabaseStorage:
             result = cursor.fetchall()
             cursor.close()
             return [dict(row) for row in result]
-        except:
+        except Exception as e:
+            print(f"❌ DB load AI decisions error: {e}")
             return []
+        finally:
+            if conn: self._put_conn(conn)
     
     # ========== Performance ==========
     def save_performance(self, metrics_data):
-        try:
-            metrics_data['date'] = datetime.now().strftime('%Y-%m-%d')
-            self.supabase.table('performance_metrics').insert(metrics_data).execute()
-            return True
-        except Exception as e:
-            print(f"❌ DB save performance error: {e}")
-            return False
+        """This function is currently not in use and is pending refactoring."""
+        print("⚠️ save_performance is not implemented with the new connection handling.")
+        return False
     
     def load_performance(self, days=7):
-        try:
-            result = self.supabase.table('performance_metrics').select('*').order('date', desc=True).limit(days).execute()
-            return result.data
-        except:
-            return []
+        """This function is currently not in use and is pending refactoring."""
+        print("⚠️ load_performance is not implemented with the new connection handling.")
+        return []
     
     # ========== Consultant Votes ==========
     def save_consultant_vote(self, vote_data):
-        """حفظ نتيجة تصويت مستشار"""
+        """Saves a consultant vote, ensuring the connection is always returned."""
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
@@ -427,71 +420,79 @@ class DatabaseStorage:
             return True
         except Exception as e:
             print(f"❌ DB save vote error: {e}")
-            self._get_conn().rollback()
+            if conn: conn.rollback()
             return False
+        finally:
+            if conn: self._put_conn(conn)
     
     def load_consultant_votes(self, consultant_name=None, limit=1000):
-        """قراءة نتائج التصويت"""
+        """Loads consultant votes, ensuring the connection is always returned."""
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor(cursor_factory=self.RealDictCursor)
+            sql = "SELECT * FROM consultant_votes "
+            params = []
             if consultant_name:
-                cursor.execute("""
-                    SELECT * FROM consultant_votes 
-                    WHERE consultant_name = %s 
-                    ORDER BY timestamp DESC LIMIT %s
-                """, (consultant_name, limit))
-            else:
-                cursor.execute("""
-                    SELECT * FROM consultant_votes 
-                    ORDER BY timestamp DESC LIMIT %s
-                """, (limit,))
+                sql += "WHERE consultant_name = %s "
+                params.append(consultant_name)
+            sql += "ORDER BY timestamp DESC LIMIT %s"
+            params.append(limit)
+            
+            cursor.execute(sql, tuple(params))
             result = cursor.fetchall()
             cursor.close()
             return [dict(row) for row in result]
-        except:
+        except Exception as e:
+            print(f"❌ DB load consultant votes error: {e}")
             return []
+        finally:
+            if conn: self._put_conn(conn)
 
     
     # ========== Auto Cleanup ==========
     def cleanup_old_data(self):
-        """حذف البيانات القديمة تلقائياً"""
+        """Cleans up old data, ensuring the connection is always returned."""
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
             
-            # بيانات التدريب: 6 أشهر (مهمة للـ Deep Learning Trainer)
-            cursor.execute("DELETE FROM trades_history WHERE timestamp < NOW() - INTERVAL '180 days'")
-            trades_deleted = cursor.rowcount
+            queries = {
+                "trades (6m)": "DELETE FROM trades_history WHERE timestamp < NOW() - INTERVAL '180 days'",
+                "patterns (6m)": "DELETE FROM learned_patterns WHERE last_updated < NOW() - INTERVAL '180 days'",
+                "traps (6m)": "DELETE FROM trap_memory WHERE timestamp < NOW() - INTERVAL '180 days'",
+                "votes (6m)": "DELETE FROM consultant_votes WHERE timestamp < NOW() - INTERVAL '180 days'",
+                "AI decisions (30d)": "DELETE FROM ai_decisions WHERE timestamp < NOW() - INTERVAL '30 days'"
+            }
             
-            cursor.execute("DELETE FROM learned_patterns WHERE last_updated < NOW() - INTERVAL '180 days'")
-            patterns_deleted = cursor.rowcount
-            
-            cursor.execute("DELETE FROM trap_memory WHERE timestamp < NOW() - INTERVAL '180 days'")
-            traps_deleted = cursor.rowcount
-            
-            cursor.execute("DELETE FROM consultant_votes WHERE timestamp < NOW() - INTERVAL '180 days'")
-            votes_deleted = cursor.rowcount
-            
-            # ai_decisions: 30 يوم فقط (للمراقبة - لا يستخدمها الـ Trainer)
-            cursor.execute("DELETE FROM ai_decisions WHERE timestamp < NOW() - INTERVAL '30 days'")
-            decisions_deleted = cursor.rowcount
-            
+            total_deleted = 0
+            deleted_log = []
+            for key, query in queries.items():
+                cursor.execute(query)
+                count = cursor.rowcount
+                if count > 0:
+                    deleted_log.append(f"{count} {key}")
+                total_deleted += count
+
             conn.commit()
             cursor.close()
             
-            total_deleted = trades_deleted + patterns_deleted + decisions_deleted + traps_deleted + votes_deleted
             if total_deleted > 0:
-                print(f"🗑️ Cleaned: {trades_deleted} trades (6m), {patterns_deleted} patterns (6m), {decisions_deleted} AI decisions (30d), {traps_deleted} traps (6m), {votes_deleted} votes (6m)")
+                print(f"🗑️ Cleaned: {', '.join(deleted_log)}")
             
             return True
         except Exception as e:
             print(f"⚠️ Cleanup error: {e}")
-            self._get_conn().rollback()
+            if conn: conn.rollback()
             return False
+        finally:
+            if conn: self._put_conn(conn)
     
     # ========== Traps ==========
     def save_trap(self, trap_data):
+        """Saves a trap, ensuring the connection is always returned."""
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
@@ -507,10 +508,14 @@ class DatabaseStorage:
             return True
         except Exception as e:
             print(f"❌ DB save trap error: {e}")
-            self._get_conn().rollback()
+            if conn: conn.rollback()
             return False
+        finally:
+            if conn: self._put_conn(conn)
     
     def load_traps(self):
+        """Loads all traps, ensuring the connection is always returned."""
+        conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor(cursor_factory=self.RealDictCursor)
@@ -518,8 +523,11 @@ class DatabaseStorage:
             result = cursor.fetchall()
             cursor.close()
             return [dict(row) for row in result]
-        except:
+        except Exception as e:
+            print(f"❌ DB load traps error: {e}")
             return []
+        finally:
+            if conn: self._put_conn(conn)
     
     # ========== Model Storage (King's Brain) ==========
     def load_model(self, name):
