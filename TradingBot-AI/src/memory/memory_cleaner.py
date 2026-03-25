@@ -101,20 +101,31 @@ class MemoryCleaner:
         return initial_count - final_count
     
     def _cleanup_temp_variables(self, context):
-        """ينظف المتغيرات المؤقتة"""
+        """ينظف المتغيرات المؤقتة والمصفوفات الكبيرة"""
         cleared = 0
         
         # نمسح المتغيرات الكبيرة المؤقتة
         temp_vars = [
             'temp_analysis', 'temp_candles', 'temp_indicators',
-            'large_temp_list', 'temp_calculation'
+            'large_temp_list', 'temp_calculation', 'temp_df',
+            'temp_array', 'temp_matrix', 'temp_results'
         ]
         
         if context:
             for var in temp_vars:
                 if var in context:
-                    del context[var]
-                    cleared += 1
+                    try:
+                        # نفرغ المحتوى أولاً ثم نمسح
+                        if hasattr(context[var], 'clear'):
+                            context[var].clear()
+                        del context[var]
+                        cleared += 1
+                    except:
+                        pass
+        
+        # تنظيف المتغيرات المؤقتة في الذاكرة العامة
+        import gc
+        gc.collect()  # جمع القمامة مرتين للتأكد
         
         return cleared
     
