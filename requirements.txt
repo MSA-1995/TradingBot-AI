@@ -1,3 +1,4 @@
+psutil
 ccxt
 lightgbm
 scikit-learn
