@@ -1,4 +1,6 @@
 # memory_optimizer.py - المدير الرئيسي
+import time
+import gc
 from memory_cache import MemoryCache
 from memory_compressor import MemoryCompressor
 from memory_cleaner import MemoryCleaner
