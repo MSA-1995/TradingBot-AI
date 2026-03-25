@@ -41,9 +41,21 @@ from capital_manager import CapitalManager  # إدارة رأس المال
 # Memory Optimization System
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'memory'))
+import time
+import gc
+
+# إضافة مسار memory إلى sys.path
+memory_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'memory')
+if memory_path not in sys.path:
+    sys.path.insert(0, memory_path)
+
 try:
-    from memory.memory_optimizer import MemoryOptimizer
+    # محاولة استيراد الملفات مباشرة
+    from memory_cache import MemoryCache
+    from memory_compressor import MemoryCompressor
+    from memory_cleaner import MemoryCleaner
+    from memory_optimizer import MemoryOptimizer
+    
     memory_optimizer = MemoryOptimizer()
     MEMORY_OPTIMIZATION_ENABLED = True
     print("🧠 Memory Optimizer: ACTIVE")
@@ -412,7 +424,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     mem_stats = memory_optimizer.get_stats()
                     if mem_stats['memory_status']['used_percent'] > 75:
                         # Use lighter MTF or fallback
-                        mtf = get_multi_timeframe_analysis(exchange_instance, symbol, timeframes=['15m', '1h'])
+                        mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
                     else:
                         mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
                 else:
