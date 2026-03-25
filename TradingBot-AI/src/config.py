@@ -29,6 +29,10 @@ USE_DYNAMIC_TRAILING_STOP = True  # Master switch for the feature
 ATR_PERIOD = 14  # Period for ATR calculation
 ATR_MULTIPLIER = 2.0  # Multiplier for ATR to set stop-loss. Higher value = wider stop-loss
 
+# Performance & Memory Tuning
+BATCH_SIZE = 5          # Number of symbols to process in a single batch to conserve memory
+MAX_WORKERS = 5         # Max number of threads for parallel processing, should be <= BATCH_SIZE
+
 # Timing
 LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
 REPORT_INTERVAL = 30
