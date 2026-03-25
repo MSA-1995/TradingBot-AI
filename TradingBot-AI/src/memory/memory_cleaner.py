@@ -1,8 +1,14 @@
 # memory_cleaner.py - في الذاكرة فقط
 import gc
-import psutil
 import time
 from typing import Dict, Any
+
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("⚠️ psutil not available, using fallback memory detection")
 
 class MemoryCleaner:
     """ينظف الذاكرة بذكاء بدون يؤثر على التداول"""
@@ -21,16 +27,21 @@ class MemoryCleaner:
     def should_cleanup(self):
         """يحدد إذا كان وقت التنظيف"""
         current_time = time.time()
-        memory_percent = psutil.virtual_memory().percent
         
-        # ننظف إذا:
-        # 1. مر أكثر من دقيقتين
-        # 2. الذاكرة فوق 80%
-        # 3. أو فيه عمليات ثقيلة
+        # ننظف إذا مر أكثر من دقيقتين كحد أدنى
         time_condition = (current_time - self.last_cleanup) > self.cleanup_interval
-        memory_condition = memory_percent > 80
         
-        return time_condition or memory_condition
+        # إذا كان psutil متاح، نستخدمه لقياس الذاكرة
+        if PSUTIL_AVAILABLE:
+            try:
+                memory_percent = psutil.virtual_memory().percent
+                memory_condition = memory_percent > 80
+                return time_condition or memory_condition
+            except:
+                pass
+        
+        # fallback: ننظف فقط بناءً على الوقت
+        return time_condition
     
     def safe_cleanup(self, context: Dict[str, Any] = None):
         """ينظف الذاكرة بطريقة آمنة"""
@@ -136,10 +147,22 @@ class MemoryCleaner:
     
     def get_memory_status(self):
         """يعطي حالة الذاكرة"""
-        memory = psutil.virtual_memory()
+        if PSUTIL_AVAILABLE:
+            try:
+                memory = psutil.virtual_memory()
+                return {
+                    'total_mb': memory.total // (1024 * 1024),
+                    'available_mb': memory.available // (1024 * 1024),
+                    'used_percent': memory.percent,
+                    'need_cleanup': memory.percent > 80
+                }
+            except:
+                pass
+        
+        # fallback: نعطي معلومات أساسية
         return {
-            'total_mb': memory.total // (1024 * 1024),
-            'available_mb': memory.available // (1024 * 1024),
-            'used_percent': memory.percent,
-            'need_cleanup': memory.percent > 80
+            'total_mb': 0,
+            'available_mb': 0,
+            'used_percent': 50,  # قيمة افتراضية
+            'need_cleanup': False
         }
