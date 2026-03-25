@@ -32,17 +32,17 @@ class DatabaseStorage:
         
         self._db_params = {
                 'host': parsed.hostname,
-                'port': parsed.port,
+                'port': 5432, # --- FINAL FIX: Force Direct Connection (Bypass PgBouncer) ---
                 'database': parsed.path[1:],
                 'user': parsed.username,
                 'password': unquote(parsed.password),
                 'sslmode': 'require',
-                'connect_timeout': 10,
-                # --- TCP Keepalives for stability in cloud environments ---
+                'connect_timeout': 15, # Increased timeout for direct connection
+                # --- TCP Keepalives (Good practice, but direct port is the real fix) ---
                 'keepalives': 1,
-                'keepalives_idle': 30,
-                'keepalives_interval': 15,
-                'keepalives_count': 5
+                'keepalives_idle': 60,
+                'keepalives_interval': 30,
+                'keepalives_count': 10
             }
         
         # --- Initialize Connection Pool ---
