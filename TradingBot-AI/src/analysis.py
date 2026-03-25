@@ -179,7 +179,6 @@ def get_market_analysis(exchange, symbol, limit=60):
             'volume_ratio': latest['volume_ratio'],
             'price_momentum': latest['price_change'],
             'close': latest['close'],
-            'df': df,
             'mtf': mtf_analysis,  # إضافة تحليل multi-timeframe
             # الإضافات الجديدة
             'atr': latest['atr'],
