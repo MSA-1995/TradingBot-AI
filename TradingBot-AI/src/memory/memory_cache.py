@@ -1,6 +1,7 @@
 # memory_cache.py - في الذاكرة فقط
 import time
 import gc
+from typing import Dict, Any, Optional
 
 class MemoryCache:
     def __init__(self, default_expiry=300, max_items=100):
