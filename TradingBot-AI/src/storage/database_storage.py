@@ -546,23 +546,22 @@ class DatabaseStorage:
     
     # ========== Positions ==========
     def save_positions(self, positions):
+        """Saves positions to the database using a batch insert and proper connection handling."""
+        conn = None
         try:
             conn = self._get_conn()
-            conn.rollback()
             cursor = conn.cursor()
-            
-            cursor.execute("DELETE FROM positions")
-            
+
+            # Use TRUNCATE for efficiency, it's an atomic DDL command
+            cursor.execute("TRUNCATE TABLE positions")
+
+            values_to_insert = []
             for symbol, config in positions.items():
                 if config.get('position'):
                     pos = config['position']
                     invested = float(pos['buy_price']) * float(pos['amount'])
-                    
-                    cursor.execute("""
-                        INSERT INTO positions 
-                        (symbol, buy_price, amount, highest_price, tp_level_1, tp_level_2, buy_time, invested, data)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
+
+                    values_to_insert.append((
                         symbol,
                         float(pos['buy_price']),
                         float(pos['amount']),
@@ -573,24 +572,37 @@ class DatabaseStorage:
                         invested,
                         self.json.dumps(pos)
                     ))
-            
+
+            if values_to_insert:
+                from psycopg2.extras import execute_values
+                execute_values(
+                    cursor,
+                    """INSERT INTO positions 
+                    (symbol, buy_price, amount, highest_price, tp_level_1, tp_level_2, buy_time, invested, data)
+                    VALUES %s""",
+                    values_to_insert
+                )
+
             conn.commit()
             cursor.close()
             return True
         except Exception as e:
             print(f"❌ DB save positions error: {e}")
-            self._get_conn().rollback()
+            if conn: conn.rollback()
             return False
-    
+        finally:
+            if conn: self._put_conn(conn)
+
     def load_positions(self):
+        """Loads all positions from the database, ensuring connection is always returned."""
+        conn = None
         try:
             conn = self._get_conn()
-            conn.rollback()
             cursor = conn.cursor(cursor_factory=self.RealDictCursor)
             cursor.execute("SELECT * FROM positions")
             rows = cursor.fetchall()
             cursor.close()
-            
+
             data = {}
             for row in rows:
                 data[row['symbol']] = {
@@ -602,9 +614,10 @@ class DatabaseStorage:
                     'buy_time': row['buy_time'].isoformat(),
                     'invested': row['invested']
                 }
-            
+
             return data
         except Exception as e:
             print(f"❌ DB load positions error: {e}")
-            self._get_conn().rollback()
             return {}
+        finally:
+            if conn: self._put_conn(conn)
