@@ -11,9 +11,23 @@ class MemoryCompressor:
         if not candles_data:
             return None
         
+        # نحذف البيانات المكررة والغير مهمة
+        cleaned_data = []
+        for candle in candles_data:
+            if len(candle) >= 6:  # [timestamp, open, high, low, close, volume]
+                cleaned_candle = [
+                    int(candle[0]),      # timestamp
+                    float(candle[1]),    # open
+                    float(candle[2]),    # high
+                    float(candle[3]),    # low
+                    float(candle[4]),    # close
+                    float(candle[5])     # volume
+                ]
+                cleaned_data.append(cleaned_candle)
+        
         # نحول البيانات لنص مضغوط
-        json_str = json.dumps(candles_data)
-        compressed = zlib.compress(json_str.encode('utf-8'))
+        json_str = json.dumps(cleaned_data, separators=(',', ':'))  # إزالة المسافات
+        compressed = zlib.compress(json_str.encode('utf-8'), level=9)  # أعلى ضغط
         
         return {
             'compressed': compressed,
