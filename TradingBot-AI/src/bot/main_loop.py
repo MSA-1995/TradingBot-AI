@@ -16,6 +16,19 @@ from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRAD
 from bot.sell_handler import process_sell
 from bot.buy_handler import process_buy
 
+# Memory Optimization
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'memory'))
+try:
+    from memory.memory_optimizer import MemoryOptimizer
+    memory_optimizer = MemoryOptimizer()
+    MEMORY_OPTIMIZATION_ENABLED = True
+except Exception as e:
+    print(f"⚠️ Memory Optimizer not available in main_loop: {e}")
+    memory_optimizer = None
+    MEMORY_OPTIMIZATION_ENABLED = False
+
 
 def chunker(seq, size):
     """Yield successive n-sized chunks from a sequence."""
@@ -239,7 +252,23 @@ def run_main_loop(exchange, ctx):
                             else:
                                 print(f"⚠️ Report: Skipping {sym} due to incomplete position data.")
 
+                # إضافة إحصائيات الذاكرة إلى التقرير
+                memory_stats = None
+                if MEMORY_OPTIMIZATION_ENABLED and memory_optimizer:
+                    try:
+                        memory_stats = memory_optimizer.get_stats()
+                    except Exception as e:
+                        print(f"⚠️ Memory stats error: {e}")
+                
                 send_positions_report(available, invested, active_count, MAX_POSITIONS, open_positions_data)
+
+                # عرض إحصائيات الذاكرة
+                if memory_stats:
+                    print(f"\n🧠 Memory Stats:")
+                    print(f"  Cache Items: {memory_stats['cache_stats']['active_items']}")
+                    print(f"  Cache Hit Ratio: {memory_stats['cache_stats']['hit_ratio']:.2%}")
+                    print(f"  Memory Usage: {memory_stats['memory_status']['used_percent']:.1f}%")
+                    print(f"  Optimization: {memory_stats['total_optimization']}")
 
                 # Auto-cleanup old data (every report)
                 try:
