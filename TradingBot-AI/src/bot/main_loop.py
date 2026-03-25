@@ -19,9 +19,21 @@ from bot.buy_handler import process_buy
 # Memory Optimization
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'memory'))
+import time
+import gc
+
+# إضافة مسار memory إلى sys.path
+memory_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'memory')
+if memory_path not in sys.path:
+    sys.path.insert(0, memory_path)
+
 try:
-    from memory.memory_optimizer import MemoryOptimizer
+    # محاولة استيراد الملفات مباشرة
+    from memory_cache import MemoryCache
+    from memory_compressor import MemoryCompressor
+    from memory_cleaner import MemoryCleaner
+    from memory_optimizer import MemoryOptimizer
+    
     memory_optimizer = MemoryOptimizer()
     MEMORY_OPTIMIZATION_ENABLED = True
 except Exception as e:
