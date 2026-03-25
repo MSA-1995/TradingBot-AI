@@ -159,7 +159,7 @@ def send_buy_notification(symbol, amount, price, value, confidence, tp_target=No
         {"name": "Amount", "value": f"{amount:.6f}", "inline": True},
         {"name": "Price", "value": f"${price:.4f}", "inline": True},
         {"name": "Value", "value": f"${value:.2f}", "inline": True},
-        {"name": "Confidence", "value": f"{confidence}/120", "inline": True}
+        {"name": "Confidence", "value": f"{confidence}/100", "inline": True}
     ]
     
     # Add buy voting results if available
