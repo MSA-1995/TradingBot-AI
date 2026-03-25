@@ -3,37 +3,6 @@
 Lightweight main loop that imports from organized modules
 """
 
-# ========== AUTO-UPDATE PIP ==========
-import subprocess
-import sys
-try:
-    print("🔄 Checking pip updates...")
-    result = subprocess.run([sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip'], 
-                           capture_output=True, check=False, timeout=30, text=True)
-    if "Successfully installed" in result.stdout:
-        print("✅ pip updated successfully")
-    else:
-        print("✅ pip is up to date")
-except Exception as e:
-    print(f"⚠️ pip update skipped: {e}")
-
-# ========== AUTO-INSTALL ==========
-def install_dependencies():
-    import sys
-    required = ['ccxt', 'cryptography', 'requests', 'pandas', 'ta', 'colorama', 'python-dotenv']
-    for package in required:
-        try:
-            # Check if the package is importable. For python-dotenv, the module is dotenv.
-            module_name = 'dotenv' if package == 'python-dotenv' else package
-            __import__(module_name)
-        except ImportError:
-            print(f"📦 Installing {package}...")
-            import subprocess
-            subprocess.run([sys.executable, '-m', 'pip', 'install', package], 
-                         shell=False, capture_output=True)
-
-install_dependencies()
-
 # ========== LOAD ENV FILE ==========
 from dotenv import load_dotenv
 import os
