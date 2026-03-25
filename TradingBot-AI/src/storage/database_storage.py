@@ -37,7 +37,12 @@ class DatabaseStorage:
                 'user': parsed.username,
                 'password': unquote(parsed.password),
                 'sslmode': 'require',
-                'connect_timeout': 10
+                'connect_timeout': 10,
+                # --- TCP Keepalives for stability in cloud environments ---
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 15,
+                'keepalives_count': 5
             }
         
         # --- Initialize Connection Pool ---
