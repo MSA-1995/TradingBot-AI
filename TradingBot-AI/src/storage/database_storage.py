@@ -224,49 +224,50 @@ class DatabaseStorage:
         return False # فشل بعد كل المحاولات
     
     def _check_schema_updates(self):
-        """التحقق من تحديثات المخطط وإصلاحها تلقائياً (Self-Healing)"""
-        conn = None
+        """التحقق من تحديثات المخطط وإصلاحها تلقائياً (Self-Healing) في معاملات معزولة."""
+        
+        # --- المهمة 1: إضافة حقل 'invested' (في معاملة معزولة)
+        conn_invested = None
         try:
-            conn = self._get_conn()
-            cursor = conn.cursor()
+            conn_invested = self._get_conn()
+            cursor = conn_invested.cursor()
+            # إعطاء مهلة زمنية سخية لهذه العملية البطيئة المحتملة
+            cursor.execute("SET statement_timeout = '120s';") 
+            cursor.execute("ALTER TABLE positions ADD COLUMN invested FLOAT NOT NULL DEFAULT 0;")
+            conn_invested.commit()
+            print("🔧 Schema Update: Added 'invested' column to 'positions' table.")
+            cursor.close()
+        except self._psycopg2.errors.DuplicateColumn:
+            # هذا ليس خطأ، بل يعني أن الحقل موجود بالفعل. نتجاهله.
+            if conn_invested: conn_invested.rollback()
+        except Exception as e:
+            print(f"⚠️ Schema update error (invested): {e}")
+            if conn_invested: conn_invested.rollback()
+        finally:
+            if conn_invested: self._put_conn(conn_invested)
 
-            # --- FIX: Increase statement timeout for this session to prevent DDL timeouts ---
-            cursor.execute("SET statement_timeout = '60s';")
-            
-            # --- ADD 'invested' to 'positions' ---
-            try:
-                cursor.execute("ALTER TABLE positions ADD COLUMN invested FLOAT NOT NULL DEFAULT 0;")
-                conn.commit()
-                print("🔧 Schema Update: Added 'invested' column to 'positions' table.")
-            except self._psycopg2.errors.DuplicateColumn:
-                conn.rollback() # Ignore if column already exists
-            except Exception as e:
-                print(f"⚠️ Schema update error (invested): {e}")
-                conn.rollback()
-
-            # --- ADD 'dl_models_v2' table ---
-            try:
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS dl_models_v2 (
-                        model_name VARCHAR(50) PRIMARY KEY,
-                        model_data BYTEA NOT NULL,
-                        trained_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                    );
-                """)
-                conn.commit()
-                print("🔧 Schema Update: Ensured 'dl_models_v2' table exists.")
-            except Exception as e:
-                print(f"⚠️ Schema update error (dl_models_v2): {e}")
-                conn.rollback()
-            
+        # --- المهمة 2: التأكد من وجود جدول 'dl_models_v2' (في معاملة معزولة)
+        conn_dl = None
+        try:
+            conn_dl = self._get_conn()
+            cursor = conn_dl.cursor()
+            # مهلة أقصر مناسبة لهذه العملية السريعة
+            cursor.execute("SET statement_timeout = '30s';")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS dl_models_v2 (
+                    model_name VARCHAR(50) PRIMARY KEY,
+                    model_data BYTEA NOT NULL,
+                    trained_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            conn_dl.commit()
+            print("🔧 Schema Update: Ensured 'dl_models_v2' table exists.")
             cursor.close()
         except Exception as e:
-            print(f"⚠️ Schema update check failed: {e}")
-            if conn: 
-                try: conn.rollback()
-                except: pass
+            print(f"⚠️ Schema update error (dl_models_v2): {e}")
+            if conn_dl: conn_dl.rollback()
         finally:
-            if conn: self._put_conn(conn)
+            if conn_dl: self._put_conn(conn_dl)
 
     # ========== Trades ==========
     def save_trade(self, trade_data):
