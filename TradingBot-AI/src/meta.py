@@ -12,10 +12,10 @@ class Meta:
     def __init__(self, dl_client=None, risk_manager=None, rescue_scalper=None, storage=None, news_analyzer=None, fibonacci_analyzer=None):
         self.dl_client = dl_client
         self.risk_manager = risk_manager
-        self.rescue_scalper = rescue_scalper
+        self.rescue_scalper = None  # تم إيقافه - غير ضروري
         self.storage = storage
         self.news_analyzer = news_analyzer
-        self.fibonacci_analyzer = fibonacci_analyzer
+        self.fibonacci_analyzer = None  # تم إيقافه - غير ضروري
         self.meta_learner = None
         self.load_meta_learner()
         print("👑 Meta (The King) is initialized and ready to rule.")
@@ -32,7 +32,7 @@ class Meta:
 
             if model_data:
                 self.meta_learner = pickle.loads(model_data)
-                   #print("👑🧠 Meta: New King's Brain (Meta-Learner) loaded successfully from DB!")
+                #print("👑🧠 Meta: New King's Brain (Meta-Learner) loaded successfully from DB!")
             else:
                 print("⚠️ Meta: Meta-Learner model not found in DB. Buy decisions will be disabled.")
                 self.meta_learner = None
@@ -92,10 +92,8 @@ class Meta:
                 news_boost = self.news_analyzer.get_news_confidence_boost(symbol)
                 confidence += news_boost
 
-            # Add fibonacci confidence boost
-            if self.fibonacci_analyzer and analysis.get('df') is not None:
-                fibo_boost = self.fibonacci_analyzer.get_confidence_boost(analysis['df']['close'].iloc[-1], analysis['df'], analysis.get('volume_ratio', 1.0), symbol)
-                confidence += fibo_boost
+            # Fibonacci confidence boost (تم إيقافه - غير ضروري)
+            # لا يتم إضافة أي تعزيز من فيبوناتشي
 
             confidence = max(0, min(100, confidence)) # Ensure confidence is between 0 and 100
 
@@ -174,29 +172,13 @@ class Meta:
         highest_profit_percent = ((highest_price - buy_price) / buy_price) * 100
         drop_from_high_percent = ((highest_price - current_price) / buy_price) * 100
 
-        # 0. Zombie Trade Check (3 Days Limit)
+        # 0. Zombie Trade Check (3 Days Limit) - بدون rescue_scalper
         if hours_held >= 72:
-            if self.rescue_scalper:
-                print(f"🤪 {symbol}: Handing over to Crazy Rescue Scalper (> 72h)...")
-                rescue_decision = self.rescue_scalper.get_exit_decision(symbol, analysis, profit_percent)
-                
-                if rescue_decision['action'] == 'SELL':
-                    return {
-                        'action': 'SELL',
-                        'reason': rescue_decision['reason'],
-                        'profit': profit_percent
-                    }
-                else:
-                    return {
-                        'action': 'HOLD',
-                        'reason': rescue_decision['reason']
-                    }
-            else:
-                return {
-                    'action': 'SELL',
-                    'reason': 'ZOMBIE TRADE (72h timeout)',
-                    'profit': profit_percent
-                }
+            return {
+                'action': 'SELL',
+                'reason': 'ZOMBIE TRADE (72h timeout)',
+                'profit': profit_percent
+            }
 
         # 1. Dynamic Trailing Stop Loss
         stop_loss_percent = 2.0  # Default static 2%
