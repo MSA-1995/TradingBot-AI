@@ -32,7 +32,7 @@ class Meta:
 
             if model_data:
                 self.meta_learner = pickle.loads(model_data)
-                print("👑🧠 Meta: New King's Brain (Meta-Learner) loaded successfully from DB!")
+                   #print("👑🧠 Meta: New King's Brain (Meta-Learner) loaded successfully from DB!")
             else:
                 print("⚠️ Meta: Meta-Learner model not found in DB. Buy decisions will be disabled.")
                 self.meta_learner = None
