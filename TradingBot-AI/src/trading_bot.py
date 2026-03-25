@@ -56,7 +56,6 @@ try:
     from models.anomaly_detector import AnomalyDetector
     from models.exit_strategy_model import ExitStrategyModel
     from models.enhanced_pattern_recognition import EnhancedPatternRecognition
-    from models.fibonacci_analyzer import FibonacciAnalyzer
     from models.smart_money_tracker import SmartMoneyTracker
     from models.liquidity_analyzer import LiquidityAnalyzer
     from models.market_mood_analyzer import MarketMoodAnalyzer # <<< استيراد الخبير الجديد
@@ -149,13 +148,8 @@ except Exception as e:
 # Capital Manager
 capital_manager = CapitalManager(max_capital=MAX_CAPITAL, profit_reserve=PROFIT_RESERVE)
 
-# Rescue Scalper (الخبل)
-try:
-    from models.rescue_scalper import RescueScalper
-    rescue_scalper = RescueScalper()
-except Exception as e:
-    print(f"⚠️ Rescue Scalper not loaded: {e}")
-    rescue_scalper = None
+# Rescue Scalper (تم إيقافه - غير ضروري)
+rescue_scalper = None
 
 # Advanced Models
 if MODELS_ENABLED:
@@ -163,7 +157,6 @@ if MODELS_ENABLED:
     anomaly_detector = AnomalyDetector(exchange)
     exit_strategy = ExitStrategyModel(storage)
     pattern_recognizer = EnhancedPatternRecognition(storage)
-    fibonacci_analyzer = FibonacciAnalyzer()
     smart_money_tracker = SmartMoneyTracker(exchange)
     liquidity_analyzer = LiquidityAnalyzer(exchange)
     market_mood_analyzer = MarketMoodAnalyzer() # <<< إضافة الخبير الجديد
@@ -172,7 +165,6 @@ else:
     anomaly_detector = None
     exit_strategy = None
     pattern_recognizer = None
-    fibonacci_analyzer = None
     smart_money_tracker = None
     liquidity_analyzer = None
     market_mood_analyzer = None # <<< وإضافته هنا أيضاً
@@ -186,10 +178,10 @@ if META_ENABLED:
     meta = META_CLASS(
         dl_client=dl_client,
         risk_manager=risk_manager,
-        rescue_scalper=rescue_scalper,
+        rescue_scalper=None,
         storage=storage,
         news_analyzer=news_analyzer,
-        fibonacci_analyzer=fibonacci_analyzer
+        fibonacci_analyzer=None
     )
 
 # ========== BANNER ==========
@@ -250,7 +242,6 @@ if MODELS_ENABLED:
     print(f"🚨 Anomaly Detector: ACTIVE")
     print(f"🎯 Exit Strategy: ACTIVE")
     print(f"🧠 Pattern Recognition: ACTIVE")
-    print(f"📊 Fibonacci Analyzer: ACTIVE")
     print(f"🐋 Smart Money Tracker: ACTIVE")
     print(f"💧 Liquidity Analyzer: ACTIVE")
     print(f"🧐 Market Mood: ACTIVE")
@@ -393,18 +384,8 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                 except Exception as e:
                     smart_money_boost = 0
             
-            # Fibonacci Analysis (محسّن)
+            # Fibonacci Analysis (تم إيقافه - غير ضروري)
             fibonacci_boost = 0
-            if fibonacci_analyzer:
-                try:
-                    df = analysis.get('df')
-                    volume_ratio = analysis.get('volume_ratio', 1.0)
-                    if df is not None:
-                        fibonacci_boost = fibonacci_analyzer.get_confidence_boost(
-                            current_price, df, volume_ratio=volume_ratio, symbol=symbol
-                        )
-                except Exception as e:
-                    fibonacci_boost = 0
             
             # Market Mood Analysis (الخبير الاستراتيجي)
             mood_adjustment = 0
@@ -496,7 +477,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             # Add scores to reasons for clarity
             reasons.append(f"News: {news_adjustment:.1f}")
             reasons.append(f"SmartMoney: {smart_money_boost:.1f}")
-            reasons.append(f"Fibonacci: {fibonacci_boost:.1f}")
+            # reasons.append(f"Fibonacci: {fibonacci_boost:.1f}")  # تم إيقافه
             reasons.append(f"Liquidity: {liquidity_adjustment:.1f}")
             reasons.append(f"Mood: {mood_adjustment:.1f}")
             reasons.append(f"Pattern: {pattern_adjustment:.1f}")
@@ -519,7 +500,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     'exit': exit_score,
                     'pattern': pattern_adjustment,
                     'smart_money': smart_money_boost,
-                    'fibonacci': fibonacci_boost,
+                    'fibonacci': 0,  # تم إيقافه
                     'liquidity': liquidity_adjustment,
                     'market_mood': mood_adjustment,
                     'news': news_adjustment,
