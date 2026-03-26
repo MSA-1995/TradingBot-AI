@@ -262,12 +262,11 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
         
         # Get analysis
         analysis = get_market_analysis(exchange_instance, symbol)
-        if not analysis or 'df' not in analysis or analysis['df'].empty:
+        if not analysis:
             if position:
                 return {'symbol': symbol, 'action': 'ERROR', 'message': 'Analysis failed (has position)'}
             return None
         
-        df = analysis['df']
         current_price = analysis['close']
         
         # ========== SELL LOGIC ==========
@@ -357,8 +356,8 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             smart_money_tracker = preloaded_advisors.get('SmartMoneyTracker')
             try:
                 if smart_money_tracker:
-                    smart_money_boost = smart_money_tracker.get_confidence_adjustment(symbol, df)
-                    should_avoid, avoid_reason = smart_money_tracker.should_avoid(symbol, df)
+                    smart_money_boost = smart_money_tracker.get_confidence_adjustment(symbol, analysis)
+                    should_avoid, avoid_reason = smart_money_tracker.should_avoid(symbol, analysis)
                     if should_avoid:
                         return {'symbol': symbol, 'action': 'SKIP', 'reason': avoid_reason}
             except Exception as e:
@@ -371,7 +370,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                 if fibonacci_analyzer:
                     volume_ratio = analysis.get('volume_ratio', 1.0)
                     fibonacci_boost = fibonacci_analyzer.get_confidence_boost(
-                        current_price, df, volume_ratio=volume_ratio, symbol=symbol
+                        current_price, analysis, volume_ratio=volume_ratio, symbol=symbol
                     )
             except Exception as e:
                 fibonacci_boost = 0
@@ -386,24 +385,8 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             except Exception as e:
                 mood_adjustment = 0
             
-            # Calculate price drop
-            price_drop = {'drop_percent': 0, 'confirmed': False}
-            try:
-                df = analysis['df']
-                if len(df) >= 12:
-                    highest_price_1h = df['high'].tail(12).max()
-                    current_price_df = df['close'].iloc[-1]
-                    
-                    if highest_price_1h is not None and current_price_df is not None and highest_price_1h > 0:
-                        drop_percent = ((highest_price_1h - current_price_df) / highest_price_1h) * 100
-                        price_drop = {
-                            'drop_percent': drop_percent,
-                            'highest_1h': highest_price_1h,
-                            'current': current_price_df,
-                            'confirmed': drop_percent >= 2.0
-                        }
-            except Exception as e:
-                pass
+            # Get price drop from analysis
+            price_drop = analysis.get('price_drop', {'drop_percent': 0, 'confirmed': False})
             
             confidence, reasons = calculate_dynamic_confidence(analysis, mtf)
             
