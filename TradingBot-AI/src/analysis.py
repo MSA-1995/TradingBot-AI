@@ -144,6 +144,7 @@ def get_market_analysis(exchange, symbol, limit=60):
         mtf_analysis = calculate_mtf_from_5m_data(df)
         
         latest = df.iloc[-1]
+        candles = df.tail(2).to_dict('records') if len(df) >= 2 else []
         
         # تحسين: إذا المؤشرات سيئة جداً، لا داعي لجلب Order Book (توفير وقت)
         # إذا RSI > 65 (تشبع شرائي) وما زلنا نبحث عن شراء، غالباً لن نشتري
@@ -190,6 +191,7 @@ def get_market_analysis(exchange, symbol, limit=60):
         # تم استخلاص جميع المعلومات الضرورية في المتغير 'latest'
         # سيتم تحرير ذاكرة الـ df تلقائيًا عند انتهاء الدالة.
         return {
+            'candles': candles, # <<< إضافة الشموع
             # 'df': df, # <<< تم الحذف لمنع تسرب الذاكرة
             'rsi': latest['rsi'],
             'macd': latest['macd'],
