@@ -513,6 +513,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     # Amount already calculated by Meta with Risk Manager voting
                     amount_usd = decision['amount']
                     
+                    # [تحسين الذاكرة] لا تقم بإرجاع 'analysis' الكامل
                     return {
                         'symbol': symbol,
                         'action': 'BUY',
@@ -520,7 +521,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'price': current_price,
                         'confidence': decision['confidence'],
                         'decision': decision,
-                        'analysis': analysis,
+                        # 'analysis': analysis, # تم الحذف لتقليل استهلاك الذاكرة
                         'news_summary': news_summary if news_adjustment != 0 else None
                     }
                 else:
@@ -539,13 +540,14 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             else:
                 # Manual mode
                 if final_confidence >= MIN_CONFIDENCE:
+                    # [تحسين الذاكرة] لا تقم بإرجاع 'analysis' الكامل
                     return {
                         'symbol': symbol,
                         'action': 'BUY',
                         'amount': BASE_AMOUNT,
                         'price': current_price,
                         'confidence': final_confidence,
-                        'analysis': analysis
+                        # 'analysis': analysis # تم الحذف لتقليل استهلاك الذاكرة
                     }
                 else:
                     return {
