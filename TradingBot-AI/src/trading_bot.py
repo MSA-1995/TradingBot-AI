@@ -37,7 +37,7 @@ from config_encrypted import get_api_keys, get_discord_webhook
 from config import *
 
 # Modules
-from analysis import get_market_analysis, get_multi_timeframe_analysis
+from analysis import get_market_analysis
 from trading import execute_buy, execute_sell, calculate_sell_value
 from notifications import send_buy_notification, send_sell_notification, send_positions_report
 from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent, format_price
@@ -262,11 +262,12 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
         
         # Get analysis
         analysis = get_market_analysis(exchange_instance, symbol)
-        if not analysis:
+        if not analysis or 'df' not in analysis or analysis['df'].empty:
             if position:
                 return {'symbol': symbol, 'action': 'ERROR', 'message': 'Analysis failed (has position)'}
             return None
         
+        df = analysis['df']
         current_price = analysis['close']
         
         # ========== SELL LOGIC ==========
@@ -287,13 +288,10 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             sell_reason = None
             
             # Get MTF from analysis (cache) - تحسين السرعة
-            mtf = analysis.get('mtf') if analysis else None
+            mtf = analysis.get('mtf') # Guaranteed to exist from get_market_analysis
             
             # Meta (الملك الجديد) - المسؤول عن البيع
             if meta:
-                if mtf is None:
-                    mtf = get_multi_timeframe_analysis(exchange_instance, symbol)
-                
                 sell_decision = meta.should_sell(
                     symbol, position, current_price, analysis, mtf
                 )
@@ -352,15 +350,15 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                 return None
             
             # Get MTF and calculate confidence
-            mtf = analysis.get('mtf') or get_multi_timeframe_analysis(exchange_instance, symbol)
+            mtf = analysis.get('mtf') # Guaranteed to exist from get_market_analysis
             
             # Smart Money Analysis (بديل MTF)
             smart_money_boost = 0
             smart_money_tracker = preloaded_advisors.get('SmartMoneyTracker')
             try:
                 if smart_money_tracker:
-                    smart_money_boost = smart_money_tracker.get_confidence_adjustment(symbol, analysis)
-                    should_avoid, avoid_reason = smart_money_tracker.should_avoid(symbol, analysis)
+                    smart_money_boost = smart_money_tracker.get_confidence_adjustment(symbol, df)
+                    should_avoid, avoid_reason = smart_money_tracker.should_avoid(symbol, df)
                     if should_avoid:
                         return {'symbol': symbol, 'action': 'SKIP', 'reason': avoid_reason}
             except Exception as e:
@@ -371,12 +369,10 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             fibonacci_analyzer = preloaded_advisors.get('FibonacciAnalyzer')
             try:
                 if fibonacci_analyzer:
-                    df = analysis.get('df')
                     volume_ratio = analysis.get('volume_ratio', 1.0)
-                    if df is not None:
-                        fibonacci_boost = fibonacci_analyzer.get_confidence_boost(
-                            current_price, df, volume_ratio=volume_ratio, symbol=symbol
-                        )
+                    fibonacci_boost = fibonacci_analyzer.get_confidence_boost(
+                        current_price, df, volume_ratio=volume_ratio, symbol=symbol
+                    )
             except Exception as e:
                 fibonacci_boost = 0
             
