@@ -608,7 +608,7 @@ class DeepLearningClientV2:
             return {}
 
     def vote_sell_now(self, symbol, profit_percent, rsi, macd, volume_ratio, trend, hours_held,
-                      market_sentiment=None, highest_profit_percent=0, drop_from_high_percent=0):
+                      market_sentiment=None, highest_profit_percent=0, drop_from_high_percent=0, peak_hunter_signal='neutral'):
         """
         المستشارين يراقبون ويصوتون: هل نبيع الحين؟
         
@@ -726,7 +726,7 @@ class DeepLearningClientV2:
         # Neutral/Bullish: عادي (3/7)
         return 'neutral', 3
     
-    def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence, liquidity_metrics=None, market_sentiment=None, candle_analysis=None):
+    def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence, liquidity_metrics=None, market_sentiment=None, candle_analysis=None, peak_hunter_signal='neutral'):
         """
         المستشارين يصوتون: هل نشتري؟ (BUY/SKIP)
         market_sentiment: {'btc_change_1h': float, 'eth_change_1h': float, 'bnb_change_1h': float}
