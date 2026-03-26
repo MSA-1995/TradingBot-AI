@@ -520,7 +520,10 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'price': current_price,
                         'confidence': decision['confidence'],
                         'decision': decision,
-                        # 'analysis': analysis, # تم الحذف لتقليل استهلاك الذاكرة
+                        'models_scores': models_scores,
+                        'rsi': analysis.get('rsi', 0),
+                        'volume': analysis.get('volume_ratio', 0),
+                        'macd_diff': analysis.get('macd_diff', 0),
                         'news_summary': news_summary if news_adjustment != 0 else None
                     }
                 else:
@@ -546,7 +549,9 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'amount': BASE_AMOUNT,
                         'price': current_price,
                         'confidence': final_confidence,
-                        # 'analysis': analysis # تم الحذف لتقليل استهلاك الذاكرة
+                        'rsi': analysis.get('rsi', 0),
+                        'volume': analysis.get('volume_ratio', 0),
+                        'macd_diff': analysis.get('macd_diff', 0),
                     }
                 else:
                     return {
