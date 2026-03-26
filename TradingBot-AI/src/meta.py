@@ -75,34 +75,10 @@ class Meta:
                 print(f"⚠️ Consultant buy voting error: {e}")
         # --- End Consultant Buy Voting ---
 
-        # --- Market Sentiment Analysis (3-coin balance) ---
-        btc_change = analysis.get('btc_change_1h', 0) if analysis else 0
-        eth_change = analysis.get('eth_change_1h', 0) if analysis else 0
-        bnb_change = analysis.get('bnb_change_1h', 0) if analysis else 0
-
-        up_count = 0
-        down_count = 0
-        # A significant move is more than 0.2% in 1 hour
-        threshold = 0.2 
-
-        if btc_change > threshold: up_count += 1
-        elif btc_change < -threshold: down_count += 1
-
-        if eth_change > threshold: up_count += 1
-        elif eth_change < -threshold: down_count += 1
-
-        if bnb_change > threshold: up_count += 1
-        elif bnb_change < -threshold: down_count += 1
-
-        if up_count >= 2:
-            market_mood = "Bullish"
-            min_consensus_percentage = 33 # Be more aggressive
-        elif down_count >= 2:
-            market_mood = "Bearish"
-            min_consensus_percentage = 70 # Be more cautious
-        else:
-            market_mood = "Neutral"
-            min_consensus_percentage = 40 # Balanced approach
+        # --- Market Sentiment Analysis ---
+        mood_details = self._get_market_mood(analysis)
+        market_mood = mood_details['mood']
+        min_consensus_percentage = mood_details['min_buy_consensus']
         # --- End Market Sentiment ---
 
         if total_consultants > 0 and buy_vote_percentage < min_consensus_percentage:
@@ -194,31 +170,9 @@ class Meta:
         buy_price = position['buy_price']
         profit_percent = ((current_price - buy_price) / buy_price) * 100
 
-        # --- 1. Market Sentiment Analysis (3-coin balance) ---
-        btc_change = analysis.get('btc_change_1h', 0) if analysis else 0
-        eth_change = analysis.get('eth_change_1h', 0) if analysis else 0
-        bnb_change = analysis.get('bnb_change_1h', 0) if analysis else 0
-
-        up_count = 0
-        down_count = 0
-        # A significant move is more than 0.2% in 1 hour
-        threshold = 0.2
-
-        if btc_change > threshold: up_count += 1
-        elif btc_change < -threshold: down_count += 1
-
-        if eth_change > threshold: up_count += 1
-        elif eth_change < -threshold: down_count += 1
-
-        if bnb_change > threshold: up_count += 1
-        elif bnb_change < -threshold: down_count += 1
-
-        if up_count >= 2:
-            market_mood = "Bullish"
-        elif down_count >= 2:
-            market_mood = "Bearish"
-        else:
-            market_mood = "Neutral"
+        # --- 1. Market Sentiment Analysis ---
+        mood_details = self._get_market_mood(analysis)
+        market_mood = mood_details['mood']
         # --- End Market Sentiment ---
 
         # --- 2. Emergency Exit: Catastrophic News ONLY in a Bearish Market ---
@@ -296,13 +250,8 @@ class Meta:
                 market_sentiment, highest_profit_percent, drop_from_high_percent, peak_hunter_signal=peak_hunter_signal
             )
 
-                # --- Dynamic Consensus Threshold for Selling (using mood from above) ---
-                if market_mood == "Bullish":
-                    min_sell_percentage = 70  # Bullish: Hold for more profit, sell only on strong consensus
-                elif market_mood == "Bearish":
-                    min_sell_percentage = 33  # Bearish: Get out quickly on weaker consensus
-                else: # Neutral
-                    min_sell_percentage = 40  # Neutral: Balanced approach
+                # --- Dynamic Consensus Threshold for Selling ---
+                min_sell_percentage = mood_details['min_sell_consensus']
                 # --- End Dynamic Consensus ---
 
                 total_votes = len(sell_votes)
@@ -324,6 +273,42 @@ class Meta:
                 print(f"⚠️ Sell voting error: {e}")
         
         return {'action': 'HOLD', 'reason': 'Waiting for target'}
+
+    def _get_market_mood(self, analysis):
+        """Analyzes BTC, ETH, BNB changes to determine the overall market mood and required consensus."""
+        btc_change = analysis.get('btc_change_1h', 0) if analysis else 0
+        eth_change = analysis.get('eth_change_1h', 0) if analysis else 0
+        bnb_change = analysis.get('bnb_change_1h', 0) if analysis else 0
+
+        up_count = 0
+        down_count = 0
+        # A significant move is more than 0.2% in 1 hour
+        threshold = 0.2 
+
+        if btc_change > threshold: up_count += 1
+        elif btc_change < -threshold: down_count += 1
+
+        if eth_change > threshold: up_count += 1
+        elif eth_change < -threshold: down_count += 1
+
+        if bnb_change > threshold: up_count += 1
+        elif bnb_change < -threshold: down_count += 1
+
+        mood_details = {}
+        if up_count >= 2:
+            mood_details['mood'] = "Bullish"
+            mood_details['min_buy_consensus'] = 33 # Be more aggressive
+            mood_details['min_sell_consensus'] = 70 # Hold for more profit
+        elif down_count >= 2:
+            mood_details['mood'] = "Bearish"
+            mood_details['min_buy_consensus'] = 70 # Be more cautious
+            mood_details['min_sell_consensus'] = 33 # Get out quickly
+        else:
+            mood_details['mood'] = "Neutral"
+            mood_details['min_buy_consensus'] = 40 # Balanced approach
+            mood_details['min_sell_consensus'] = 40 # Balanced approach
+        
+        return mood_details
 
     def _calculate_smart_amount(self, symbol, confidence, analysis):
         """حساب المبلغ الذكي بالتصويت من المستشارين + Risk Manager"""
