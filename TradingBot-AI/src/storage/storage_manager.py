@@ -47,6 +47,12 @@ class StorageManager:
     def load_patterns(self):
         """تحميل الأنماط"""
         return self.storage.load_patterns()
+
+    def find_similar_patterns_in_db(self, features, pattern_type, limit=10):
+        """Finds similar patterns by delegating to the active storage engine."""
+        if hasattr(self.storage, 'find_similar_patterns_in_db'):
+            return self.storage.find_similar_patterns_in_db(features, pattern_type, limit)
+        return [] # Return empty list if not supported (e.g., local storage)
     
     # ========== AI Decisions ==========
     def save_ai_decision(self, decision_data):
