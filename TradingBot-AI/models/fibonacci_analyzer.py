@@ -42,18 +42,13 @@ class FibonacciAnalyzer:
         except:
             return None
     
-    def get_support_level(self, current_price, df):
+    def get_support_level(self, current_price, analysis):
         """تحديد أقرب مستوى دعم فيبوناتشي"""
         try:
-            # أعلى وأقل سعر في آخر 24 ساعة (288 شمعة × 5 دقائق)
-            if len(df) < 50:
-                return None
+            high = analysis.get('high_24h')
+            low = analysis.get('low_24h')
             
-            recent_df = df.tail(min(288, len(df)))
-            high = recent_df['high'].max()
-            low = recent_df['low'].min()
-            
-            if high <= low or high == 0:
+            if not high or not low or high <= low:
                 return None
             
             # حساب المستويات
@@ -109,10 +104,10 @@ class FibonacciAnalyzer:
         else:
             return 1.0  # عادي
     
-    def is_at_support(self, current_price, df, tolerance=0.5, volume_ratio=1.0, symbol=''):
+    def is_at_support(self, current_price, analysis, tolerance=0.5, volume_ratio=1.0, symbol=''):
         """هل السعر عند مستوى دعم فيبوناتشي؟ (محسّن)"""
         try:
-            support = self.get_support_level(current_price, df)
+            support = self.get_support_level(current_price, analysis)
             if not support:
                 return False, 0
             
@@ -149,16 +144,16 @@ class FibonacciAnalyzer:
         except:
             return False, 0
     
-    def get_confidence_boost(self, current_price, df, volume_ratio=1.0, symbol=''):
+    def get_confidence_boost(self, current_price, analysis, volume_ratio=1.0, symbol=''):
         """حساب زيادة الثقة بناءً على فيبوناتشي (محسّن)"""
         try:
-            at_support, boost = self.is_at_support(current_price, df, volume_ratio=volume_ratio, symbol=symbol)
+            at_support, boost = self.is_at_support(current_price, analysis, volume_ratio=volume_ratio, symbol=symbol)
             
             if at_support:
                 return boost
             
             # إذا مو عند دعم، شوف المسافة
-            support = self.get_support_level(current_price, df)
+            support = self.get_support_level(current_price, analysis)
             if not support:
                 return 0
             
@@ -187,10 +182,10 @@ class FibonacciAnalyzer:
             else:
                 self.level_success[level_name]['fail'] += 1
     
-    def get_stop_loss_level(self, entry_price, df):
+    def get_stop_loss_level(self, entry_price, analysis):
         """تحديد Stop Loss تحت مستوى فيبوناتشي"""
         try:
-            support = self.get_support_level(entry_price, df)
+            support = self.get_support_level(entry_price, analysis)
             if not support:
                 return entry_price * 0.985  # -1.5% default
             
