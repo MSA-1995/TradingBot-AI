@@ -350,14 +350,13 @@ class EnhancedPatternRecognition:
                 'success_rate': 1.0 if pattern_type == 'SUCCESS' else 0.0
             }
             
-            # حفظ النمط
-            self.patterns[pattern_type].append(pattern)
-            
             # حفظ في قاعدة البيانات
             self.storage.save_pattern(pattern)
-            
-            # تحديث الأوزان
-            self._update_pattern_weights(pattern_type)
+
+            # The following lines were removed as they depend on self.patterns,
+            # which is no longer used for memory optimization.
+            # self.patterns[pattern_type].append(pattern)
+            # self._update_pattern_weights(pattern_type)
             
             print(f"✅ Learned {pattern_type} pattern for {trade_data.get('symbol')}")
             
