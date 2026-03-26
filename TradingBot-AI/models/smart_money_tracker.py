@@ -99,10 +99,9 @@ class SmartMoneyTracker:
         except:
             return 0
     
-    def get_confidence_adjustment(self, symbol, analysis):
+    def get_confidence_adjustment(self, symbol, df):
         """حساب تعديل الثقة بناءً على Smart Money"""
         try:
-            df = analysis.get('df')
             if df is None or len(df) < 20:
                 return 0
             
@@ -123,10 +122,9 @@ class SmartMoneyTracker:
         except:
             return 0
     
-    def should_avoid(self, symbol, analysis):
+    def should_avoid(self, symbol, df):
         """هل يجب تجنب العملة؟"""
         try:
-            df = analysis.get('df')
             if df is None:
                 return False, ""
             
