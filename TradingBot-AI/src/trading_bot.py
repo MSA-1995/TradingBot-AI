@@ -7,7 +7,6 @@ Lightweight main loop that imports from organized modules
 from dotenv import load_dotenv
 import os
 import sys
-import psutil # <<< For memory diagnostics
 
 # إضافة المسار الرئيسي للمشروع حتى يتعرف على مجلدات models و memory
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -231,7 +230,7 @@ if NEWS_ENABLED:
     print(f"📰 News Sentiment Analyzer: ACTIVE")
 
 print(f"💰 Amount: ~$15 (Dynamic)")
-print(f"🎯 TP: Dynamic (Vote Based) | SL:2% Trailing Stop")
+print(f"🎯 TP: Dynamic | SL: Dynamic TSL (ATR Based, 1%-5%)")
 print(f"🎯 Min Buy Confidence: {MIN_CONFIDENCE}/100\n")
 
 # Startup notification calls removed for simplification.
@@ -249,7 +248,6 @@ sell_cooldown = {}
 COOLDOWN_MINUTES = 20
 
 # ========== PARALLEL ANALYSIS FUNCTION ==========
-
 def analyze_single_symbol(symbol, exchange_instance, active_count, available, invested, meta, preloaded_advisors):
     """تحليل عملة واحدة - يعمل في thread منفصل"""
     """تحليل عملة واحدة - يعمل في thread منفصل"""
@@ -294,7 +292,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             # Meta (الملك الجديد) - المسؤول عن البيع
             if meta:
                 sell_decision = meta.should_sell(
-                    symbol, position, current_price, analysis, mtf
+                    symbol, position, current_price, analysis, mtf, analysis.get('candles', [])
                 )
                 
                 if sell_decision and sell_decision.get('action') == 'SELL':
@@ -491,7 +489,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     models_scores['risk'] = risk_manager.get_risk_score(analysis, final_confidence)
                 
                 # The King decides
-                decision = meta.should_buy(symbol, analysis, models_scores)
+                decision = meta.should_buy(symbol, analysis, models_scores, analysis.get('candles', []))
 
                 if decision['action'] == 'BUY':
                     # Amount already calculated by Meta with Risk Manager voting
