@@ -42,42 +42,33 @@ def process_sell(result, exchange, ctx):
     position = result['position']
 
     # AI Learning is now handled by the trainer based on trades_history.
-    # The old ai_brain.learn_from_trade call is removed.
-
-    # Exit Strategy Learning
-    if advisor_manager:
+    # Instead of learning directly, we save the trade result to the database.
+    # The external trainer script will then use this data for asynchronous learning.
+    try:
+        hours_held = 24
         try:
-            exit_strategy = advisor_manager.get('ExitStrategyModel')
-            safe_profit = float(result['profit']) if result['profit'] is not None else 0
-            hours_held = 24
-            try:
-                buy_time_str = position.get('buy_time')
-                if buy_time_str:
-                    buy_time = datetime.fromisoformat(buy_time_str)
-                    hours_held = (datetime.now() - buy_time).total_seconds() / 3600
-            except:
-                pass
+            buy_time_str = position.get('buy_time')
+            if buy_time_str:
+                buy_time = datetime.fromisoformat(buy_time_str)
+                hours_held = (datetime.now() - buy_time).total_seconds() / 3600
+        except:
+            pass # Use default hours_held
 
-            exit_strategy.learn_from_exit(symbol, {
-                'profit_percent': safe_profit,
-                'sell_reason': result['reason'],
-                'hours_held': hours_held
-            })
-        except Exception as e:
-            pass
-
-    # Pattern Recognition Learning
-    if advisor_manager:
-        try:
-            pattern_recognizer = advisor_manager.get('EnhancedPatternRecognition')
-            safe_profit = float(result['profit']) if result['profit'] is not None else 0
-            pattern_recognizer.learn_pattern({
-                'symbol': symbol,
-                'profit_percent': safe_profit,
-                'features': position.get('ai_data', {})
-            })
-        except Exception as e:
-            pass
+        trade_data = {
+            'symbol': symbol,
+            'action': 'sell',
+            'profit_percent': result.get('profit'),
+            'sell_reason': result.get('reason'),
+            'hours_held': hours_held,
+            'data': {
+                'buy_price': position.get('buy_price'),
+                'sell_price': result.get('price'),
+                'ai_data': position.get('ai_data', {})
+            }
+        }
+        storage.save_trade(trade_data)
+    except Exception as e:
+        print(f"⚠️ Error saving trade for {symbol}: {e}")
 
     with symbols_data_lock:
         SYMBOLS_DATA[symbol]['position'] = None
