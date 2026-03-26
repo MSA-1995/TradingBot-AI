@@ -309,13 +309,6 @@ def send_model_error(model_name, error_message):
         error_message
     )
 
-def send_training_error(error_message):
-    """Send training failure alert"""
-    send_critical_alert(
-        "Training Failed",
-        "Deep Learning training encountered an error",
-        error_message
-    )
 
 def send_exchange_error(error_message):
     """Send exchange API error alert"""
