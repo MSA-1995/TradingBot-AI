@@ -100,8 +100,8 @@ class Meta:
 
             # Add fibonacci confidence boost
             fibonacci_analyzer = self.advisor_manager.get('FibonacciAnalyzer')
-            if fibonacci_analyzer and analysis.get('df') is not None:
-                fibo_boost = fibonacci_analyzer.get_confidence_boost(analysis['df']['close'].iloc[-1], analysis['df'], analysis.get('volume_ratio', 1.0), symbol)
+            if fibonacci_analyzer:
+                fibo_boost = fibonacci_analyzer.get_confidence_boost(analysis['close'], analysis, analysis.get('volume_ratio', 1.0), symbol)
                 confidence += fibo_boost
 
             confidence = max(0, min(100, confidence)) # Ensure confidence is between 0 and 100
