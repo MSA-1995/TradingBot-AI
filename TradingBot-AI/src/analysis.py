@@ -75,17 +75,18 @@ def get_market_analysis(exchange, symbol, limit=60):
         
         # ========== الإضافات الجديدة (5 مؤشرات) ==========
         
-        # 1. ATR (Average True Range) - للمخاطرة
-        df['high_low'] = df['high'] - df['low']
-        df['high_close'] = abs(df['high'] - df['close'].shift())
-        df['low_close'] = abs(df['low'] - df['close'].shift())
-        df['true_range'] = df[['high_low', 'high_close', 'low_close']].max(axis=1)
-        df['atr'] = df['true_range'].rolling(window=14).mean()
+        # 1. ATR (Average True Range) - للمخاطرة (محسّن باستخدام مكتبة ta)
+        df['atr'] = ta.volatility.AverageTrueRange(
+            high=df['high'],
+            low=df['low'],
+            close=df['close'],
+            window=14
+        ).average_true_range()
         df['atr'] = df['atr'].fillna(1.0)
         
-        # 2. EMA 9/21 Crossover - للأنماط
-        df['ema_9'] = df['close'].ewm(span=9, adjust=False).mean()
-        df['ema_21'] = df['close'].ewm(span=21, adjust=False).mean()
+        # 2. EMA 9/21 Crossover - للأنماط (محسّن باستخدام مكتبة ta)
+        df['ema_9'] = ta.trend.EMAIndicator(close=df['close'], window=9, fillna=True).ema_indicator()
+        df['ema_21'] = ta.trend.EMAIndicator(close=df['close'], window=21, fillna=True).ema_indicator()
         df['ema_crossover'] = (df['ema_9'] > df['ema_21']).astype(int) * 2 - 1  # 1 or -1
         
         # 3. Bid-Ask Spread - للفخاخ (سيتم حسابه من API)
@@ -170,6 +171,7 @@ def get_market_analysis(exchange, symbol, limit=60):
         reversal_analysis = analyze_reversal(df, latest['close'])
         
         return {
+            'df': df, # <<< إضافة مهمة جداً
             'rsi': latest['rsi'],
             'macd': latest['macd'],
             'macd_signal': latest['macd_signal'],
@@ -247,40 +249,6 @@ def calculate_mtf_from_5m_data(df):
                     scores['bearish'] += 1
                 else:
                     scores['neutral'] += 1
-        
-        trend = max(scores, key=scores.get)
-        return {'trend': trend, 'scores': scores, 'total': scores[trend]}
-        
-    except Exception as e:
-        return {'trend': 'neutral', 'scores': {'bullish': 0, 'bearish': 0, 'neutral': 3}, 'total': 3}
-
-def get_multi_timeframe_analysis(exchange, symbol):
-    """Multi-timeframe trend analysis - محسنة لتقليل استدعاءات API"""
-    try:
-        # محاولة الحصول على البيانات من التحليل الأساسي أولاً
-        analysis = get_market_analysis(exchange, symbol, limit=60)
-        if analysis and 'mtf' in analysis:
-            return analysis['mtf']
-        
-        # إذا فشل، استخدم الطريقة القديمة (fallback)
-        timeframes = {'5m': 20, '15m': 20, '1h': 20}
-        scores = {'bullish': 0, 'bearish': 0, 'neutral': 0}
-        
-        for tf, limit in timeframes.items():
-            ohlcv = exchange.fetch_ohlcv(symbol, tf, limit=limit)
-            df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            
-            df['sma_20'] = df['close'].rolling(window=20).mean()
-            df['sma_50'] = df['close'].rolling(window=min(50, len(df))).mean()
-            
-            latest = df.iloc[-1]
-            
-            if latest['close'] > latest['sma_20'] > latest['sma_50']:
-                scores['bullish'] += 1
-            elif latest['close'] < latest['sma_20'] < latest['sma_50']:
-                scores['bearish'] += 1
-            else:
-                scores['neutral'] += 1
         
         trend = max(scores, key=scores.get)
         return {'trend': trend, 'scores': scores, 'total': scores[trend]}
