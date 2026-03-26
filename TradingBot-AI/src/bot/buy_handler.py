@@ -71,83 +71,22 @@ def process_buy(result, exchange, ctx):
 
     if 'decision' in result:
         decision = result['decision']
+        models_scores = result.get('models_scores', {})
 
-        # Collect all advisor scores
+        # Collect all advisor scores directly from the pre-calculated models_scores
         advisor_scores = {
-            'confidence':   result['confidence'],
-            'rsi':          result['analysis']['rsi'],
-            'volume':       result['analysis']['volume'],
-            'macd_diff':    result['analysis']['macd_diff'],
-            'mtf_score':    0,
-            'risk_score':   0,
-            'anomaly_score': 0,
-            'exit_score':   0,
-            'pattern_score': 0,
-            'ranking_score': 0
+            'confidence':   result.get('confidence', 0),
+            'rsi':          result.get('rsi', 0),
+            'volume':       result.get('volume', 0),
+            'macd_diff':    result.get('macd_diff', 0),
+            'mtf_score':    models_scores.get('mtf', 0),
+            'risk_score':   models_scores.get('risk', 0),
+            'anomaly_score': models_scores.get('anomaly', 0),
+            'exit_score':   models_scores.get('exit', 0),
+            'pattern_score': models_scores.get('pattern', 0),
+            'ranking_score': models_scores.get('liquidity', 0),
+            'smart_money_score': models_scores.get('smart_money', 0)
         }
-
-        # Get Smart Money score
-        if advisor_manager:
-            try:
-                smart_money_tracker = advisor_manager.get('SmartMoneyTracker')
-                sm_boost = smart_money_tracker.get_confidence_adjustment(symbol, result['analysis'])
-                advisor_scores['smart_money_score'] = sm_boost
-            except:
-                pass
-
-        # Get Risk score
-        if advisor_manager and isinstance(result.get('analysis'), dict):
-            try:
-                risk_manager = advisor_manager.get('RiskManager')
-                risk_score = risk_manager.get_risk_score(result['analysis'], result.get('confidence', 50))
-                if risk_score is not None:
-                    advisor_scores['risk_score'] = risk_score
-            except Exception as e:
-                print(f"Error getting risk score for {symbol}: {e}")
-
-        # Get Anomaly score
-        if advisor_manager:
-            try:
-                anomaly_detector = advisor_manager.get('AnomalyDetector')
-                anomaly_result = anomaly_detector.detect_anomalies(symbol, result['analysis'])
-                if anomaly_result:
-                    advisor_scores['anomaly_score'] = anomaly_result.get('anomaly_score', 0) or 0
-            except:
-                pass
-
-        # Get Exit score
-        if advisor_manager:
-            try:
-                exit_strategy = advisor_manager.get('ExitStrategyModel')
-                exit_score = exit_strategy.get_entry_score(symbol, result['analysis'])
-                if exit_score:
-                    advisor_scores['exit_score'] = exit_score or 0
-            except:
-                pass
-
-        # Get Pattern score
-        if advisor_manager:
-            try:
-                pattern_recognizer = advisor_manager.get('EnhancedPatternRecognition')
-                safe_mtf        = {'trend': 'neutral', 'total': 0}
-                safe_price_drop = {'drop_percent': 0, 'confirmed': False}
-                pattern_analysis = pattern_recognizer.analyze_entry_pattern(
-                    symbol, result['analysis'], safe_mtf, safe_price_drop
-                )
-                if pattern_analysis:
-                    advisor_scores['pattern_score'] = pattern_analysis.get('confidence_adjustment', 0) or 0
-            except:
-                pass
-
-        # Get Liquidity score
-        if advisor_manager:
-            try:
-                liquidity_analyzer = advisor_manager.get('LiquidityAnalyzer')
-                liquidity_check = liquidity_analyzer.should_trade_coin(symbol, result['analysis'])
-                if liquidity_check:
-                    advisor_scores['ranking_score'] = liquidity_check.get('confidence_adjustment', 0) or 0
-            except:
-                pass
 
         position_data.update({
             'tp_target':      0,
