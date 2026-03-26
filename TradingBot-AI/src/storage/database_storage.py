@@ -327,17 +327,43 @@ class DatabaseStorage:
         finally:
             if conn: self._put_conn(conn)
     
-    def load_patterns(self):
+    def find_similar_patterns_in_db(self, features, pattern_type, limit=10):
+        """Finds similar patterns directly in the database to save memory."""
         conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor(cursor_factory=self.RealDictCursor)
-            cursor.execute("SELECT * FROM learned_patterns ORDER BY last_updated DESC")
+
+            # Build a dynamic query based on the provided features
+            query_conditions = ["pattern_type = %s"]
+            params = [pattern_type]
+
+            # More targeted search for higher efficiency
+            if 'rsi_zone' in features:
+                query_conditions.append("data->'features'->>'rsi_zone' = %s")
+                params.append(features['rsi_zone'])
+            
+            if 'trend' in features:
+                query_conditions.append("data->'features'->>'trend' = %s")
+                params.append(features['trend'])
+
+            query = f"""
+                SELECT *, 
+                       (data->>'success_rate')::float as success_rate
+                FROM learned_patterns
+                WHERE {' AND '.join(query_conditions)}
+                ORDER BY last_updated DESC
+                LIMIT %s
+            """
+            params.append(limit * 10) # Fetch a larger batch for in-memory filtering
+
+            cursor.execute(query, tuple(params))
             result = cursor.fetchall()
             cursor.close()
             return [dict(row) for row in result]
+
         except Exception as e:
-            print(f"❌ DB load patterns error: {e}")
+            print(f"❌ DB find_similar_patterns error: {e}")
             return []
         finally:
             if conn: self._put_conn(conn)
