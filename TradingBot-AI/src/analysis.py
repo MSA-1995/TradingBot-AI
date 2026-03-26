@@ -161,6 +161,10 @@ def get_market_analysis(exchange, symbol, limit=60):
         # ========== إضافة بيانات السيولة (Order Book) ==========
         liquidity_metrics = get_liquidity_metrics(exchange, symbol, df)
 
+        # ========== Fibonacci Data Pre-calculation ==========
+        high_24h = df['high'].tail(288).max() if len(df) >= 288 else (df['high'].max() if not df.empty else 0)
+        low_24h = df['low'].tail(288).min() if len(df) >= 288 else (df['low'].min() if not df.empty else 0)
+
         # ========== Reversal Analysis (New) ==========
         reversal_analysis = analyze_reversal(df, latest['close'])
 
@@ -212,7 +216,10 @@ def get_market_analysis(exchange, symbol, limit=60):
             # بيانات السوق العام (Top 3)
             'btc_change_1h': btc_change_1h,
             'eth_change_1h': eth_change_1h,
-            'bnb_change_1h': bnb_change_1h
+            'bnb_change_1h': bnb_change_1h,
+            # Fibonacci data
+            'high_24h': high_24h,
+            'low_24h': low_24h
         }
     except Exception as e:
         print(f"❌ Analysis error {symbol}: {e}")
