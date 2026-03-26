@@ -19,7 +19,7 @@ class FibonacciAnalyzer:
             '100': 1.0
         }
         
-        # تتبع نجاح المستويات
+        # The level_success dictionary is kept for structure but will no longer be updated.
         self.level_success = {
             '61.8': {'success': 0, 'fail': 0},
             '50': {'success': 0, 'fail': 0},
@@ -174,13 +174,6 @@ class FibonacciAnalyzer:
         except:
             return 0
     
-    def record_level_result(self, level_name, success):
-        """تسجيل نتيجة المستوى (للتعلم)"""
-        if level_name in self.level_success:
-            if success:
-                self.level_success[level_name]['success'] += 1
-            else:
-                self.level_success[level_name]['fail'] += 1
     
     def get_stop_loss_level(self, entry_price, analysis):
         """تحديد Stop Loss تحت مستوى فيبوناتشي"""
