@@ -9,7 +9,7 @@ import statistics
 class ExitStrategyModel:
     def __init__(self, storage):
         self.storage = storage
-        self.exit_patterns = {}
+        self.exit_patterns = {} # This is no longer used for learning, but can be kept for other analytics if needed.
         print("🎯 Exit Strategy Model initialized")
     
     def should_exit(self, symbol, position, current_price, analysis, mtf):
@@ -220,63 +220,33 @@ class ExitStrategyModel:
     def _get_coin_exit_history(self, symbol):
         """جلب تاريخ البيع للعملة"""
         try:
-            all_trades = self.storage.get_all_trades()
-            coin_trades = [t for t in all_trades if t.get('symbol') == symbol]
+            # Directly query the storage for historical trades of the symbol
+            coin_trades = self.storage.get_trades_for_symbol(symbol, limit=50) # Fetch last 50 trades
             
-            if len(coin_trades) < 3:
+            if not coin_trades or len(coin_trades) < 3:
                 return None
             
-            profits = [t.get('profit_percent', 0) for t in coin_trades]
+            # Filter for sell trades and ensure profit_percent is a float
+            sell_trades = [t for t in coin_trades if t.get('action') == 'SELL']
+            profits = [float(t.get('profit_percent', 0) or 0) for t in sell_trades]
+            
+            if not profits:
+                return None
+
             avg_profit = statistics.mean(profits)
             
-            durations = [t.get('hours_held', 24) for t in coin_trades]
+            durations = [float(t.get('hours_held', 24) or 24) for t in sell_trades]
             avg_duration = statistics.mean(durations)
             
             return {
                 'avg_profit': avg_profit,
                 'avg_duration': avg_duration,
-                'trades_count': len(coin_trades)
+                'trades_count': len(sell_trades)
             }
             
         except:
             return None
     
-    def learn_from_exit(self, symbol, exit_data):
-        """التعلم من البيع"""
-        try:
-            if symbol not in self.exit_patterns:
-                self.exit_patterns[symbol] = []
-            
-            # حماية من None
-            profit = exit_data.get('profit_percent', 0)
-            if profit is None:
-                profit = 0
-            try:
-                profit = float(profit)
-            except:
-                profit = 0
-            
-            hours_held = exit_data.get('hours_held', 0)
-            if hours_held is None:
-                hours_held = 0
-            try:
-                hours_held = float(hours_held)
-            except:
-                hours_held = 0
-            
-            self.exit_patterns[symbol].append({
-                'profit': profit,
-                'reason': exit_data.get('sell_reason', ''),
-                'duration': hours_held,
-                'timestamp': datetime.now().isoformat()
-            })
-            
-            # الاحتفاظ بآخر 20 بيع فقط
-            if len(self.exit_patterns[symbol]) > 20:
-                self.exit_patterns[symbol] = self.exit_patterns[symbol][-20:]
-            
-        except Exception as e:
-            print(f"⚠️ Exit learning error: {e}")
     
     def get_optimal_exit_point(self, symbol, current_profit):
         """الحصول على نقطة البيع المثالية"""
