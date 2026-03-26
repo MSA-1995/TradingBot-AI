@@ -6,9 +6,33 @@ Handles RSI, MACD, Volume, Momentum calculations
 import pandas as pd
 import ta
 from datetime import datetime
+from functools import lru_cache
+import time
 
-# ذاكرة مؤقتة لبيانات السوق العام (BTC, ETH, BNB) لتقليل الطلبات
-_market_cache = {'time': None, 'data': {}}
+# [تحسين الذاكرة] تم حذف المتغير العام _market_cache
+
+@lru_cache(maxsize=1)
+def get_market_data(exchange, ttl_hash=None):
+    """[تحسين الذاكرة] جلب بيانات السوق مع تخزين مؤقت آمن باستخدام lru_cache"""
+    del ttl_hash # يستخدم فقط لتحديث الكاش
+    new_market_data = {}
+    for market_coin in ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']:
+        try:
+            m_ohlcv = exchange.fetch_ohlcv(market_coin, '5m', limit=13)
+            if len(m_ohlcv) >= 13:
+                m_current = m_ohlcv[-1][4]
+                m_1h_ago = m_ohlcv[-13][4]
+                change = ((m_current - m_1h_ago) / m_1h_ago) * 100
+                new_market_data[market_coin] = change
+            else:
+                new_market_data[market_coin] = 0
+        except:
+            new_market_data[market_coin] = 0
+    return new_market_data
+
+def get_ttl_hash(seconds=20):
+    """[تحسين الذاكرة] إنشاء hash يعتمد على الوقت لتحديث الكاش"""
+    return round(time.time() / seconds)
 
 def analyze_reversal(df, current_price):
     """
@@ -108,38 +132,8 @@ def get_market_analysis(exchange, symbol, limit=60):
         eth_change_1h = 0
         bnb_change_1h = 0
         
-        # استخدام الذاكرة المؤقتة لبيانات السوق العام (تحديث كل 20 ثانية)
-        global _market_cache
-        current_time = datetime.now()
-        cache_valid = False
-        
-        if _market_cache['time'] and (current_time - _market_cache['time']).total_seconds() < 20:
-            cache_valid = True
-        
-        # إذا الكاش قديم، نحدثه
-        if not cache_valid:
-            new_market_data = {}
-            for market_coin in ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']:
-                try:
-                    m_ohlcv = exchange.fetch_ohlcv(market_coin, '5m', limit=13)
-                    if len(m_ohlcv) >= 13:
-                        m_current = m_ohlcv[-1][4]
-                        m_1h_ago = m_ohlcv[-13][4]
-                        change = ((m_current - m_1h_ago) / m_1h_ago) * 100
-                        new_market_data[market_coin] = change
-                    else:
-                        new_market_data[market_coin] = 0
-                except:
-                    new_market_data[market_coin] = 0
-            
-            _market_cache = {
-                'time': current_time,
-                'data': new_market_data
-            }
-            # print(f"🔄 Market data updated") # Debug
-
-        # قراءة البيانات من الكاش أو التحديث
-        market_data = _market_cache['data']
+        # [تحسين الذاكرة] استخدام الدالة الجديدة مع التخزين المؤقت الآمن
+        market_data = get_market_data(exchange, ttl_hash=get_ttl_hash())
         
         if symbol not in ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']:
             btc_change_1h = market_data.get('BTC/USDT', 0)
