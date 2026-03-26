@@ -163,9 +163,30 @@ def get_market_analysis(exchange, symbol, limit=60):
 
         # ========== Reversal Analysis (New) ==========
         reversal_analysis = analyze_reversal(df, latest['close'])
+
+        # ========== Price Drop Analysis (New) ==========
+        price_drop = {'drop_percent': 0, 'confirmed': False}
+        try:
+            if len(df) >= 12:
+                highest_price_1h = df['high'].tail(12).max()
+                current_price_df = df['close'].iloc[-1]
+                
+                if highest_price_1h is not None and current_price_df is not None and highest_price_1h > 0:
+                    drop_percent = ((highest_price_1h - current_price_df) / highest_price_1h) * 100
+                    price_drop = {
+                        'drop_percent': drop_percent,
+                        'highest_1h': highest_price_1h,
+                        'current': current_price_df,
+                        'confirmed': drop_percent >= 2.0
+                    }
+        except Exception as e:
+            pass # Ignore if calculation fails
         
+        # [تحسين الذاكرة] لا تقم بإرجاع الـ DataFrame الكامل.
+        # تم استخلاص جميع المعلومات الضرورية في المتغير 'latest'
+        # سيتم تحرير ذاكرة الـ df تلقائيًا عند انتهاء الدالة.
         return {
-            'df': df, # <<< إضافة مهمة جداً
+            # 'df': df, # <<< تم الحذف لمنع تسرب الذاكرة
             'rsi': latest['rsi'],
             'macd': latest['macd'],
             'macd_signal': latest['macd_signal'],
@@ -185,6 +206,7 @@ def get_market_analysis(exchange, symbol, limit=60):
             'volume_trend': latest['volume_trend'],
             'price_change_1h': latest['price_change_1h'],
             'reversal': reversal_analysis,  # إضافة تحليل الارتداد
+            'price_drop': price_drop, # إضافة تحليل هبوط السعر
             # بيانات السيولة
             'liquidity': liquidity_metrics,
             # بيانات السوق العام (Top 3)
