@@ -481,7 +481,6 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             final_confidence = confidence + news_adjustment + smart_money_boost + fibonacci_boost + liquidity_adjustment + mood_adjustment + pattern_adjustment + anomaly_adjustment
             final_confidence = max(0, min(100, int(final_confidence)))
             
-            # Meta (The King) Decision
             if meta:
                 # In the BUY logic, there is no existing position, so exit_score is 0.
                 # The logic to calculate it based on a position is only relevant for selling.
@@ -562,6 +561,10 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
     
     except Exception as e:
         return {'symbol': symbol, 'action': 'ERROR', 'message': str(e)}
+    finally:
+        # [تحسين الذاكرة] استدعاء جامع القمامة بشكل صريح
+        # لضمان تحرير ذاكرة كائن التحليل الكبير فورًا
+        gc.collect()
 
 # ========== MAIN LOOP ==========
 from bot.main_loop import run_main_loop
