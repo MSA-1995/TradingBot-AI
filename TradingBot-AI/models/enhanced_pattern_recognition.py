@@ -60,6 +60,36 @@ class EnhancedPatternRecognition:
         except Exception as e:
             print(f"⚠️ Pattern analysis error: {e}")
             return None
+
+    def analyze_peak_hunter_pattern(self, candles):
+        """تحليل نمط صائد القمم والقيعان بناءً على شمعتين وحجم التداول."""
+        if not candles or len(candles) < 2:
+            return {'signal': 'neutral', 'reason': 'Not enough data'}
+
+        # [0] is the previous candle, [1] is the current candle
+        prev_candle = candles[0]
+        curr_candle = candles[1]
+
+        # --- Data Validation ---
+        required_keys = ['open', 'close', 'volume']
+        if not all(key in prev_candle and key in curr_candle for key in required_keys):
+            return {'signal': 'neutral', 'reason': 'Incomplete candle data'}
+
+        is_prev_red = prev_candle['close'] < prev_candle['open']
+        is_prev_green = prev_candle['close'] > prev_candle['open']
+        is_curr_red = curr_candle['close'] < curr_candle['open']
+        is_curr_green = curr_candle['close'] > curr_candle['open']
+        is_volume_high = curr_candle['volume'] > prev_candle['volume'] * 1.5 # Volume is 50% higher
+
+        # --- Peak Hunter Logic (Sell Signal) ---
+        if is_prev_green and is_curr_red and is_volume_high:
+            return {'signal': 'sell', 'reason': 'Peak Hunter: Green -> Red with High Volume'}
+
+        # --- Bottom Fisher Logic (Buy Signal) ---
+        if is_prev_red and is_curr_green and is_volume_high:
+            return {'signal': 'buy', 'reason': 'Bottom Fisher: Red -> Green with High Volume'}
+
+        return {'signal': 'neutral', 'reason': 'No clear pattern'}
     
     def _extract_features(self, analysis, mtf, price_drop):
         """استخراج الخصائص من البيانات"""
