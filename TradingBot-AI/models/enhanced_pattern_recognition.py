@@ -9,29 +9,16 @@ import statistics
 class EnhancedPatternRecognition:
     def __init__(self, storage):
         self.storage = storage
-        self.patterns = {
-            'SUCCESS': [],
-            'NEUTRAL': [],
-            'TRAP': []
-        }
-        self.pattern_weights = {}
-        self.load_patterns()
-        print("🧠 Enhanced Pattern Recognition initialized")
-    
-    def load_patterns(self):
-        """تحميل الأنماط المحفوظة"""
-        try:
-            stored_patterns = self.storage.load_patterns()
-            
-            for pattern in stored_patterns:
-                pattern_type = pattern.get('pattern_type') or pattern.get('type', 'NEUTRAL')
-                if pattern_type in self.patterns:
-                    self.patterns[pattern_type].append(pattern)
-            
-            print(f"📚 Loaded {len(stored_patterns)} patterns")
-            
-        except Exception as e:
-            print(f"⚠️ Pattern loading error: {e}")
+        # The patterns are no longer loaded into memory.
+        # self.patterns = {
+        #     'SUCCESS': [],
+        #     'NEUTRAL': [],
+        #     'TRAP': []
+        # }
+        # self.pattern_weights = {}
+        # self.load_patterns()
+        print("🧠 Enhanced Pattern Recognition initialized (Memory Optimized)")
+
     
     def analyze_entry_pattern(self, symbol, analysis, mtf, price_drop):
         """تحليل نمط الدخول"""
@@ -159,27 +146,31 @@ class EnhancedPatternRecognition:
             return 'extreme'
     
     def _find_similar_patterns(self, features, pattern_type):
-        """البحث عن أنماط مشابهة"""
+        """Finds similar patterns by querying the database directly."""
+        # 1. Query the database for candidate patterns
+        candidate_patterns = self.storage.find_similar_patterns_in_db(features, pattern_type)
+
+        # 2. Perform detailed similarity calculation in memory on the small subset
         similar = []
-        
-        for pattern in self.patterns.get(pattern_type, []):
-            pattern_features = pattern.get('conditions') or pattern.get('data', {}).get('features', {})
+        for pattern in candidate_patterns:
+            # The pattern data is now in the 'data' field (JSON)
+            pattern_features = pattern.get('data', {}).get('features', {})
             
             if not pattern_features:
                 continue
             
             similarity = self._calculate_similarity(features, pattern_features)
             
-            if similarity > 0.65:  # 65% مشابه
+            if similarity > 0.65:  # 65% threshold
                 similar.append({
                     'pattern': pattern,
                     'similarity': similarity
                 })
         
-        # ترتيب حسب التشابه
+        # 3. Sort by similarity and return the top 10
         similar.sort(key=lambda x: x['similarity'], reverse=True)
         
-        return similar[:10]  # أفضل 10 أنماط
+        return similar[:10]
     
     def _calculate_similarity(self, features1, features2):
         """حساب التشابه بين نمطين"""
@@ -389,55 +380,10 @@ class EnhancedPatternRecognition:
     
     def get_pattern_statistics(self):
         """إحصائيات الأنماط"""
-        try:
-            total = sum(len(patterns) for patterns in self.patterns.values())
-            
-            if total == 0:
-                return None
-            
-            return {
-                'total_patterns': total,
-                'success_patterns': len(self.patterns['SUCCESS']),
-                'neutral_patterns': len(self.patterns['NEUTRAL']),
-                'trap_patterns': len(self.patterns['TRAP']),
-                'success_rate': (len(self.patterns['SUCCESS']) / total) * 100 if total > 0 else 0,
-                'pattern_weights': self.pattern_weights,
-                'timestamp': datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            print(f"⚠️ Pattern stats error: {e}")
-            return None
+        # This function is no longer needed as patterns are not stored in memory
+        pass
     
     def get_coin_pattern_history(self, symbol):
         """تاريخ أنماط العملة"""
-        try:
-            coin_patterns = {
-                'SUCCESS': [],
-                'NEUTRAL': [],
-                'TRAP': []
-            }
-            
-            for pattern_type, patterns in self.patterns.items():
-                for pattern in patterns:
-                    if pattern.get('symbol') == symbol:
-                        coin_patterns[pattern_type].append(pattern)
-            
-            total = sum(len(p) for p in coin_patterns.values())
-            
-            if total == 0:
-                return None
-            
-            success_rate = (len(coin_patterns['SUCCESS']) / total) * 100
-            
-            return {
-                'symbol': symbol,
-                'total_patterns': total,
-                'success_patterns': len(coin_patterns['SUCCESS']),
-                'trap_patterns': len(coin_patterns['TRAP']),
-                'success_rate': round(success_rate, 2),
-                'recommendation': 'BUY' if success_rate >= 65 else 'AVOID' if success_rate < 40 else 'NEUTRAL'
-            }
-            
-        except:
-            return None
+        # This function is no longer needed as patterns are not stored in memory
+        pass
