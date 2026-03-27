@@ -62,43 +62,31 @@ class DatabaseStorage:
 
     def _get_conn(self):
         """Get a healthy connection from the pool."""
-        start_time = time.time()
-        try:
-            for attempt in range(20): # Try up to 20 times (2 seconds total wait)
-                try:
-                    conn = self.pool.getconn()
-                    tx_status = conn.get_transaction_status()
-                    if tx_status != 0:
-                        TX_STATUS_MAP = {0: 'IDLE', 1: 'ACTIVE', 2: 'INTRANS', 3: 'INERROR'}
-                        print(f"🔍 DB _get_conn: Received conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
-                    return conn
-                except PoolError:
-                    # Pool is exhausted, wait a bit and retry
-                    time.sleep(0.1)
-            
-            # If we get here, we failed after all retries
-            raise Exception("Connection pool exhausted after retries")
-        finally:
-            elapsed = time.time() - start_time
-            if elapsed > 0.5:
-                print(f"⏱️ DB _get_conn took: {elapsed:.2f}s")
-
-    def _put_conn(self, conn):
-        """Return a connection to the pool."""
-        start_time = time.time()
-        try:
-            if conn and not conn.closed:
+        for attempt in range(20): # Try up to 20 times (2 seconds total wait)
+            try:
+                conn = self.pool.getconn()
                 tx_status = conn.get_transaction_status()
                 if tx_status != 0:
                     TX_STATUS_MAP = {0: 'IDLE', 1: 'ACTIVE', 2: 'INTRANS', 3: 'INERROR'}
-                    # print(f"🔍 DB _put_conn: Returning conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
-                self.pool.putconn(conn)
-            else:
-                print(f"ℹ️ Attempted to return a closed/invalid connection. It was ignored.")
-        finally:
-            elapsed = time.time() - start_time
-            if elapsed > 0.1:
-                print(f"⏱️ DB _put_conn took: {elapsed:.2f}s")
+                    print(f"🔍 DB _get_conn: Received conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
+                return conn
+            except PoolError:
+                # Pool is exhausted, wait a bit and retry
+                time.sleep(0.1)
+        
+        # If we get here, we failed after all retries
+        raise Exception("Connection pool exhausted after retries")
+
+    def _put_conn(self, conn):
+        """Return a connection to the pool."""
+        if conn and not conn.closed:
+            tx_status = conn.get_transaction_status()
+            if tx_status != 0:
+                TX_STATUS_MAP = {0: 'IDLE', 1: 'ACTIVE', 2: 'INTRANS', 3: 'INERROR'}
+                # print(f"🔍 DB _put_conn: Returning conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
+            self.pool.putconn(conn)
+        else:
+            print(f"ℹ️ Attempted to return a closed/invalid connection. It was ignored.")
 
     # ========== General Settings ==========
     def save_setting(self, key, value):
