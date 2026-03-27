@@ -296,17 +296,17 @@ class Meta:
 
         mood_details = {}
         if up_count >= 2:
-            mood_details['mood'] = "Bullish"
-            mood_details['min_buy_consensus'] = 33 # Be more aggressive
-            mood_details['min_sell_consensus'] = 70 # Hold for more profit
+            mood_details['mood'] = "Bullish" # سوق صاعد (إيجابي)
+            mood_details['min_buy_consensus'] = 25 # نسبة الشراء: 25% (متساهل جداً لفتح صفقات أكثر للتعلم)
+            mood_details['min_sell_consensus'] = 70 # نسبة البيع: 70% (نطمع في الربح ولا نبيع بسرعة)
         elif down_count >= 2:
-            mood_details['mood'] = "Bearish"
-            mood_details['min_buy_consensus'] = 70 # Be more cautious
-            mood_details['min_sell_consensus'] = 33 # Get out quickly
+            mood_details['mood'] = "Bearish" # سوق هابط (سلبي)
+            mood_details['min_buy_consensus'] = 45 # نسبة الشراء: 45% (متوازن للسماح بصفقات في السوق السيء)
+            mood_details['min_sell_consensus'] = 33 # نسبة البيع: 33% (هروب سريع لحماية رأس المال)
         else:
-            mood_details['mood'] = "Neutral"
-            mood_details['min_buy_consensus'] = 40 # Balanced approach
-            mood_details['min_sell_consensus'] = 40 # Balanced approach
+            mood_details['mood'] = "Neutral" # سوق محايد (مستقر)
+            mood_details['min_buy_consensus'] = 33 # نسبة الشراء: 33% (نهج متوازن)
+            mood_details['min_sell_consensus'] = 50 # نسبة البيع: 50% (جني أرباح متوازن)
         
         return mood_details
 
