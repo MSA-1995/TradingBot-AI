@@ -118,6 +118,7 @@ exchange.set_sandbox_mode(True)
 storage = StorageManager()
 
 # Test database connection
+test_conn = None
 try:
     test_conn = storage.storage._get_conn()
     if test_conn and not test_conn.closed:
@@ -129,6 +130,9 @@ try:
         print("❌ Database: Connection failed")
 except Exception as e:
     print(f"❌ Database: Connection error - {e}")
+finally:
+    if test_conn:
+        storage.storage._put_conn(test_conn)
 
 # Capital Manager
 capital_manager = CapitalManager(max_capital=MAX_CAPITAL, profit_reserve=PROFIT_RESERVE)
