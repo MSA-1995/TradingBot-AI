@@ -132,6 +132,7 @@ except Exception as e:
     print(f"❌ Database: Connection error - {e}")
 finally:
     if test_conn:
+        test_conn.rollback()
         storage.storage._put_conn(test_conn)
 
 # Capital Manager
