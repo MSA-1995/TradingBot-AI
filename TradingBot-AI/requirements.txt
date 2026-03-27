@@ -1,0 +1,14 @@
+ccxt
+cryptography
+requests
+pandas
+ta
+colorama
+psycopg2-binary
+python-dotenv
+
+# To install manually:
+# pip install ccxt cryptography requests pandas ta colorama psycopg2-binary
+#
+# Or use this file:
+# pip install -r requirements.txt
