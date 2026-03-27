@@ -30,8 +30,8 @@ ATR_PERIOD = 14  # Period for ATR calculation
 ATR_MULTIPLIER = 2.0  # Multiplier for ATR to set stop-loss. Higher value = wider stop-loss
 
 # Performance & Memory Tuning
-BATCH_SIZE = 5           # Number of symbols to process in a single batch to conserve memory (Reduced for 256MB RAM)
-MAX_WORKERS = 5          # Max number of threads for parallel processing, should be <= BATCH_SIZE (Reduced for 256MB RAM)
+BATCH_SIZE = 10          # Number of symbols to process in a single batch (Increased to match DB pool)
+MAX_WORKERS = 10         # Max number of threads for parallel processing (Increased to match DB pool)
 
 # Memory Management
 MEMORY_CLEANUP_INTERVAL = 120  # Interval in seconds to run the memory cleaner (e.g., 120 = 2 minutes)
