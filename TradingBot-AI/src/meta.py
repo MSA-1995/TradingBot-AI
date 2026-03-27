@@ -81,14 +81,6 @@ class Meta:
         min_consensus_percentage = mood_details['min_buy_consensus']
         # --- End Market Sentiment ---
 
-        if total_consultants > 0 and buy_vote_percentage < min_consensus_percentage:
-            return {
-                'action': 'DISPLAY',
-                'reason': f'Consultant consensus failed ({buy_vote_percentage:.0f}% < {min_consensus_percentage}%) in {market_mood} market',
-                'confidence': 0
-            }
-
-
         # --- Dynamic Model Loading ---
         # Load the model from raw data
         meta_learner = pickle.loads(self.meta_learner_data)
@@ -137,8 +129,15 @@ class Meta:
 
             confidence = max(0, min(100, confidence))
 
+            # Check Consultant Consensus FIRST before allowing a BUY
+            if total_consultants > 0 and buy_vote_percentage < min_consensus_percentage:
+                decision = {
+                    'action': 'DISPLAY',
+                    'reason': f'Consultant consensus failed ({buy_vote_percentage:.0f}% < {min_consensus_percentage}%) in {market_mood} market',
+                    'confidence': confidence
+                }
             # The King makes the final decision, but only after consultants have agreed
-            if prediction == 1 and confidence >= 55:
+            elif prediction == 1 and confidence >= 55:
                 amount = self._calculate_smart_amount(symbol, confidence, analysis)
 
                 decision = {
