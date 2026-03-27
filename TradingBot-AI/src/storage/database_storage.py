@@ -48,8 +48,8 @@ class DatabaseStorage:
             }
         
         # --- Initialize Connection Pool ---
-        # minconn=10, maxconn=10 (Pre-create all connections to avoid locking during runtime)
-        self.pool = ThreadedConnectionPool(10, 10, **self._db_params)
+        # minconn=5, maxconn=5 (Pre-create all connections to avoid locking during runtime)
+        self.pool = ThreadedConnectionPool(5, 5, **self._db_params)
         # --- END ---
 
         self.json = json_module
