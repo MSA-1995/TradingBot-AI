@@ -257,6 +257,28 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
             field_name = f"Open Positions ({field_count})" if field_count > 1 else "Open Positions"
             fields.append({"name": field_name, "value": positions_text.strip(), "inline": False})
     
+    # --- FIX: Send the actual embed message ---
+    global STATUS_MESSAGE_ID
+    # Try to edit the existing message, or create a new one
+    response_data = send_discord_embed(
+        "PORTFOLIO REPORT",
+        fields,
+        color='blue',
+        message_id=STATUS_MESSAGE_ID
+    )
+
+    if response_data:
+        new_message_id = response_data.get('id')
+        if new_message_id and new_message_id != STATUS_MESSAGE_ID:
+            save_status_message_id(new_message_id)
+    else:
+        # If sending failed (e.g., message was deleted), clear the ID
+        # so we create a new one next time.
+        if STATUS_MESSAGE_ID:
+            print("ℹ️ Failed to update status message. Will create a new one on next report.")
+            save_status_message_id(None) # Clear the invalid ID
+    # --- END FIX ---
+
     # Update the last sent time at the end of the function
     last_report_sent_time = datetime.now()
 
