@@ -31,7 +31,7 @@ ATR_MULTIPLIER = 2.0  # Multiplier for ATR to set stop-loss. Higher value = wide
 
 # Performance & Memory Tuning
 BATCH_SIZE = 10          # Number of symbols to process in a single batch (Increased to match DB pool)
-MAX_WORKERS = 10         # Max number of threads for parallel processing (Increased to match DB pool)
+MAX_WORKERS = 5          # Max number of threads for parallel processing (Matched to DB pool size)
 
 # Memory Management
 MEMORY_CLEANUP_INTERVAL = 120  # Interval in seconds to run the memory cleaner (e.g., 120 = 2 minutes)
