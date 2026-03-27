@@ -3,6 +3,8 @@
 """
 import os
 from datetime import datetime
+import time
+import inspect
 
 # --- DATABASE CONNECTION POOL ---
 # To make the bot stable, we use a connection pool.
@@ -46,8 +48,8 @@ class DatabaseStorage:
             }
         
         # --- Initialize Connection Pool ---
-        # minconn=1, maxconn=5
-        self.pool = ThreadedConnectionPool(1, 5, **self._db_params)
+        # minconn=10, maxconn=10 (Pre-create all connections to avoid locking during runtime)
+        self.pool = ThreadedConnectionPool(10, 10, **self._db_params)
         # --- END ---
 
         self.json = json_module
@@ -59,30 +61,39 @@ class DatabaseStorage:
         self._check_schema_updates()
 
     def _get_conn(self):
-        """Get a healthy connection from the pool, implementing a manual pre-ping."""
-        for attempt in range(3): # Try up to 3 times to get a healthy connection
-            conn = self.pool.getconn()
-            try:
-                # --- Pre-ping: Test the connection before returning it ---
-                cursor = conn.cursor()
-                cursor.execute("SELECT 1")
-                cursor.close()
-                # --- Connection is healthy, return it ---
+        """Get a healthy connection from the pool."""
+        start_time = time.time()
+        try:
+            for attempt in range(3):
+                conn = self.pool.getconn()
+                tx_status = conn.get_transaction_status()
+                if tx_status != 0:
+                    TX_STATUS_MAP = {0: 'IDLE', 1: 'ACTIVE', 2: 'INTRANS', 3: 'INERROR'}
+                    print(f"🔍 DB _get_conn: Received conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
+                
+                # تم إزالة الفحص الاستباقي (SELECT 1) لتسريع الحصول على الاتصال ليصبح لحظياً
                 return conn
-            except self._psycopg2.Error as e:
-                print(f"⚠️ Pre-ping failed (attempt {attempt+1}): {e}. Discarding connection.")
-                # --- Connection is dead, discard it and get a new one ---
-                self.pool.putconn(conn, close=True)
-                if attempt == 2:
-                    print("❌ Failed to get a healthy DB connection after multiple attempts.")
-                    raise # Re-raise the last exception
+        finally:
+            elapsed = time.time() - start_time
+            if elapsed > 0.1:
+                print(f"⏱️ DB _get_conn took: {elapsed:.2f}s")
 
     def _put_conn(self, conn):
         """Return a connection to the pool."""
-        if conn and not conn.closed:
-            self.pool.putconn(conn)
-        else:
-            print("ℹ️ Attempted to return a closed connection to the pool. It was ignored.")
+        start_time = time.time()
+        try:
+            if conn and not conn.closed:
+                tx_status = conn.get_transaction_status()
+                if tx_status != 0:
+                    TX_STATUS_MAP = {0: 'IDLE', 1: 'ACTIVE', 2: 'INTRANS', 3: 'INERROR'}
+                    # print(f"🔍 DB _put_conn: Returning conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
+                self.pool.putconn(conn)
+            else:
+                print(f"ℹ️ Attempted to return a closed/invalid connection. It was ignored.")
+        finally:
+            elapsed = time.time() - start_time
+            if elapsed > 0.1:
+                print(f"⏱️ DB _put_conn took: {elapsed:.2f}s")
 
     # ========== General Settings ==========
     def save_setting(self, key, value):
@@ -105,7 +116,10 @@ class DatabaseStorage:
             if conn: conn.rollback()
             return False
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                # For WRITE functions, we do NOT rollback in finally.
+                # The transaction is handled by commit() or rollback() in the try/except blocks.
+                self._put_conn(conn)
 
     def load_setting(self, key):
         """Loads a value from the bot_settings table."""
@@ -122,7 +136,9 @@ class DatabaseStorage:
             print(f"❌ DB Error loading setting {key}: {e}")
             return None
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # End any lingering transaction
+                self._put_conn(conn)
 
     def _create_tables(self):
         """إنشاء الجداول إذا لم تكن موجودة (مع إعادة محاولة). Returns True on success, False on failure."""
@@ -188,6 +204,20 @@ class DatabaseStorage:
             timestamp TIMESTAMP DEFAULT NOW()
         );
         """
+        # --- FIX: Add indexes for cleanup performance and query speed ---
+        create_indexes_sql = """
+        CREATE INDEX IF NOT EXISTS idx_trades_history_timestamp ON trades_history(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_learned_patterns_last_updated ON learned_patterns(last_updated);
+        CREATE INDEX IF NOT EXISTS idx_ai_decisions_timestamp ON ai_decisions(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_trap_memory_timestamp ON trap_memory(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_consultant_votes_timestamp ON consultant_votes(timestamp);
+        
+        -- Indexes for lightning fast pattern searching
+        CREATE INDEX IF NOT EXISTS idx_learned_patterns_type ON learned_patterns(pattern_type);
+        CREATE INDEX IF NOT EXISTS idx_learned_patterns_rsi ON learned_patterns((data->'features'->>'rsi_zone'));
+        CREATE INDEX IF NOT EXISTS idx_learned_patterns_trend ON learned_patterns((data->'features'->>'trend'));
+        """
+
         for attempt in range(3):
             conn = None
             try:
@@ -195,15 +225,17 @@ class DatabaseStorage:
                 cursor = conn.cursor()
                 # --- FIX: Increase statement timeout for this session to prevent DDL timeouts ---
                 cursor.execute("SET statement_timeout = '60s';")
+                # --- Create tables first, then indexes ---
                 cursor.execute(create_sql)
+                cursor.execute(create_indexes_sql)
                 conn.commit()
                 cursor.close()
                 self._put_conn(conn) # --- إرجاع الاتصال السليم إلى المجمع
-                print("✅ Database tables created/verified successfully.")
+                print("✅ Database tables and indexes created/verified successfully.")
                 return True # --- نجاح، خروج
 
             except self._psycopg2.Error as e: # --- التعامل مع أخطاء قاعدة البيانات فقط
-                print(f"⚠️ Table creation DB error (attempt {attempt + 1}/3): {e}")
+                print(f"⚠️ Table/Index creation DB error (attempt {attempt + 1}/3): {e}")
                 if conn:
                     # --- الخطوة الأهم: تخلص من الاتصال الفاشل ولا تعيده للمجمع
                     self.pool.putconn(conn, close=True)
@@ -213,9 +245,9 @@ class DatabaseStorage:
                     import time
                     time.sleep(5) # --- انتظار قبل المحاولة التالية
                 else:
-                    print("❌ Final attempt to create tables failed.")
+                    print("❌ Final attempt to create tables/indexes failed.")
             except Exception as e:
-                print(f"⚠️ An unexpected error occurred during table creation: {e}")
+                print(f"⚠️ An unexpected error occurred during table/index creation: {e}")
                 if conn: # تخلص من الاتصال عند حدوث أي خطأ غير متوقع أيضًا
                     self.pool.putconn(conn, close=True)
                 # لا تعيد المحاولة في الأخطاء العامة غير المتوقعة
@@ -247,7 +279,9 @@ class DatabaseStorage:
             print(f"⚠️ Schema update error (dl_models_v2): {e}")
             if conn_dl: conn_dl.rollback()
         finally:
-            if conn_dl: self._put_conn(conn_dl)
+            if conn_dl:
+                # For WRITE functions, we do NOT rollback in finally.
+                self._put_conn(conn_dl)
 
     # ========== Trades ==========
     def save_trade(self, trade_data):
@@ -283,7 +317,9 @@ class DatabaseStorage:
             if conn: conn.rollback()
             return False
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # Always rollback to ensure clean state before returning to pool
+                self._put_conn(conn)
     
     def load_trades(self, limit=None):
         conn = None
@@ -301,7 +337,9 @@ class DatabaseStorage:
             print(f"❌ DB load trades error: {e}")
             return []
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # End any lingering transaction
+                self._put_conn(conn)
     
     # ========== Patterns ==========
     def save_pattern(self, pattern_data):
@@ -325,7 +363,9 @@ class DatabaseStorage:
             if conn: conn.rollback()
             return False
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # Always rollback to ensure clean state before returning to pool
+                self._put_conn(conn)
     
     def find_similar_patterns_in_db(self, features, pattern_type, limit=10):
         """Finds similar patterns directly in the database to save memory."""
@@ -359,6 +399,7 @@ class DatabaseStorage:
 
             cursor.execute(query, tuple(params))
             result = cursor.fetchall()
+
             cursor.close()
             return [dict(row) for row in result]
 
@@ -366,7 +407,10 @@ class DatabaseStorage:
             print(f"❌ DB find_similar_patterns error: {e}")
             return []
         finally:
-            if conn: self._put_conn(conn)
+            # Ensure the transaction is closed and connection is returned clean
+            if conn:
+                conn.rollback()
+                self._put_conn(conn)
     
     # ========== AI Decisions ==========
     def save_ai_decision(self, decision_data):
@@ -392,7 +436,9 @@ class DatabaseStorage:
             if conn: conn.rollback()
             return False
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # Always rollback to ensure clean state before returning to pool
+                self._put_conn(conn)
     
     def load_ai_decisions(self, limit=10):
         """Loads AI decisions, ensuring the connection is always returned."""
@@ -408,7 +454,9 @@ class DatabaseStorage:
             print(f"❌ DB load AI decisions error: {e}")
             return []
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # End any lingering transaction
+                self._put_conn(conn)
     
     # ========== Performance ==========
     def save_performance(self, metrics_data):
@@ -449,7 +497,9 @@ class DatabaseStorage:
             if conn: conn.rollback()
             return False
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # Always rollback to ensure clean state before returning to pool
+                self._put_conn(conn)
     
     def load_consultant_votes(self, consultant_name=None, limit=1000):
         """Loads consultant votes, ensuring the connection is always returned."""
@@ -473,7 +523,9 @@ class DatabaseStorage:
             print(f"❌ DB load consultant votes error: {e}")
             return []
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # End any lingering transaction
+                self._put_conn(conn)
 
     
     # ========== Auto Cleanup ==========
@@ -481,31 +533,49 @@ class DatabaseStorage:
         """Cleans up old data, ensuring the connection is always returned."""
         conn = None
         try:
+            # --- BATCH DELETE STRATEGY TO AVOID LONG TABLE LOCKS ---
             conn = self._get_conn()
             cursor = conn.cursor()
             
             queries = {
-                "trades (6m)": "DELETE FROM trades_history WHERE timestamp < NOW() - INTERVAL '180 days'",
-                "patterns (6m)": "DELETE FROM learned_patterns WHERE last_updated < NOW() - INTERVAL '180 days'",
-                "traps (6m)": "DELETE FROM trap_memory WHERE timestamp < NOW() - INTERVAL '180 days'",
-                "votes (6m)": "DELETE FROM consultant_votes WHERE timestamp < NOW() - INTERVAL '180 days'",
-                "AI decisions (30d)": "DELETE FROM ai_decisions WHERE timestamp < NOW() - INTERVAL '30 days'"
+                "trades (6m)": ("trades_history", "timestamp", 180),
+                "patterns (6m)": ("learned_patterns", "last_updated", 180),
+                "traps (6m)": ("trap_memory", "timestamp", 180),
+                "votes (6m)": ("consultant_votes", "timestamp", 180),
+                "AI decisions (30d)": ("ai_decisions", "timestamp", 30)
             }
             
             total_deleted = 0
             deleted_log = []
-            for key, query in queries.items():
-                cursor.execute(query)
-                count = cursor.rowcount
-                if count > 0:
-                    deleted_log.append(f"{count} {key}")
-                total_deleted += count
+            batch_size = 500 # Delete 500 rows at a time
 
-            conn.commit()
+            for key, (table, date_col, days) in queries.items():
+                table_total_deleted = 0
+                while True:
+                    # Construct and execute the DELETE command for a single batch
+                    query = f"""DELETE FROM {table} WHERE ctid IN (
+                                 SELECT ctid FROM {table} 
+                                 WHERE {date_col} < NOW() - INTERVAL '{days} days' 
+                                 LIMIT {batch_size}
+                             );"""
+                    cursor.execute(query)
+                    count = cursor.rowcount
+                    conn.commit() # Commit after each batch to release locks
+                    
+                    if count == 0:
+                        break # No more old rows to delete in this table
+                    
+                    table_total_deleted += count
+                    time.sleep(0.1) # Small sleep to yield to other processes
+
+                if table_total_deleted > 0:
+                    deleted_log.append(f"{table_total_deleted} {key}")
+                total_deleted += table_total_deleted
+
             cursor.close()
             
             if total_deleted > 0:
-                print(f"🗑️ Cleaned: {', '.join(deleted_log)}")
+                print(f"🗑️ Batched Cleaned: {', '.join(deleted_log)}")
             
             return True
         except Exception as e:
@@ -513,7 +583,8 @@ class DatabaseStorage:
             if conn: conn.rollback()
             return False
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                self._put_conn(conn)
     
     # ========== Traps ==========
     def save_trap(self, trap_data):
@@ -537,7 +608,9 @@ class DatabaseStorage:
             if conn: conn.rollback()
             return False
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # Always rollback to ensure clean state
+                self._put_conn(conn)
     
     def load_traps(self):
         """Loads all traps, ensuring the connection is always returned."""
@@ -553,7 +626,9 @@ class DatabaseStorage:
             print(f"❌ DB load traps error: {e}")
             return []
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # Always rollback to ensure clean state
+                self._put_conn(conn)
     
     # ========== Model Storage (King's Brain) ==========
     def load_model(self, name):
@@ -625,7 +700,9 @@ class DatabaseStorage:
             if conn: conn.rollback()
             return False
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # Always rollback to ensure clean state
+                self._put_conn(conn)
 
     def load_positions(self):
         """Loads all positions from the database, ensuring connection is always returned."""
@@ -654,4 +731,6 @@ class DatabaseStorage:
             print(f"❌ DB load positions error: {e}")
             return {}
         finally:
-            if conn: self._put_conn(conn)
+            if conn:
+                conn.rollback() # Always rollback to ensure clean state
+                self._put_conn(conn)
