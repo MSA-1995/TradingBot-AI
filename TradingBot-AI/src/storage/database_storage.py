@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 import time
 import inspect
+import inspect
 
 # --- DATABASE CONNECTION POOL ---
 # To make the bot stable, we use a connection pool.
@@ -61,32 +62,62 @@ class DatabaseStorage:
         self._check_schema_updates()
 
     def _get_conn(self):
-        """Get a healthy connection from the pool."""
-        for attempt in range(20): # Try up to 20 times (2 seconds total wait)
+        """Gets a HEALTHY connection from the pool, with self-healing."""
+        for attempt in range(20): # Try up to 20 times
             try:
                 conn = self.pool.getconn()
-                tx_status = conn.get_transaction_status()
-                if tx_status != 0:
-                    TX_STATUS_MAP = {0: 'IDLE', 1: 'ACTIVE', 2: 'INTRANS', 3: 'INERROR'}
-                    print(f"🔍 DB _get_conn: Received conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
-                return conn
+                
+                # --- CONNECTION SELF-HEALING (Ping Check) ---
+                # Run a super-fast, lightweight query to check if the connection is alive.
+                # If it fails, the connection is dead and we'll discard it.
+                with conn.cursor() as cursor:
+                    cursor.execute('SELECT 1')
+                # --- END SELF-HEALING ---
+
+                # Optional: Check transaction status if needed for debugging
+                # tx_status = conn.get_transaction_status()
+                # if tx_status != 0:
+                #     TX_STATUS_MAP = {0: 'IDLE', 1: 'ACTIVE', 2: 'INTRANS', 3: 'INERROR'}
+                #     print(f"🔍 DB _get_conn: Received conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
+                
+                return conn # Connection is healthy, return it
+
+            except self._psycopg2.OperationalError as e:
+                # This is the key: The connection was dead. Discard it and retry.
+                print(f"⚠️ Stale DB connection detected: {e}. Discarding and retrying...")
+                if conn:
+                    self.pool.putconn(conn, close=True) # Close the dead connection
+                time.sleep(0.1)
+
             except PoolError:
-                # Pool is exhausted, wait a bit and retry
+                # Pool is genuinely exhausted, wait a bit and retry
+                print("Pool exhausted, waiting...")
                 time.sleep(0.1)
         
         # If we get here, we failed after all retries
-        raise Exception("Connection pool exhausted after retries")
+        raise Exception("DB Connection failed after multiple retries. The database might be down.")
 
     def _put_conn(self, conn):
-        """Return a connection to the pool."""
+        """
+        إرجاع اتصال إلى المجمع مع فحص سلامته.
+        هذا هو "صمام الأمان" الرئيسي لمنع تسرب الموارد.
+        """
         if conn and not conn.closed:
             tx_status = conn.get_transaction_status()
+            # 0 = IDLE (الحالة السليمة)
             if tx_status != 0:
+                # --- الطباعة التشخيصية القوية ---
+                # الحصول على اسم الوظيفة التي استدعت _put_conn بشكل غير صحيح
+                caller_frame = inspect.stack()[1]
+                caller_function = caller_frame.function
                 TX_STATUS_MAP = {0: 'IDLE', 1: 'ACTIVE', 2: 'INTRANS', 3: 'INERROR'}
-                # print(f"🔍 DB _put_conn: Returning conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
+                print(f"⚠️ Leak Detector: Function '{caller_function}' returned a dirty connection (Status: {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')}). Forcing rollback.")
+                conn.rollback() # --- التنظيف بالقوة ---
+            
             self.pool.putconn(conn)
         else:
-            print(f"ℹ️ Attempted to return a closed/invalid connection. It was ignored.")
+            # هذا ليس خطأ، قد يتم تجاهل الاتصالات المغلقة عمداً
+            pass
 
     # ========== General Settings ==========
     def save_setting(self, key, value):
@@ -110,8 +141,9 @@ class DatabaseStorage:
             return False
         finally:
             if conn:
-                # For WRITE functions, we do NOT rollback in finally.
-                # The transaction is handled by commit() or rollback() in the try/except blocks.
+                # For READ functions, we MUST rollback to close the transaction
+                # and prevent `IDLE IN TRANSACTION` state which causes locks.
+                conn.rollback()
                 self._put_conn(conn)
 
     def load_setting(self, key):
@@ -130,7 +162,8 @@ class DatabaseStorage:
             return None
         finally:
             if conn:
-                conn.rollback() # End any lingering transaction
+                # For WRITE functions, we do NOT rollback in finally.
+                # The transaction is handled by commit() or rollback() in the try/except blocks.
                 self._put_conn(conn)
 
     def _create_tables(self):
@@ -209,6 +242,14 @@ class DatabaseStorage:
         CREATE INDEX IF NOT EXISTS idx_learned_patterns_type ON learned_patterns(pattern_type);
         CREATE INDEX IF NOT EXISTS idx_learned_patterns_rsi ON learned_patterns((data->'features'->>'rsi_zone'));
         CREATE INDEX IF NOT EXISTS idx_learned_patterns_trend ON learned_patterns((data->'features'->>'trend'));
+
+        -- *** SUPER INDEX for find_similar_patterns_in_db ***
+        -- This composite index is specifically designed to make that query extremely fast.
+        -- It covers all filtering conditions and the sorting order in one go.
+        CREATE INDEX IF NOT EXISTS idx_super_pattern_search ON learned_patterns(pattern_type, (data->'features'->>'rsi_zone'), (data->'features'->>'trend'), last_updated DESC);
+
+        -- Force update of query planner statistics
+        ANALYZE learned_patterns;
         """
 
         for attempt in range(3):
@@ -311,7 +352,8 @@ class DatabaseStorage:
             return False
         finally:
             if conn:
-                conn.rollback() # Always rollback to ensure clean state before returning to pool
+                # For WRITE functions, we do NOT rollback in finally.
+                # The transaction is handled by commit() or rollback() in the try/except blocks.
                 self._put_conn(conn)
     
     def load_trades(self, limit=None):
@@ -357,21 +399,24 @@ class DatabaseStorage:
             return False
         finally:
             if conn:
-                conn.rollback() # Always rollback to ensure clean state before returning to pool
+                # For WRITE functions, we do NOT rollback in finally.
+                # The transaction is handled by commit() or rollback() in the try/except blocks.
                 self._put_conn(conn)
     
     def find_similar_patterns_in_db(self, features, pattern_type, limit=10):
-        """Finds similar patterns directly in the database to save memory."""
+        """
+        Finds similar patterns with 'precision surgery' to release the connection ASAP.
+        """
         conn = None
+        raw_results = []
         try:
+            # --- Step 1: Get connection & data ---
             conn = self._get_conn()
             cursor = conn.cursor(cursor_factory=self.RealDictCursor)
 
-            # Build a dynamic query based on the provided features
             query_conditions = ["pattern_type = %s"]
             params = [pattern_type]
 
-            # More targeted search for higher efficiency
             if 'rsi_zone' in features:
                 query_conditions.append("data->'features'->>'rsi_zone' = %s")
                 params.append(features['rsi_zone'])
@@ -381,29 +426,29 @@ class DatabaseStorage:
                 params.append(features['trend'])
 
             query = f"""
-                SELECT *, 
-                       (data->>'success_rate')::float as success_rate
+                SELECT *, (data->>'success_rate')::float as success_rate
                 FROM learned_patterns
                 WHERE {' AND '.join(query_conditions)}
                 ORDER BY last_updated DESC
                 LIMIT %s
             """
-            params.append(limit * 10) # Fetch a larger batch for in-memory filtering
+            params.append(limit * 10)
 
             cursor.execute(query, tuple(params))
-            result = cursor.fetchall()
-
+            raw_results = cursor.fetchall()
             cursor.close()
-            return [dict(row) for row in result]
 
         except Exception as e:
             print(f"❌ DB find_similar_patterns error: {e}")
             return []
         finally:
-            # Ensure the transaction is closed and connection is returned clean
+            # --- Step 2: Release connection IMMEDIATELY ---
             if conn:
-                conn.rollback()
+                conn.rollback() # Always rollback read-only queries
                 self._put_conn(conn)
+
+        # --- Step 3: Process data AFTER connection is released ---
+        return [dict(row) for row in raw_results]
     
     # ========== AI Decisions ==========
     def save_ai_decision(self, decision_data):
@@ -430,7 +475,8 @@ class DatabaseStorage:
             return False
         finally:
             if conn:
-                conn.rollback() # Always rollback to ensure clean state before returning to pool
+                # For WRITE functions, we do NOT rollback in finally.
+                # The transaction is handled by commit() or rollback() in the try/except blocks.
                 self._put_conn(conn)
     
     def load_ai_decisions(self, limit=10):
@@ -491,7 +537,8 @@ class DatabaseStorage:
             return False
         finally:
             if conn:
-                conn.rollback() # Always rollback to ensure clean state before returning to pool
+                # For WRITE functions, we do NOT rollback in finally.
+                # The transaction is handled by commit() or rollback() in the try/except blocks.
                 self._put_conn(conn)
     
     def load_consultant_votes(self, consultant_name=None, limit=1000):
@@ -577,6 +624,7 @@ class DatabaseStorage:
             return False
         finally:
             if conn:
+                conn.rollback() # End any lingering transaction
                 self._put_conn(conn)
     
     # ========== Traps ==========
@@ -602,7 +650,8 @@ class DatabaseStorage:
             return False
         finally:
             if conn:
-                conn.rollback() # Always rollback to ensure clean state
+                # For WRITE functions, we do NOT rollback in finally.
+                # The transaction is handled by commit() or rollback() in the try/except blocks.
                 self._put_conn(conn)
     
     def load_traps(self):
@@ -620,31 +669,34 @@ class DatabaseStorage:
             return []
         finally:
             if conn:
-                conn.rollback() # Always rollback to ensure clean state
+                # For WRITE functions, we do NOT rollback in finally.
+                # The transaction is handled by commit() or rollback() in the try/except blocks.
                 self._put_conn(conn)
     
     # ========== Model Storage (King's Brain) ==========
     def load_model(self, name):
         """تحميل ملف الموديل"""
-        conn = self._get_conn()
-        cursor = conn.cursor()
+        conn = None
         try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
             cursor.execute("SELECT model_data FROM dl_models_v2 WHERE model_name = %s ORDER BY trained_at DESC LIMIT 1", (name,))
             result = cursor.fetchone()
+            cursor.close()
             if result and result[0] is not None:
                 return bytes(result[0])
             return None
         except self._psycopg2.errors.UndefinedTable:
             # This happens if dl_models_v2 doesn't exist yet. It's not an error.
-            conn.rollback()
             print(f"INFO: Table 'dl_models_v2' not found for model '{name}'. This is expected before the first training cycle.")
             return None
         except Exception as e:
             print(f"❌ DB Error loading model {name}: {e}")
             return None
         finally:
-            if cursor:
-                cursor.close()
+            if conn:
+                conn.rollback() # End any lingering transaction
+                self._put_conn(conn)
     
     # ========== Positions ==========
     def save_positions(self, positions):
@@ -694,7 +746,8 @@ class DatabaseStorage:
             return False
         finally:
             if conn:
-                conn.rollback() # Always rollback to ensure clean state
+                # For WRITE functions, we do NOT rollback in finally.
+                # The transaction is handled by commit() or rollback() in the try/except blocks.
                 self._put_conn(conn)
 
     def load_positions(self):
