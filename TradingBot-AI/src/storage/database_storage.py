@@ -9,7 +9,7 @@ import inspect
 # --- DATABASE CONNECTION POOL ---
 # To make the bot stable, we use a connection pool.
 # This avoids connection drops and manages reconnections automatically.
-from psycopg2.pool import ThreadedConnectionPool
+from psycopg2.pool import ThreadedConnectionPool, PoolError
 # --- END --- 
 
 try:
@@ -64,18 +64,23 @@ class DatabaseStorage:
         """Get a healthy connection from the pool."""
         start_time = time.time()
         try:
-            for attempt in range(3):
-                conn = self.pool.getconn()
-                tx_status = conn.get_transaction_status()
-                if tx_status != 0:
-                    TX_STATUS_MAP = {0: 'IDLE', 1: 'ACTIVE', 2: 'INTRANS', 3: 'INERROR'}
-                    print(f"🔍 DB _get_conn: Received conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
-                
-                # تم إزالة الفحص الاستباقي (SELECT 1) لتسريع الحصول على الاتصال ليصبح لحظياً
-                return conn
+            for attempt in range(20): # Try up to 20 times (2 seconds total wait)
+                try:
+                    conn = self.pool.getconn()
+                    tx_status = conn.get_transaction_status()
+                    if tx_status != 0:
+                        TX_STATUS_MAP = {0: 'IDLE', 1: 'ACTIVE', 2: 'INTRANS', 3: 'INERROR'}
+                        print(f"🔍 DB _get_conn: Received conn with tx_status = {TX_STATUS_MAP.get(tx_status, 'UNKNOWN')} ({tx_status})")
+                    return conn
+                except PoolError:
+                    # Pool is exhausted, wait a bit and retry
+                    time.sleep(0.1)
+            
+            # If we get here, we failed after all retries
+            raise Exception("Connection pool exhausted after retries")
         finally:
             elapsed = time.time() - start_time
-            if elapsed > 0.1:
+            if elapsed > 0.5:
                 print(f"⏱️ DB _get_conn took: {elapsed:.2f}s")
 
     def _put_conn(self, conn):
