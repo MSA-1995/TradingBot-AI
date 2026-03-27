@@ -39,7 +39,7 @@ MEMORY_USAGE_THRESHOLD = 80    # Percentage of RAM usage that triggers an aggres
 
 # Timing
 LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
-REPORT_INTERVAL = 30
+REPORT_INTERVAL = 1800
 
 # Notifications
 # Choose where to store the Discord status message ID: 'database' or 'file'
