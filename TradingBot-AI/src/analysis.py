@@ -60,21 +60,27 @@ def analyze_reversal(df, current_price):
 
         # --- 3. كشف القاع بالشموع (Hammer / Bullish Engulfing) ---
         candle_signal = False
-        if len(df) >= 3:
-            last   = df.iloc[-1]
-            prev   = df.iloc[-2]
-            body   = abs(last['close'] - last['open'])
+        # التحقق من آخر 3 شموع لأنماط الانعكاس
+        for i in range(1, min(4, len(df) + 1)): # التحقق من آخر 3 شموع (index -1, -2, -3)
+            last = df.iloc[-i]
+            prev = None
+            if i + 1 <= len(df): # التأكد من وجود الشمعة السابقة لنمط الابتلاع
+                prev = df.iloc[-(i + 1)]
+
+            body = abs(last['close'] - last['open'])
             range_ = last['high'] - last['low']
             lower_shadow = last['open'] - last['low'] if last['close'] >= last['open'] else last['close'] - last['low']
 
             # Hammer: ظل سفلي طويل (مرتين الجسم) وجسم صغير في الأعلى
-            is_hammer = (range_ > 0 and lower_shadow >= 2 * body and last['close'] > last['open'])
+            is_hammer = (range_ > 0 and body > 0 and lower_shadow >= 2 * body and last['close'] > last['open'])
 
             # Bullish Engulfing: شمعة خضراء تبتلع الحمراء قبلها
-            is_engulfing = (last['close'] > last['open'] and prev['close'] < prev['open']
+            is_engulfing = (prev is not None and last['close'] > last['open'] and prev['close'] < prev['open']
                             and last['close'] > prev['open'] and last['open'] < prev['close'])
 
-            candle_signal = is_hammer or is_engulfing
+            if is_hammer or is_engulfing:
+                candle_signal = True
+                break # تم العثور على إشارة، لا داعي للتحقق أكثر
 
         # --- 4. تأكيد الارتداد ---
         is_reversing = bounce_percent >= BOTTOM_BOUNCE_THRESHOLD and candle_signal
@@ -121,21 +127,27 @@ def analyze_peak(df, current_price):
 
         # --- 3. كشف القمة بالشموع (Shooting Star / Bearish Engulfing) ---
         candle_signal = False
-        if len(df) >= 3:
-            last   = df.iloc[-1]
-            prev   = df.iloc[-2]
-            body   = abs(last['close'] - last['open'])
+        # التحقق من آخر 3 شموع لأنماط الانعكاس
+        for i in range(1, min(4, len(df) + 1)): # التحقق من آخر 3 شموع (index -1, -2, -3)
+            last = df.iloc[-i]
+            prev = None
+            if i + 1 <= len(df): # التأكد من وجود الشمعة السابقة لنمط الابتلاع
+                prev = df.iloc[-(i + 1)]
+
+            body = abs(last['close'] - last['open'])
             range_ = last['high'] - last['low']
             upper_shadow = last['high'] - last['close'] if last['close'] >= last['open'] else last['high'] - last['open']
 
             # Shooting Star: ظل علوي طويل وجسم صغير في الأسفل
-            is_shooting_star = (range_ > 0 and upper_shadow >= 2 * body and last['close'] < last['open'])
+            is_shooting_star = (range_ > 0 and body > 0 and upper_shadow >= 2 * body and last['close'] < last['open'])
 
             # Bearish Engulfing: شمعة حمراء تبتلع الخضراء قبلها
-            is_engulfing = (last['close'] < last['open'] and prev['close'] > prev['open']
+            is_engulfing = (prev is not None and last['close'] < last['open'] and prev['close'] > prev['open']
                             and last['close'] < prev['open'] and last['open'] > prev['close'])
 
-            candle_signal = is_shooting_star or is_engulfing
+            if is_shooting_star or is_engulfing:
+                candle_signal = True
+                break # تم العثور على إشارة، لا داعي للتحقق أكثر
 
         # --- 4. تأكيد القمة ---
         is_peaking = drop_percent >= PEAK_DROP_THRESHOLD and candle_signal
