@@ -34,138 +34,225 @@ def get_ttl_hash(seconds=20):
     """[تحسين الذاكرة] إنشاء hash يعتمد على الوقت لتحديث الكاش"""
     return round(time.time() / seconds)
 
-def analyze_reversal(df, current_price):
+def analyze_reversal(df, rsi):
     """
-    تحليل الارتداد من القاع بالشموع ومؤشرات السوق
-    Returns: dict with reversal analysis
+    تحليل الارتداد من القاع باستخدام نظام نقاط الثقة المرن.
+    - فلتر التشبع الشرائي (RSI > 75)
+    - شمعة تأكيد للأنماط الانعكاسية
+    - نقاط مرنة لقوة حجم التداول
     """
     from config import BOTTOM_BOUNCE_THRESHOLD, REVERSAL_CANDLES
 
+    # --- 0. تهيئة القيم ---
+    base_result = {
+        'confidence': 0,
+        'candle_signal': False,
+        'reasons': [],
+        'bounce_percent': 0,
+        'is_reversing': False # للحفاظ على التوافقية
+    }
+
     if df is None or len(df) < 5:
-        return {
-            'low_n': 0,
-            'bounce_percent': 0,
-            'is_reversing': False,
-            'candle_signal': False
-        }
-    
+        return base_result
+
+    # --- 1. فلتر منطقة التشبع الشرائي (No-Go Zone) ---
+    if rsi > 75:
+        base_result['reasons'].append(f'RSI Overbought ({rsi:.0f})')
+        return base_result # الخروج فوراً
+
     try:
-        n = min(REVERSAL_CANDLES, len(df))
-
-        # --- 1. أدنى سعر في آخر N شمعة ---
-        low_n = df['low'].tail(n).min()
-
-        # --- 2. نسبة الارتداد من القاع ---
-        bounce_percent = ((current_price - low_n) / low_n) * 100 if low_n > 0 else 0
-
-        # --- 3. كشف القاع بالشموع (Hammer / Bullish Engulfing) ---
+        confidence = 0
+        reasons = []
         candle_signal = False
-        # التحقق من آخر 3 شموع لأنماط الانعكاس
-        for i in range(1, min(4, len(df) + 1)): # التحقق من آخر 3 شموع (index -1, -2, -3)
-            last = df.iloc[-i]
-            prev = None
-            if i + 1 <= len(df): # التأكد من وجود الشمعة السابقة لنمط الابتلاع
-                prev = df.iloc[-(i + 1)]
+        confirmed_pattern_info = {}
 
-            body = abs(last['close'] - last['open'])
-            range_ = last['high'] - last['low']
-            lower_shadow = last['open'] - last['low'] if last['close'] >= last['open'] else last['close'] - last['low']
+        # --- 2. منطق شمعة التأكيد (البحث عن نمط + تأكيد) ---
+        # نبحث عن نمط في الشموع (-4, -3, -2) وننتظر تأكيداً في الشمعة التالية
+        for i in range(2, min(5, len(df))): # i=2,3,4
+            pattern_candle = df.iloc[-i]
+            confirmation_candle = df.iloc[-i+1]
+            
+            # للتأكد من وجود شمعة سابقة لنمط الابتلاع
+            if len(df) < i + 1: continue
+            prev_to_pattern = df.iloc[-(i+1)]
 
-            # Hammer: ظل سفلي طويل (مرتين الجسم) وجسم صغير في الأعلى
-            is_hammer = (range_ > 0 and body > 0 and lower_shadow >= 2 * body and last['close'] > last['open'])
+            # --- تعريف الأنماط ---
+            body = abs(pattern_candle['close'] - pattern_candle['open'])
+            if body == 0: continue # تجنب القسمة على صفر
+            
+            lower_shadow = pattern_candle['open'] - pattern_candle['low'] if pattern_candle['close'] >= pattern_candle['open'] else pattern_candle['close'] - pattern_candle['low']
+            
+            # Hammer: ظل سفلي طويل وجسم صغير
+            is_hammer = (lower_shadow >= 2 * body and (pattern_candle['high'] - pattern_candle['close']) < body)
 
-            # Bullish Engulfing: شمعة خضراء تبتلع الحمراء قبلها
-            is_engulfing = (prev is not None and last['close'] > last['open'] and prev['close'] < prev['open']
-                            and last['close'] > prev['open'] and last['open'] < prev['close'])
+            # Bullish Engulfing: خضراء تبتلع حمراء
+            is_engulfing = (prev_to_pattern is not None and pattern_candle['close'] > pattern_candle['open'] and prev_to_pattern['close'] < prev_to_pattern['open']
+                            and pattern_candle['close'] > prev_to_pattern['open'] and pattern_candle['open'] < prev_to_pattern['close'])
+            
+            pattern_found = None
+            if is_hammer: pattern_found = "Hammer"
+            elif is_engulfing: pattern_found = "Engulfing"
 
-            if is_hammer or is_engulfing:
-                candle_signal = True
-                break # تم العثور على إشارة، لا داعي للتحقق أكثر
+            # --- شرط شمعة التأكيد ---
+            if pattern_found:
+                is_confirmed = (confirmation_candle['close'] > confirmation_candle['open'] and 
+                                confirmation_candle['close'] > pattern_candle['high']) # يجب أن تغلق فوق قمة شمعة النمط
 
-        # --- 4. تأكيد الارتداد ---
-        is_reversing = bounce_percent >= BOTTOM_BOUNCE_THRESHOLD and candle_signal
+                if is_confirmed:
+                    candle_signal = True
+                    confidence += 20
+                    reasons.append(f"Confirm {pattern_found}")
+                    confirmed_pattern_info = {
+                        'volume_ratio': confirmation_candle['volume_ratio'],
+                        'index': -i+1
+                    }
+                    break # وجدنا نمط مؤكد، نخرج من اللوب
 
-        return {
-            'low_n': low_n,
+        # --- 3. منطق حجم التداول المرن (على شمعة التأكيد) ---
+        if candle_signal and confirmed_pattern_info:
+            vol_ratio = confirmed_pattern_info['volume_ratio']
+            if vol_ratio > 3.0:
+                confidence += 15
+                reasons.append(f"Vol Spike ({vol_ratio:.1f}x)")
+            elif vol_ratio > 1.8:
+                confidence += 10
+                reasons.append(f"Vol Up ({vol_ratio:.1f}x)")
+            elif vol_ratio > 1.2:
+                confidence += 5
+                reasons.append(f"Vol OK ({vol_ratio:.1f}x)")
+
+        # --- 4. نسبة الارتداد من القاع (كنقاط إضافية) ---
+        n = min(REVERSAL_CANDLES, len(df))
+        low_n = df['low'].tail(n).min()
+        current_price = df.iloc[-1]['close']
+        bounce_percent = ((current_price - low_n) / low_n) * 100 if low_n > 0 else 0
+        
+        if bounce_percent >= BOTTOM_BOUNCE_THRESHOLD:
+            confidence += 10
+            reasons.append(f"Bounce {bounce_percent:.1f}%")
+            base_result['is_reversing'] = True # للحفاظ على التوافقية
+
+        base_result.update({
+            'confidence': confidence,
+            'candle_signal': candle_signal,
+            'reasons': reasons,
             'bounce_percent': round(bounce_percent, 3),
-            'is_reversing': is_reversing,
-            'candle_signal': candle_signal
-        }
+        })
+        return base_result
 
     except Exception as e:
-        return {
-            'low_n': 0,
-            'bounce_percent': 0,
-            'is_reversing': False,
-            'candle_signal': False
-        }
+        # في حالة الخطأ، أرجع القيم الأساسية مع تسجيل السبب
+        base_result['reasons'].append(f'Analysis Error: {e}')
+        return base_result
 
 
-def analyze_peak(df, current_price):
+def analyze_peak(df, rsi):
     """
-    تحليل الانعكاس من القمة بالشموع ومؤشرات السوق
-    Returns: dict with peak analysis
+    تحليل الانعكاس من القمة باستخدام نظام نقاط الثقة المرن.
+    - فلتر التشبع البيعي (RSI < 25)
+    - شمعة تأكيد للأنماط الانعكاسية
+    - نقاط مرنة لقوة حجم التداول
     """
     from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES
 
+    # --- 0. تهيئة القيم ---
+    base_result = {
+        'confidence': 0,
+        'candle_signal': False,
+        'reasons': [],
+        'drop_percent': 0,
+        'is_peaking': False # للحفاظ على التوافقية
+    }
+
     if df is None or len(df) < 5:
-        return {
-            'high_n': 0,
-            'drop_percent': 0,
-            'is_peaking': False,
-            'candle_signal': False
-        }
+        return base_result
+
+    # --- 1. فلتر منطقة التشبع البيعي (No-Go Zone) ---
+    if rsi < 25:
+        base_result['reasons'].append(f'RSI Oversold ({rsi:.0f})')
+        return base_result # الخروج فوراً
 
     try:
-        n = min(REVERSAL_CANDLES, len(df))
-
-        # --- 1. أعلى سعر في آخر N شمعة ---
-        high_n = df['high'].tail(n).max()
-
-        # --- 2. نسبة الهبوط من القمة ---
-        drop_percent = ((high_n - current_price) / high_n) * 100 if high_n > 0 else 0
-
-        # --- 3. كشف القمة بالشموع (Shooting Star / Bearish Engulfing) ---
+        confidence = 0
+        reasons = []
         candle_signal = False
-        # التحقق من آخر 3 شموع لأنماط الانعكاس
-        for i in range(1, min(4, len(df) + 1)): # التحقق من آخر 3 شموع (index -1, -2, -3)
-            last = df.iloc[-i]
-            prev = None
-            if i + 1 <= len(df): # التأكد من وجود الشمعة السابقة لنمط الابتلاع
-                prev = df.iloc[-(i + 1)]
+        confirmed_pattern_info = {}
 
-            body = abs(last['close'] - last['open'])
-            range_ = last['high'] - last['low']
-            upper_shadow = last['high'] - last['close'] if last['close'] >= last['open'] else last['high'] - last['open']
+        # --- 2. منطق شمعة التأكيد (البحث عن نمط + تأكيد) ---
+        for i in range(2, min(5, len(df))): # i=2,3,4
+            pattern_candle = df.iloc[-i]
+            confirmation_candle = df.iloc[-i+1]
+            
+            if len(df) < i + 1: continue
+            prev_to_pattern = df.iloc[-(i+1)]
 
-            # Shooting Star: ظل علوي طويل وجسم صغير في الأسفل
-            is_shooting_star = (range_ > 0 and body > 0 and upper_shadow >= 2 * body and last['close'] < last['open'])
+            # --- تعريف الأنماط ---
+            body = abs(pattern_candle['close'] - pattern_candle['open'])
+            if body == 0: continue
 
-            # Bearish Engulfing: شمعة حمراء تبتلع الخضراء قبلها
-            is_engulfing = (prev is not None and last['close'] < last['open'] and prev['close'] > prev['open']
-                            and last['close'] < prev['open'] and last['open'] > prev['close'])
+            upper_shadow = pattern_candle['high'] - pattern_candle['close'] if pattern_candle['close'] >= pattern_candle['open'] else pattern_candle['high'] - pattern_candle['open']
+            
+            # Shooting Star: ظل علوي طويل وجسم صغير
+            is_shooting_star = (upper_shadow >= 2 * body and (pattern_candle['open'] - pattern_candle['low']) < body)
 
-            if is_shooting_star or is_engulfing:
-                candle_signal = True
-                break # تم العثور على إشارة، لا داعي للتحقق أكثر
+            # Bearish Engulfing: حمراء تبتلع خضراء
+            is_engulfing = (prev_to_pattern is not None and pattern_candle['close'] < pattern_candle['open'] and prev_to_pattern['close'] > prev_to_pattern['open']
+                            and pattern_candle['close'] < prev_to_pattern['open'] and pattern_candle['open'] > prev_to_pattern['close'])
 
-        # --- 4. تأكيد القمة ---
-        is_peaking = drop_percent >= PEAK_DROP_THRESHOLD and candle_signal
+            pattern_found = None
+            if is_shooting_star: pattern_found = "ShootingStar"
+            elif is_engulfing: pattern_found = "Engulfing"
 
-        return {
-            'high_n': high_n,
+            # --- شرط شمعة التأكيد ---
+            if pattern_found:
+                is_confirmed = (confirmation_candle['close'] < confirmation_candle['open'] and 
+                                confirmation_candle['close'] < pattern_candle['low']) # يجب أن تغلق تحت قاع شمعة النمط
+
+                if is_confirmed:
+                    candle_signal = True
+                    confidence += 20
+                    reasons.append(f"Confirm {pattern_found}")
+                    confirmed_pattern_info = {
+                        'volume_ratio': confirmation_candle['volume_ratio'],
+                        'index': -i+1
+                    }
+                    break
+
+        # --- 3. منطق حجم التداول المرن (على شمعة التأكيد) ---
+        if candle_signal and confirmed_pattern_info:
+            vol_ratio = confirmed_pattern_info['volume_ratio']
+            if vol_ratio > 3.0:
+                confidence += 15
+                reasons.append(f"Vol Spike ({vol_ratio:.1f}x)")
+            elif vol_ratio > 1.8:
+                confidence += 10
+                reasons.append(f"Vol Up ({vol_ratio:.1f}x)")
+            elif vol_ratio > 1.2:
+                confidence += 5
+                reasons.append(f"Vol OK ({vol_ratio:.1f}x)")
+
+        # --- 4. نسبة الهبوط من القمة (كنقاط إضافية) ---
+        n = min(REVERSAL_CANDLES, len(df))
+        high_n = df['high'].tail(n).max()
+        current_price = df.iloc[-1]['close']
+        drop_percent = ((high_n - current_price) / high_n) * 100 if high_n > 0 else 0
+        
+        if drop_percent >= PEAK_DROP_THRESHOLD:
+            confidence += 10
+            reasons.append(f"Drop {drop_percent:.1f}%")
+            base_result['is_peaking'] = True
+
+        base_result.update({
+            'confidence': confidence,
+            'candle_signal': candle_signal,
+            'reasons': reasons,
             'drop_percent': round(drop_percent, 3),
-            'is_peaking': is_peaking,
-            'candle_signal': candle_signal
-        }
+        })
+        return base_result
 
     except Exception as e:
-        return {
-            'high_n': 0,
-            'drop_percent': 0,
-            'is_peaking': False,
-            'candle_signal': False
-        }
+        base_result['reasons'].append(f'Analysis Error: {e}')
+        return base_result
 
 def get_market_analysis(exchange, symbol, limit=120):
     """Get technical analysis for a symbol with multi-timeframe data"""
@@ -264,8 +351,8 @@ def get_market_analysis(exchange, symbol, limit=120):
         low_24h = df['low'].tail(288).min() if len(df) >= 288 else (df['low'].min() if not df.empty else 0)
 
         # ========== Reversal Analysis (New) ==========
-        reversal_analysis = analyze_reversal(df, latest['close'])
-        peak_analysis = analyze_peak(df, latest['close'])
+        reversal_analysis = analyze_reversal(df, latest['rsi'])
+        peak_analysis = analyze_peak(df, latest['rsi'])
 
         # ========== Price Drop Analysis (New) ==========
         price_drop = {'drop_percent': 0, 'confirmed': False}
