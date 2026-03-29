@@ -31,9 +31,9 @@ ATR_PERIOD = 14  # Period for ATR calculation
 ATR_MULTIPLIER = 2.0  # Multiplier for ATR to set stop-loss. Higher value = wider stop-loss
 
 VOLUME_SPIKE_FACTOR = 1.5 # Multiplier for detecting significant volume spikes (e.g., 2.0 = 100% increase, balanced)
-PEAK_DROP_THRESHOLD = 2.0   # % هبوط من القمة يعتبر إشارة بيع (0.5% = وسط)
+PEAK_DROP_THRESHOLD = 1.5   # % هبوط من القمة يعتبر إشارة بيع (0.5% = وسط)
 BOTTOM_BOUNCE_THRESHOLD = 0.8  # % ارتداد من القاع يعتبر إشارة شراء (0.5% = وسط)
-REVERSAL_CANDLES = 30       # عدد الشموع للبحث عن القاع والقمة
+REVERSAL_CANDLES = 20       # عدد الشموع للبحث عن القاع والقمة
 
 # Performance & Memory Tuning
 BATCH_SIZE = 10          # Number of symbols to process in a single batch (Increased to match DB pool)
