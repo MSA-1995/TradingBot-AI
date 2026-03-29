@@ -2,7 +2,7 @@
 Meta (The King) - The Ultimate Decision Maker
 """
 import pandas as pd
-from config import MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT, USE_DYNAMIC_TRAILING_STOP, ATR_MULTIPLIER, MIN_CONFIDENCE, PEAK_DROP_THRESHOLD, BOTTOM_BOUNCE_THRESHOLD, MIN_PROFIT_TO_SELL, VOLUME_SPIKE_FACTOR
+from config import MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT, USE_DYNAMIC_TRAILING_STOP, ATR_MULTIPLIER, MIN_CONFIDENCE, PEAK_DROP_THRESHOLD, BOTTOM_BOUNCE_THRESHOLD, VOLUME_SPIKE_FACTOR
 from datetime import datetime
 import gc
 import psutil
@@ -49,6 +49,7 @@ class Meta:
         action = "DISPLAY"
         reasons = []
 
+        # --- بداية الكود الحساس ---
         if not analysis_data or not isinstance(analysis_data, dict):
             return {'action': 'DISPLAY', 'reason': 'Invalid analysis data', 'confidence': 0}
 
@@ -92,6 +93,8 @@ class Meta:
 
         temp_conf = min(temp_conf, 99)
 
+        # --- نهاية الكود الحساس ---
+
         # --- 4. تصويت المستشارين ---
         buy_votes = {}
         try:
@@ -119,20 +122,18 @@ class Meta:
 
             min_required = mood_details.get('min_buy_consensus', 57)
             
-            # --- Bottom Hunter Trigger (3 out of 4) ---
-            rsi_condition = rsi < 35
+            # --- صائد القيعان (الزناد الجديد: فوليوم + شمعة) ---
             candle_condition = reversal.get('is_reversing_up', False)
             volume_condition = volume_ratio > VOLUME_SPIKE_FACTOR
-            macd_condition = macd_diff > 0.0
-            vote_count = sum([rsi_condition, candle_condition, volume_condition, macd_condition])
+            trigger_activated = candle_condition and volume_condition
 
             if final_vote >= min_required:
-                if vote_count >= 3:
+                if trigger_activated:
                     action = "BUY"
-                    reason = f"Bottom Hunter ({vote_count}/4) | Conf:{final_vote:.0f}% >= {min_required}% | {', '.join(reasons)}"
+                    reason = f"Bottom Hunter Triggered | Conf:{final_vote:.0f}% >= {min_required}% | {', '.join(reasons)}"
                 else:
                     action = "DISPLAY"
-                    reason = f"Wait Bottom Hunter ({vote_count}/4) | Conf:{final_vote:.0f}% | {', '.join(reasons)}"
+                    reason = f"Wait Bottom Hunter (Vol:{volume_condition}, Candle:{candle_condition}) | Conf:{final_vote:.0f}% | {', '.join(reasons)}"
             else:
                 action = "DISPLAY"
                 reason = f"Conf:{temp_conf}% | {', '.join(reasons) if reasons else 'Monitoring'}"
@@ -161,61 +162,45 @@ class Meta:
         return decision
 
     def should_sell(self, symbol, position, current_price, analysis, mtf, candles=None):
-        """القرار الذكي: هل نبيع؟ (الملك يقرر مع استشارة المستشارين)"""
+        """القرار الذكي: هل نبيع؟ (صائد القمم الجديد)"""
         buy_price = position['buy_price']
         profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
 
-        # --- 1. Unconditional Rule: Trailing Stop Loss (The Royal Guard) ---
+        # --- 1. شبكة الأمان النهائية: وقف الخسارة المتحرك ---
         highest_price = position.get('highest_price', buy_price)
-        stop_loss_percent = 2.0
+        # يستخدم PEAK_DROP_THRESHOLD من الكونفج
         drop_from_high = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
-        if drop_from_high >= stop_loss_percent:
-            # Trailing stop is triggered. Check for minimum profit before selling.
-            if 0 < profit_percent < MIN_PROFIT_TO_SELL:
-                # Profit is positive but too small. Return HOLD instead of SELL.
-                return {
-                    'action': 'HOLD',
-                    'reason': f"TS Ignored: Profit {profit_percent:.2f}% < {MIN_PROFIT_TO_SELL}%",
-                    'profit': profit_percent
-                }
-            else:
-                print(f"🛑 {symbol}: TRAILING STOP triggered (dropped {drop_from_high:.2f}% from peak, limit {stop_loss_percent:.2f}%)")
-                return {
-                    'action': 'SELL',
-                    'reason': f'TRAILING STOP -{stop_loss_percent:.1f}%',
-                    'profit': profit_percent
-                }
+        if drop_from_high >= PEAK_DROP_THRESHOLD:
+            return {
+                'action': 'SELL',
+                'reason': f'TRAILING STOP -{drop_from_high:.1f}%',
+                'profit': profit_percent
+            }
 
         # News is now just a confidence factor, not an emergency exit.
         news_analyzer = self.advisor_manager.get('NewsAnalyzer')
         mood_details = self._get_market_mood(analysis)
 
-        # --- 3. بناء "مجلس المستشارين" للبيع (Peak Hunter) ---
-        # 1. مستشار الربح
-        profit_condition = profit_percent > MIN_PROFIT_TO_SELL
-
-        # 2. مستشار حركة السعر (الشموع)
+        # --- 2. صائد القمم (الزناد الجديد: فوليوم + شمعة) ---
+        # الشرط الأول: شمعة انعكاسية هابطة
         peak_analysis = analysis.get('peak', {})
         candle_condition = peak_analysis.get('is_peaking', False)
 
-        # 3. مستشار الزخم (الفوليوم)
-        # نستخدم نفس المعامل من الكونفج، أو يمكن زيادته قليلاً للبيع (مثلاً +0.5) للتأكد من القمة الانفجارية
-        volume_spike_factor_sell = VOLUME_SPIKE_FACTOR + 0.5 
+        # الشرط الثاني: فوليوم بيع انفجاري
+        volume_spike_factor_sell = VOLUME_SPIKE_FACTOR + 0.5
         volume_condition = analysis.get('volume_ratio', 1.0) > volume_spike_factor_sell
 
-        # 4. مستشار الجشع (RSI)
-        rsi_condition = analysis.get('rsi', 50) > 75
+        # تفعيل الزناد: يجب أن يتحقق الشرطان معاً
+        trigger_activated = candle_condition and volume_condition
 
-        # --- 4. التصويت المبدئي (الزناد) ---
-        votes = [profit_condition, candle_condition, volume_condition, rsi_condition]
-        vote_count = sum(votes)
+        # إذا لم يتحقق الزناد، لا تفكر بالبيع
+        if not trigger_activated:
+            return {'action': 'HOLD', 'reason': f'Waiting for Peak Hunter trigger (Vol:{volume_condition}, Candle:{candle_condition})', 'profit': profit_percent}
 
-        # إذا لم يتحقق الزناد (أقل من 3 أصوات)، لا تفكر بالبيع
-        if vote_count < 3:
-            return {'action': 'HOLD', 'reason': f'Waiting for Peak Hunter trigger ({vote_count}/3 votes)', 'profit': profit_percent}
+        # --- 3. اجتماع المجلس الكامل (حساب الثقة النهائية) ---
+        # إذا تم إطلاق الزناد، نحسب الثقة الكاملة
+        print(f"🎯 {symbol}: PEAK HUNTER trigger activated. Proceeding to full council vote.")
 
-        # --- 5. اجتماع المجلس الكامل (حساب الثقة النهائية) ---
-        # إذا تم إطلاق الزناد، نحسب الثقة الكاملة كما في السابق
         sell_conf = 20
         sell_reasons = []
 
@@ -259,15 +244,15 @@ class Meta:
 
         sell_conf = min(sell_conf, 99)
 
-        # --- 6. القرار الملكي النهائي (Peak Hunter) ---
+        # --- 4. القرار الملكي النهائي (Peak Hunter) ---
         min_required_conf = mood_details.get('min_sell_consensus', 55)
 
         if sell_conf >= min_required_conf:
             action = 'SELL'
-            reason = f"Peak Hunter SELL ({vote_count}/4 votes) | Conf {sell_conf:.0f}% | {', '.join(sell_reasons)}"
+            reason = f"Peak Hunter SELL | Conf {sell_conf:.0f}% | {', '.join(sell_reasons)}"
         else:
             action = 'HOLD'
-            reason = f"Triggered ({vote_count}/4) but low conf ({sell_conf}%) | Holding"
+            reason = f"Triggered but low conf ({sell_conf}%) | Holding"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent}
 
