@@ -103,14 +103,14 @@ class Meta:
             temp_conf += 15
             reasons.append("EMA Cross")
 
-        # --- 3. كشف القاع بالشموع ---
+        # --- 3. كشف القاع بالشموع (نظام الثقة الجديد) ---
         reversal = analysis_data.get('reversal', {})
-        if reversal.get('is_reversing'):
-            temp_conf += 20
-            reasons.append(f"Bottom Bounce {reversal.get('bounce_percent', 0):.2f}%")
-        elif reversal.get('candle_signal'):
-            temp_conf += 10
-            reasons.append("Candle Bottom Signal")
+        reversal_confidence = reversal.get('confidence', 0)
+        reversal_reasons = reversal.get('reasons', [])
+
+        if reversal_confidence > 0:
+            temp_conf += reversal_confidence
+            reasons.extend(reversal_reasons)
 
         # --- 📰 4. تعديل الثقة بالأخبار (مُعدِّل فقط، لا يحكم) ---
         news_boost, news_summary = self._get_news_confidence_modifier(symbol)
@@ -150,10 +150,8 @@ class Meta:
 
             min_required = mood_details.get('min_buy_consensus', 57)
             
-            # --- صائد القيعان (الزناد: فوليوم + شمعة في آخر 3 شموع) ---
-            candle_now      = reversal.get('is_reversing', False)
-            candle_recent   = reversal.get('candle_signal', False)
-            candle_condition = candle_now or candle_recent
+            # --- صائد القيعان (الزناد: فوليوم + شمعة مؤكدة) ---
+            candle_condition = reversal.get('candle_signal', False) # candle_signal now means confirmed pattern
             volume_condition = volume_ratio > VOLUME_SPIKE_FACTOR
             trigger_activated = candle_condition and volume_condition
 
@@ -212,11 +210,9 @@ class Meta:
 
         mood_details = self._get_market_mood(analysis)
 
-        # --- 2. صائد القمم (الزناد: فوليوم + شمعة في آخر 3 شموع) ---
+        # --- 2. صائد القمم (الزناد: فوليوم + شمعة مؤكدة) ---
         peak_analysis = analysis.get('peak', {})
-        candle_now_sell    = peak_analysis.get('is_peaking', False)
-        candle_recent_sell = peak_analysis.get('candle_signal', False)
-        candle_condition   = candle_now_sell or candle_recent_sell
+        candle_condition   = peak_analysis.get('candle_signal', False) # candle_signal now means confirmed pattern
 
         volume_spike_factor_sell = VOLUME_SPIKE_FACTOR + 0.5
         volume_condition = analysis.get('volume_ratio', 1.0) > volume_spike_factor_sell
@@ -255,13 +251,13 @@ class Meta:
             sell_conf += 15
             sell_reasons.append("EMA Death Cross")
 
-        peak = analysis.get('peak', {})
-        if peak.get('is_peaking'):
-            sell_conf += 20
-            sell_reasons.append(f"Peak Drop {peak.get('drop_percent', 0):.2f}%")
-        elif peak.get('candle_signal'):
-            sell_conf += 10
-            sell_reasons.append("Candle Peak Signal")
+        # The 'peak_analysis' variable is already defined above
+        peak_confidence = peak_analysis.get('confidence', 0)
+        peak_reasons = peak_analysis.get('reasons', [])
+
+        if peak_confidence > 0:
+            sell_conf += peak_confidence
+            sell_reasons.extend(peak_reasons)
 
         # --- 📰 تعديل ثقة البيع بالأخبار (مُعدِّل فقط، لا يحكم) ---
         # للبيع: أخبار إيجابية = تخفض رغبة البيع | أخبار سلبية = ترفعها
