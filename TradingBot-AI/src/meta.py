@@ -269,15 +269,42 @@ class Meta:
 
         sell_conf = min(max(sell_conf, 0), 99)
 
-        # --- 3. القرار الملكي النهائي (Peak Hunter) ---
+        # --- 3. تصويت المستشارين (القرار النهائي) ---
+        sell_votes = {}
+        try:
+            dl_client = self.advisor_manager.get('dl_client') if self.advisor_manager else None
+            # نفترض وجود دالة vote_sell_now للتصويت على البيع
+            if dl_client and hasattr(dl_client, 'vote_sell_now'):
+                mtf_data = analysis.get('mtf', {}) # استخدام البيانات من التحليل الشامل
+                trend = mtf_data.get('trend', 'neutral')
+                trend_numeric = 1 if trend == 'bullish' else (-1 if trend == 'bearish' else 0)
+                
+                sell_vote = dl_client.vote_sell_now(
+                    rsi=rsi, macd=macd_diff, volume_ratio=volume_ratio,
+                    trend=trend_numeric, mtf_score=mtf_data.get('total', 0),
+                    profit=profit_percent # إضافة الربح كعامل مهم في قرار البيع
+                )
+                if sell_vote:
+                    sell_votes['dl_client'] = sell_vote.get('score', 0)
+        except Exception as e:
+            print(f"⚠️ Meta sell voting error: {e}")
+            pass
+
+        # --- 4. القرار الملكي النهائي (Peak Hunter) ---
+        if sell_votes:
+            consultant_avg = sum(sell_votes.values()) / len(sell_votes)
+            final_vote = (sell_conf + consultant_avg) / 2
+        else:
+            final_vote = sell_conf
+
         min_required_conf = mood_details.get('min_sell_consensus', 55)
 
-        if sell_conf >= min_required_conf:
+        if final_vote >= min_required_conf:
             action = 'SELL'
-            reason = f"Peak Hunter SELL | Conf {sell_conf:.0f}% | {', '.join(sell_reasons)}"
+            reason = f"Peak Hunter SELL | Conf {final_vote:.0f}% | {', '.join(sell_reasons)}"
         else:
             action = 'HOLD'
-            reason = f"Triggered but low conf ({sell_conf}%) | Holding"
+            reason = f"Triggered but low conf ({final_vote:.0f}%) | Holding"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent}
 
