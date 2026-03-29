@@ -150,8 +150,10 @@ class Meta:
 
             min_required = mood_details.get('min_buy_consensus', 57)
             
-            # --- صائد القيعان (الزناد: فوليوم + شمعة) ---
-            candle_condition = reversal.get('is_reversing', False)
+            # --- صائد القيعان (الزناد: فوليوم + شمعة في آخر 3 شموع) ---
+            candle_now      = reversal.get('is_reversing', False)
+            candle_recent   = reversal.get('candle_signal', False)
+            candle_condition = candle_now or candle_recent
             volume_condition = volume_ratio > VOLUME_SPIKE_FACTOR
             trigger_activated = candle_condition and volume_condition
 
@@ -210,9 +212,11 @@ class Meta:
 
         mood_details = self._get_market_mood(analysis)
 
-        # --- 2. صائد القمم (الزناد: فوليوم + شمعة) ---
+        # --- 2. صائد القمم (الزناد: فوليوم + شمعة في آخر 3 شموع) ---
         peak_analysis = analysis.get('peak', {})
-        candle_condition = peak_analysis.get('is_peaking', False)
+        candle_now_sell    = peak_analysis.get('is_peaking', False)
+        candle_recent_sell = peak_analysis.get('candle_signal', False)
+        candle_condition   = candle_now_sell or candle_recent_sell
 
         volume_spike_factor_sell = VOLUME_SPIKE_FACTOR + 0.5
         volume_condition = analysis.get('volume_ratio', 1.0) > volume_spike_factor_sell
