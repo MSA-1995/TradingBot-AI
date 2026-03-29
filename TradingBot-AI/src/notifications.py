@@ -276,7 +276,7 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
         "PORTFOLIO REPORT",
         fields,
         color='blue',
-        message_id=STATUS_MESSAGE_ID
+        message_id=None # دائماً أرسل رسالة جديدة
     )
 
     if response_data:
