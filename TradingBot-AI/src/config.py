@@ -6,8 +6,8 @@ All bot settings and constants
 # Trading Parameters
 
 MIN_CONFIDENCE = 45
-MAX_POSITIONS = 40  # الحد الأقصى للصفقات المفتوحة (كل العملات)
-TOTAL_COINS_TO_SCAN = 40
+MAX_POSITIONS = 20  # الحد الأقصى للصفقات المفتوحة (كل العملات)
+TOTAL_COINS_TO_SCAN = 20
 
 # Capital Management
 MAX_CAPITAL = 1000
@@ -56,17 +56,11 @@ STATUS_STORAGE_METHOD = 'file' # or 'database'
 # قائمة العملات الثابتة (Top 50 by Market Cap - March 2026)
 SYMBOLS = [
     # Top 10 - Giants
-    'BTC/USDT', 'ETH/USDT', 'XRP/USDT', 'BNB/USDT', 'SOL/USDT', 'DOGE/USDT', 'ADA/USDT', 'TRX/USDT', 'AVAX/USDT', 'TON/USDT', 
+    'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT',
+    'DOGE/USDT', 'ADA/USDT', 'AVAX/USDT', 'LINK/USDT', 'DOT/USDT',
     # 11-20 - Major Alts
-    'LINK/USDT', 'DOT/USDT', 'BCH/USDT', 'NEAR/USDT', 'LTC/USDT',
-    'UNI/USDT', 'ATOM/USDT', 'XLM/USDT', 'HBAR/USDT', 'ICP/USDT',
-    # 21-30 - Established Coins
-    'XTZ/USDT', 'ETC/USDT', 'FIL/USDT', 'VET/USDT', 'ALGO/USDT',
-    'MANA/USDT', 'SAND/USDT', 'AXS/USDT', 'AAVE/USDT', 'IOTA/USDT',
-    # 31-40 - Popular Coins
-    'NEO/USDT', 'THETA/USDT', 'DASH/USDT', 'GRT/USDT', 'RUNE/USDT',
-    'EGLD/USDT', 'CHZ/USDT', 'GALA/USDT', 'ENJ/USDT', 'ZIL/USDT',
-
+    'BCH/USDT', 'NEAR/USDT', 'UNI/USDT', 'ATOM/USDT', 'XLM/USDT',
+    'ETC/USDT', 'GRT/USDT', 'AAVE/USDT', 'FIL/USDT', 'SAND/USDT',
 ]
 
 # عدد العملات النشطة للتداول (الأقوى من القائمة)
