@@ -271,7 +271,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
         timing_data['get_market_analysis'] = (time.time() - analysis_start) * 1000
         if not analysis:
             # إذا فشل التحليل (بيانات غير كافية)، تجاهل العملة في هذه الدورة
-            print(f"🔍 DEBUG: {symbol} - get_market_analysis returned None (insufficient data)")
+            # print(f"🔍 DEBUG: {symbol} - get_market_analysis returned None (insufficient data)")
             return None
 
         current_price = analysis['close']
