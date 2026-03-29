@@ -9,10 +9,27 @@ class StorageManager:
     def __init__(self):
         self.mode = self.detect_environment()
         
-        # كاش للصفقات (تحسين السرعة)
+        # ====== SMART CACHE (تقليل Egress من Supabase) ======
+        # كاش للصفقات - يُستخدم بكثرة من RiskManager في كل دورة
         self.trades_cache = None
         self.trades_cache_time = None
-        self.cache_duration = 60  # ثانية
+        self.cache_duration = 120  # دقيقتان (كان 60 ثانية)
+
+        # كاش للفخاخ - تتغير نادراً
+        self._traps_cache = None
+        self._traps_cache_time = None
+        self._traps_cache_ttl = 300  # 5 دقائق
+
+        # كاش للأنماط - تتغير نادراً جداً
+        self._patterns_cache = None
+        self._patterns_cache_time = None
+        self._patterns_cache_ttl = 600  # 10 دقائق
+
+        # كاش لقرارات AI
+        self._ai_decisions_cache = None
+        self._ai_decisions_cache_time = None
+        self._ai_decisions_cache_ttl = 60  # دقيقة
+        # ====================================================
         
         if self.mode == 'cloud':
             from .database_storage import DatabaseStorage
@@ -42,6 +59,7 @@ class StorageManager:
     # ========== Pattern Operations ==========
     def save_pattern(self, pattern_data):
         """حفظ نمط متعلم"""
+        self._patterns_cache = None  # invalidate cache on write
         return self.storage.save_pattern(pattern_data)
     
     def load_patterns(self):
@@ -49,17 +67,30 @@ class StorageManager:
         return self.storage.load_patterns()
 
     def load_all_patterns(self):
-        """تحميل كل الأنماط المخبأة للتخزين المؤقت في الذاكرة"""
-        return self.storage.load_all_patterns()
+        """تحميل كل الأنماط - مع cache لمدة 10 دقائق لتقليل Egress"""
+        now = datetime.now()
+        if self._patterns_cache is not None and self._patterns_cache_time:
+            if (now - self._patterns_cache_time).total_seconds() < self._patterns_cache_ttl:
+                return self._patterns_cache
+        self._patterns_cache = self.storage.load_all_patterns()
+        self._patterns_cache_time = now
+        return self._patterns_cache
     
     # ========== AI Decisions ==========
     def save_ai_decision(self, decision_data):
         """حفظ قرار AI"""
+        self._ai_decisions_cache = None  # invalidate cache on write
         return self.storage.save_ai_decision(decision_data)
     
     def load_ai_decisions(self, limit=10):
-        """تحميل قرارات AI"""
-        return self.storage.load_ai_decisions(limit)
+        """تحميل قرارات AI - مع cache لمدة دقيقة"""
+        now = datetime.now()
+        if self._ai_decisions_cache is not None and self._ai_decisions_cache_time:
+            if (now - self._ai_decisions_cache_time).total_seconds() < self._ai_decisions_cache_ttl:
+                return self._ai_decisions_cache[-limit:]
+        self._ai_decisions_cache = self.storage.load_ai_decisions(limit=100)
+        self._ai_decisions_cache_time = now
+        return self._ai_decisions_cache[-limit:]
     
     # ========== Performance Metrics ==========
     def save_performance(self, metrics_data):
@@ -73,11 +104,18 @@ class StorageManager:
     # ========== Trap Memory ==========
     def save_trap(self, trap_data):
         """حفظ فخ"""
+        self._traps_cache = None  # invalidate cache on write
         return self.storage.save_trap(trap_data)
     
     def load_traps(self):
-        """تحميل الفخاخ"""
-        return self.storage.load_traps()
+        """تحميل الفخاخ - مع cache لمدة 5 دقائق لتقليل Egress"""
+        now = datetime.now()
+        if self._traps_cache is not None and self._traps_cache_time:
+            if (now - self._traps_cache_time).total_seconds() < self._traps_cache_ttl:
+                return self._traps_cache
+        self._traps_cache = self.storage.load_traps()
+        self._traps_cache_time = now
+        return self._traps_cache
     
     # ========== Consultant Votes ==========
     def save_consultant_vote(self, vote_data):
@@ -123,16 +161,18 @@ class StorageManager:
     
     # ========== Advanced Queries ==========
     def get_all_trades(self):
-        """جلب جميع الصفقات (للتحليل) - مع كاش"""
+        """
+        جلب جميع الصفقات (للتحليل) - مع cache 120 ثانية.
+        ⚠️ هذه الدالة تُستدعى من RiskManager في كل دورة تحليل.
+        الـ cache هنا هو الحل الرئيسي لتقليل Egress من Supabase.
+        """
         try:
-            # استخدام الكاش إذا كان حديث
             now = datetime.now()
             if self.trades_cache and self.trades_cache_time:
                 elapsed = (now - self.trades_cache_time).total_seconds()
-                if elapsed < self.cache_duration:
+                if elapsed < self.cache_duration:  # 120 ثانية
                     return self.trades_cache
             
-            # تحديث الكاش
             trades = self.storage.load_trades(limit=1000)
             self.trades_cache = trades
             self.trades_cache_time = now
