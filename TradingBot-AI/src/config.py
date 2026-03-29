@@ -6,8 +6,8 @@ All bot settings and constants
 # Trading Parameters
 
 MIN_CONFIDENCE = 45
-MAX_POSITIONS = 50  # الحد الأقصى للصفقات المفتوحة (كل العملات)
-TOTAL_COINS_TO_SCAN = 50
+MAX_POSITIONS = 40  # الحد الأقصى للصفقات المفتوحة (كل العملات)
+TOTAL_COINS_TO_SCAN = 40
 
 # Capital Management
 MAX_CAPITAL = 1000
@@ -66,9 +66,7 @@ SYMBOLS = [
     # 31-40 - Popular Coins
     'NEO/USDT', 'THETA/USDT', 'DASH/USDT', 'GRT/USDT', 'RUNE/USDT',
     'EGLD/USDT', 'CHZ/USDT', 'GALA/USDT', 'ENJ/USDT', 'ZIL/USDT',
-    # 41-50 - DeFi & Others
-    'COMP/USDT', 'SNX/USDT', 'SUSHI/USDT', 'YFI/USDT', 'CRV/USDT',
-    '1INCH/USDT', 'ZEC/USDT', 'QTUM/USDT', 'KSM/USDT', 'SHIB/USDT',
+
 ]
 
 # عدد العملات النشطة للتداول (الأقوى من القائمة)
