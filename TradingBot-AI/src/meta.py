@@ -41,6 +41,27 @@ class Meta:
             print(f"❌ Meta: Error loading Meta-Learner blueprint from DB: {e}")
             self.meta_learner_data = None
 
+    # =========================================================
+    # 📰 NEWS CONFIDENCE MODIFIER (يُعدّل الثقة فقط، لا يقرر)
+    # =========================================================
+    def _get_news_confidence_modifier(self, symbol):
+        """
+        يجلب تعديل الثقة من مستشار الأخبار.
+        القيمة موجبة = أخبار إيجابية → ترفع الثقة
+        القيمة سالبة = أخبار سلبية → تخفض الثقة
+        النطاق: -15 إلى +15 نقطة فقط
+        لا يمنع الشراء ولا يأمر بالبيع بنفسه.
+        """
+        try:
+            news_analyzer = self.advisor_manager.get('NewsAnalyzer') if self.advisor_manager else None
+            if not news_analyzer:
+                return 0, "No news"
+            boost = news_analyzer.get_news_confidence_boost(symbol)
+            summary = news_analyzer.get_news_summary(symbol)
+            return boost, summary
+        except Exception:
+            return 0, "No news"
+
     def should_buy(self, symbol, analysis, models_scores, candles=None):
         """القرار - كشف القاع بالشموع + مؤشرات + تصويت المستشارين"""
 
@@ -91,11 +112,18 @@ class Meta:
             temp_conf += 10
             reasons.append("Candle Bottom Signal")
 
-        temp_conf = min(temp_conf, 99)
+        # --- 📰 4. تعديل الثقة بالأخبار (مُعدِّل فقط، لا يحكم) ---
+        news_boost, news_summary = self._get_news_confidence_modifier(symbol)
+        if news_boost != 0:
+            temp_conf += news_boost
+            direction = f"+{news_boost}" if news_boost > 0 else str(news_boost)
+            reasons.append(f"News({direction})")
+
+        temp_conf = min(max(temp_conf, 0), 99)  # نضمن النطاق 0-99
 
         # --- نهاية الكود الحساس ---
 
-        # --- 4. تصويت المستشارين ---
+        # --- 5. تصويت المستشارين ---
         buy_votes = {}
         try:
             dl_client = self.advisor_manager.get('dl_client') if self.advisor_manager else None
@@ -112,7 +140,7 @@ class Meta:
         except Exception:
             pass
 
-        # --- 5. القرار النهائي ---
+        # --- 6. القرار النهائي ---
         if temp_conf >= MIN_CONFIDENCE:
             if buy_votes:
                 consultant_avg = sum(buy_votes.values()) / len(buy_votes)
@@ -122,7 +150,7 @@ class Meta:
 
             min_required = mood_details.get('min_buy_consensus', 57)
             
-            # --- صائد القيعان (الزناد الجديد: فوليوم + شمعة) ---
+            # --- صائد القيعان (الزناد: فوليوم + شمعة) ---
             candle_condition = reversal.get('is_reversing_up', False)
             volume_condition = volume_ratio > VOLUME_SPIKE_FACTOR
             trigger_activated = candle_condition and volume_condition
@@ -146,8 +174,12 @@ class Meta:
             reason = "Market Bearish - holding off buy"
             temp_conf = max(20, temp_conf - 30)
 
-
-        decision = {'action': action, 'reason': reason, 'confidence': temp_conf}
+        decision = {
+            'action': action,
+            'reason': reason,
+            'confidence': temp_conf,
+            'news_summary': news_summary  # للعرض فقط في الواجهة
+        }
 
         if action == 'BUY':
             try:
@@ -168,7 +200,6 @@ class Meta:
 
         # --- 1. شبكة الأمان النهائية: وقف الخسارة المتحرك ---
         highest_price = position.get('highest_price', buy_price)
-        # يستخدم PEAK_DROP_THRESHOLD من الكونفج
         drop_from_high = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
         if drop_from_high >= PEAK_DROP_THRESHOLD:
             return {
@@ -177,40 +208,30 @@ class Meta:
                 'profit': profit_percent
             }
 
-        # News is now just a confidence factor, not an emergency exit.
-        news_analyzer = self.advisor_manager.get('NewsAnalyzer')
         mood_details = self._get_market_mood(analysis)
 
-        # --- 2. صائد القمم (الزناد الجديد: فوليوم + شمعة) ---
-        # الشرط الأول: شمعة انعكاسية هابطة
+        # --- 2. صائد القمم (الزناد: فوليوم + شمعة) ---
         peak_analysis = analysis.get('peak', {})
         candle_condition = peak_analysis.get('is_peaking', False)
 
-        # الشرط الثاني: فوليوم بيع انفجاري
         volume_spike_factor_sell = VOLUME_SPIKE_FACTOR + 0.5
         volume_condition = analysis.get('volume_ratio', 1.0) > volume_spike_factor_sell
 
-        # تفعيل الزناد: يجب أن يتحقق الشرطان معاً
         trigger_activated = candle_condition and volume_condition
 
-        # إذا لم يتحقق الزناد، لا تفكر بالبيع
         if not trigger_activated:
             return {'action': 'HOLD', 'reason': f'Waiting for Peak Hunter trigger (Vol:{volume_condition}, Candle:{candle_condition})', 'profit': profit_percent}
 
-        # --- 3. اجتماع المجلس الكامل (حساب الثقة النهائية) ---
-        # إذا تم إطلاق الزناد، نحسب الثقة الكاملة
         print(f"🎯 {symbol}: PEAK HUNTER trigger activated. Proceeding to full council vote.")
 
         sell_conf = 20
         sell_reasons = []
 
-        # مؤشرات البيع
         rsi = analysis.get('rsi', 50)
         macd_diff = analysis.get('macd_diff', 0)
         volume_ratio = analysis.get('volume_ratio', 1.0)
         ema_crossover = analysis.get('ema_crossover', 0)
 
-        # RSI تشبع شرائي
         if rsi >= 70:
             sell_conf += 25
             sell_reasons.append(f"RSI High ({rsi:.0f})")
@@ -218,22 +239,18 @@ class Meta:
             sell_conf += 15
             sell_reasons.append(f"RSI Elevated ({rsi:.0f})")
 
-        # MACD هبوط
         if macd_diff < 0:
             sell_conf += 15
             sell_reasons.append("MACD Bearish")
 
-        # حجم منخفض = ضعف الاتجاه
         if volume_ratio < 0.7:
             sell_conf += 10
             sell_reasons.append(f"Vol Low ({volume_ratio:.1f}x)")
 
-        # EMA سلبي
         if ema_crossover < 0:
             sell_conf += 15
             sell_reasons.append("EMA Death Cross")
 
-        # كشف القمة بالشموع
         peak = analysis.get('peak', {})
         if peak.get('is_peaking'):
             sell_conf += 20
@@ -242,9 +259,17 @@ class Meta:
             sell_conf += 10
             sell_reasons.append("Candle Peak Signal")
 
-        sell_conf = min(sell_conf, 99)
+        # --- 📰 تعديل ثقة البيع بالأخبار (مُعدِّل فقط، لا يحكم) ---
+        # للبيع: أخبار إيجابية = تخفض رغبة البيع | أخبار سلبية = ترفعها
+        news_boost, news_summary = self._get_news_confidence_modifier(symbol)
+        if news_boost != 0:
+            sell_conf -= news_boost  # عكس الاتجاه: خبر إيجابي يخفف رغبة البيع
+            direction = f"+{news_boost}" if news_boost > 0 else str(news_boost)
+            sell_reasons.append(f"News({direction})")
 
-        # --- 4. القرار الملكي النهائي (Peak Hunter) ---
+        sell_conf = min(max(sell_conf, 0), 99)
+
+        # --- 3. القرار الملكي النهائي (Peak Hunter) ---
         min_required_conf = mood_details.get('min_sell_consensus', 55)
 
         if sell_conf >= min_required_conf:
@@ -264,8 +289,7 @@ class Meta:
 
         up_count = 0
         down_count = 0
-        # A significant move is more than 0.5% in 1 hour (0.2% was too sensitive for crypto noise)
-        threshold = 0.5 
+        threshold = 0.5
 
         if btc_change > threshold: up_count += 1
         elif btc_change < -threshold: down_count += 1
@@ -278,17 +302,17 @@ class Meta:
 
         mood_details = {}
         if up_count >= 2:
-            mood_details['mood'] = "Bullish" # سوق صاعد (إيجابي)
-            mood_details['min_buy_consensus'] = 42 # نسبة الشراء: 42% (3/7) - أكثر حذراً
-            mood_details['min_sell_consensus'] = 70 # نسبة البيع: 70% (نطمع في الربح ولا نبيع بسرعة)
+            mood_details['mood'] = "Bullish"
+            mood_details['min_buy_consensus'] = 42
+            mood_details['min_sell_consensus'] = 70
         elif down_count >= 2:
-            mood_details['mood'] = "Bearish" # سوق هابط (سلبي)
-            mood_details['min_buy_consensus'] = 71 # نسبة الشراء: 71% (5/7) - حذر جداً، نبحث عن فرصة حقيقية فقط
-            mood_details['min_sell_consensus'] = 33 # نسبة البيع: 33% (هروب سريع لحماية رأس المال)
+            mood_details['mood'] = "Bearish"
+            mood_details['min_buy_consensus'] = 71
+            mood_details['min_sell_consensus'] = 33
         else:
-            mood_details['mood'] = "Neutral" # سوق محايد (مستقر)
-            mood_details['min_buy_consensus'] = 57 # نسبة الشراء: 57% (4/7) - أغلبية واضحة مطلوبة
-            mood_details['min_sell_consensus'] = 50 # نسبة البيع: 50% (جني أرباح متوازن)
+            mood_details['mood'] = "Neutral"
+            mood_details['min_buy_consensus'] = 57
+            mood_details['min_sell_consensus'] = 50
         
         return mood_details
 
