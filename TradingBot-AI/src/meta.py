@@ -151,7 +151,7 @@ class Meta:
             min_required = mood_details.get('min_buy_consensus', 57)
             
             # --- صائد القيعان (الزناد: فوليوم + شمعة) ---
-            candle_condition = reversal.get('is_reversing_up', False)
+            candle_condition = reversal.get('is_reversing', False)
             volume_condition = volume_ratio > VOLUME_SPIKE_FACTOR
             trigger_activated = candle_condition and volume_condition
 
