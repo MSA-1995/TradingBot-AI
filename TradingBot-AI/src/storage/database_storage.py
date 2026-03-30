@@ -5,7 +5,6 @@ import os
 from datetime import datetime
 import time
 import inspect
-import inspect
 import threading
 
 # --- DATABASE CONNECTION POOL ---
@@ -36,7 +35,7 @@ class DatabaseStorage:
         
         self._db_params = {
                 'host': parsed.hostname,
-                'port': 5432, # --- FINAL FIX: Force Direct Connection (Bypass PgBouncer) ---
+                'port': parsed.port or 5432, # استخدام المنفذ من URL أو القيمة الافتراضية
                 'database': parsed.path[1:],
                 'user': parsed.username,
                 'password': unquote(parsed.password),
