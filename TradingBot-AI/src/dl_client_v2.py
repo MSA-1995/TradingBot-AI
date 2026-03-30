@@ -8,13 +8,38 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from urllib.parse import urlparse, unquote
 
+ADVISORS_LEARNING_FILE = 'data/advisors_learning.json'
+
 class DeepLearningClientV2:
     def __init__(self, database_url):
         self.database_url = database_url
         self.conn = None
         self._db_params = None
         self._connect_db()
+        self._load_learning_data()
         print("🧠 Deep Learning Client V3 initialized (LightGBM)")
+    
+    def _load_learning_data(self):
+        """تحميل بيانات تعلم المستشارين"""
+        os.makedirs('data', exist_ok=True)
+        if os.path.exists(ADVISORS_LEARNING_FILE):
+            with open(ADVISORS_LEARNING_FILE, 'r') as f:
+                self.learning_data = json.load(f)
+        else:
+            self.learning_data = {
+                'exit': {'buy_success': 0, 'buy_fail': 0, 'sell_success': 0, 'sell_fail': 0, 'threshold': 0.5},
+                'mtf': {'buy_success': 0, 'buy_fail': 0, 'sell_success': 0, 'sell_fail': 0, 'threshold': 0},
+                'risk': {'buy_success': 0, 'buy_fail': 0, 'sell_success': 0, 'sell_fail': 0, 'threshold': 1.0},
+                'pattern': {'buy_success': 0, 'buy_fail': 0, 'sell_success': 0, 'sell_fail': 0, 'threshold': 0},
+                'cnn': {'buy_success': 0, 'buy_fail': 0, 'sell_success': 0, 'sell_fail': 0, 'threshold': 1.0},
+                'anomaly': {'buy_success': 0, 'buy_fail': 0, 'sell_success': 0, 'sell_fail': 0, 'threshold': 1.5},
+                'liquidity': {'buy_success': 0, 'buy_fail': 0, 'sell_success': 0, 'sell_fail': 0, 'threshold': 1.1}
+            }
+    
+    def _save_learning_data(self):
+        """حفظ بيانات تعلم المستشارين"""
+        with open(ADVISORS_LEARNING_FILE, 'w') as f:
+            json.dump(self.learning_data, f, indent=2, ensure_ascii=False)
     
     def _connect_db(self):
         """Connect to PostgreSQL"""
@@ -780,3 +805,66 @@ class DeepLearningClientV2:
             votes['liquidity'] = 1 if volume_ratio > 1.1 else 0
         
         return votes, market_status
+
+    # =========================================================
+    # 🎓 التعلم المباشر للمستشارين ال7 - يتعلمون من كل صفقة
+    # =========================================================
+    def learn_from_trade(self, profit, trade_quality, buy_votes, sell_votes, signal_type='sell'):
+        """
+        التعلم المباشر من كل صفقة
+        كل مستشار يتعلم من أخطائه بدون أوزان متفاوتة
+        """
+        try:
+            if signal_type == 'sell' and sell_votes:
+                for advisor, voted in sell_votes.items():
+                    if advisor in self.learning_data:
+                        if trade_quality in ['GREAT', 'GOOD', 'OK']:
+                            if voted == 1:
+                                self.learning_data[advisor]['sell_success'] += 1
+                            else:
+                                self.learning_data[advisor]['sell_fail'] += 1
+                        elif trade_quality in ['RISKY', 'TRAP']:
+                            if voted == 1:
+                                self.learning_data[advisor]['sell_fail'] += 1
+                            else:
+                                self.learning_data[advisor]['sell_success'] += 1
+            
+            elif signal_type == 'buy' and buy_votes:
+                for advisor, voted in buy_votes.items():
+                    if advisor in self.learning_data:
+                        if profit > 0.5:
+                            if voted == 1:
+                                self.learning_data[advisor]['buy_success'] += 1
+                            else:
+                                self.learning_data[advisor]['buy_fail'] += 1
+                        elif profit < -0.5:
+                            if voted == 1:
+                                self.learning_data[advisor]['buy_fail'] += 1
+                            else:
+                                self.learning_data[advisor]['buy_success'] += 1
+            
+            self._save_learning_data()
+            
+            # طباعة التعلم
+            print(f"🎓 المستشارون تعلموا: {trade_quality} | profit: {profit:+.2f}%")
+            
+        except Exception as e:
+            print(f"⚠️ خطأ في تعلم المستشارين: {e}")
+    
+    def get_advisor_accuracy(self, advisor_name):
+        """حساب دقة المستشار (0-100)"""
+        if advisor_name not in self.learning_data:
+            return 50
+        
+        data = self.learning_data[advisor_name]
+        total = data['buy_success'] + data['buy_fail'] + data['sell_success'] + data['sell_fail']
+        
+        if total < 5:
+            return 50
+        
+        success = data['buy_success'] + data['sell_success']
+        return round((success / total) * 100, 1)
+    
+    def get_all_advisors_accuracy(self):
+        """دقة جميع المستشارين"""
+        return {name: self.get_advisor_accuracy(name) for name in self.learning_data.keys()}
