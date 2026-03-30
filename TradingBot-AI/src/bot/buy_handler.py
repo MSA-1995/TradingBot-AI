@@ -59,9 +59,7 @@ def process_buy(result, exchange, ctx):
         buy_vote_percentage, buy_vote_count, total_consultants
     )
 
-    # The learning process is now handled by the trainer, not the bot.
-    # The old ai_brain.save_buy_voting_results call is removed.
-
+    # Save for learning - with full decision context
     position_data = {
         'buy_price':    buy_result['price'],
         'amount':       buy_result['amount'],
@@ -72,8 +70,10 @@ def process_buy(result, exchange, ctx):
     if 'decision' in result:
         decision = result['decision']
         models_scores = result.get('models_scores', {})
+        
+        # جلب أصوات المستشارين للشراء
+        buy_votes_from_decision = decision.get('buy_votes', {})
 
-        # Collect all advisor scores directly from the pre-calculated models_scores
         advisor_scores = {
             'confidence':   result.get('confidence', 0),
             'rsi':          result.get('rsi', 0),
@@ -92,7 +92,14 @@ def process_buy(result, exchange, ctx):
             'tp_target':      0,
             'sl_target':      0,
             'max_wait_hours': decision.get('max_wait_hours', 48),
-            'ai_data':        advisor_scores
+            'ai_data':        advisor_scores,
+            'decision_factors': {
+                'buy_vote_percentage': decision.get('buy_vote_percentage', 0),
+                'buy_vote_count': decision.get('buy_vote_count', 0),
+                'total_consultants': decision.get('total_consultants', 0),
+                'reasons': [result.get('confidence', 0), result.get('rsi', 0)]
+            },
+            'advisor_votes': buy_votes_from_decision
         })
 
     with symbols_data_lock:
