@@ -80,6 +80,59 @@ class Meta:
         mood_details = self._get_market_mood(analysis_data)
         market_mood = mood_details['mood']
 
+        # --- 🎯 1.5 Market Regime Detection - حالة السوق ---
+        market_regime = analysis_data.get('market_regime', {})
+        regime = market_regime.get('regime', 'UNKNOWN')
+        
+        # في ترند هابط قوي - لا تشتري
+        if regime == 'STRONG_DOWNTREND':
+            return {
+                'action': 'DISPLAY',
+                'reason': f'🚫 Strong Downtrend - No Buy',
+                'confidence': 0,
+                'market_regime': regime
+            }
+        
+        # في تقلبات عالية - خفض الحجم
+        regime_position_multiplier = market_regime.get('trading_advice', {}).get('position_size', 1.0)
+        
+        # --- 🚨 1.6 Flash Crash Protection - حماية السقوط المفاجئ ---
+        flash_crash = analysis_data.get('flash_crash_protection', {})
+        flash_risk_score = flash_crash.get('risk_score', 0)
+        
+        # خطر حرج - لا تتاجر
+        if flash_risk_score >= 70:
+            return {
+                'action': 'DISPLAY',
+                'reason': f'🚨 Flash Crash Risk ({flash_risk_score}%) - STOP',
+                'confidence': 0,
+                'flash_risk': flash_risk_score
+            }
+        
+        # خطر عالي - فقط البيع
+        if flash_risk_score >= 50:
+            return {
+                'action': 'DISPLAY',
+                'reason': f'⚠️ High Risk ({flash_risk_score}%) - No Buy',
+                'confidence': 0,
+                'flash_risk': flash_risk_score
+            }
+
+        # --- ⏰ 1.7 Time Analysis - تحليل الوقت ---
+        time_analysis = analysis_data.get('time_analysis', {})
+        time_recommendation = time_analysis.get('trading_recommendation', {})
+        time_multiplier = time_recommendation.get('size_multiplier', 1.0)
+        time_can_trade = time_recommendation.get('can_trade', True)
+        
+        # وقت سيء - لا تتاجر
+        if not time_can_trade:
+            return {
+                'action': 'DISPLAY',
+                'reason': f'⏰ Bad Time: {time_recommendation.get("reason", "")}',
+                'confidence': 0,
+                'time_analysis': time_analysis
+            }
+
         # --- 2. Technical Indicators ---
         rsi = analysis_data.get('rsi', 50)
         macd_diff = analysis_data.get('macd_diff', 0)
@@ -210,7 +263,10 @@ class Meta:
             'buy_vote_percentage': int((buy_vote_count / total_advisors * 100)) if total_advisors > 0 else 0,
             'buy_votes': vote_breakdown,  # للأرشفة والتعلم
             'fib_score': fib_score,  # فيبوناتشي score
-            'fib_level': fib_level   # فيبوناتشي مستوى
+            'fib_level': fib_level,   # فيبوناتشي مستوى
+            'market_regime': regime,  # حالة السوق
+            'market_regime_multiplier': regime_position_multiplier,  # مضاعف الحجم
+            'flash_crash_risk': flash_risk_score  # خطر السقوط المفاجئ
         }
 
         if action == 'BUY':
@@ -238,6 +294,29 @@ class Meta:
                 'action': 'SELL',
                 'reason': f'TRAILING STOP -{drop_from_high:.1f}%',
                 'profit': profit_percent
+            }
+
+        # --- 🚨 1.5 Flash Crash Protection في البيع ---
+        flash_crash = analysis.get('flash_crash_protection', {})
+        flash_risk = flash_crash.get('risk_score', 0)
+        
+        # خطر حرج - بيع فوراً
+        if flash_risk >= 70:
+            return {
+                'action': 'SELL',
+                'reason': f'🚨 FLASH CRASH - Emergency Sell ({flash_risk}%)',
+                'profit': profit_percent,
+                'flash_risk': flash_risk
+            }
+        
+        # خطر عالي - بيع 50%
+        if flash_risk >= 50:
+            return {
+                'action': 'SELL',
+                'reason': f'⚠️ High Risk - Partial Sell ({flash_risk}%)',
+                'profit': profit_percent,
+                'flash_risk': flash_risk,
+                'partial_sell': 0.5
             }
 
         mood_details = self._get_market_mood(analysis)
@@ -409,9 +488,26 @@ class Meta:
                 king_adjustment = min(max((confidence - 65) * 0.06, -3.0), 3.0)
                 final_amount = max(12.0, min(23.0, avg_amount + king_adjustment))
                 
+                # 🎯 Market Regime Multiplier - مضاعف حالة السوق
+                market_regime = analysis.get('market_regime', {})
+                regime_multiplier = market_regime.get('trading_advice', {}).get('position_size', 1.0)
+                final_amount = final_amount * regime_multiplier
+                
+                # 🚨 Flash Crash Protection - مضاعف حماية السقوط
+                flash_crash = analysis.get('flash_crash_protection', {})
+                flash_risk = flash_crash.get('risk_score', 0)
+                if flash_risk >= 30:
+                    flash_multiplier = 0.5
+                    final_amount = final_amount * flash_multiplier
+                
+                # ⏰ Time Multiplier - مضاعف الوقت
+                time_analysis = analysis.get('time_analysis', {})
+                time_multiplier = time_analysis.get('trading_recommendation', {}).get('size_multiplier', 1.0)
+                final_amount = final_amount * time_multiplier
+                
                 amount = round(final_amount, 2)
                 
-                print(f"💰 {symbol}: ${avg_amount:.2f}→${amount} (Meta Vote)")
+                print(f"💰 {symbol}: ${avg_amount:.2f}→${amount} | Regime:{regime_multiplier}x | Time:{time_multiplier}x | Flash:{flash_risk}%")
                 
             except Exception as e:
                 print(f"⚠️ Meta amount voting error: {e}")
@@ -427,7 +523,7 @@ class Meta:
     def learn_from_trade(self, profit, trade_quality, buy_votes, sell_votes):
         """
         التعلم المباشر من كل صفقة
-        يتعلم الملك من أخطائه بدون أوزان متفاوتة
+        يتعلم الملك من أخطائه مع Time Decay (الحديث أهم)
         """
         try:
             os.makedirs('data', exist_ok=True)
@@ -438,11 +534,30 @@ class Meta:
                     data = json.load(f)
             else:
                 data = {
+                    'trades': [],  # قائمة الصفقات مع timestamps
                     'buy_success': 0, 'buy_fail': 0,
                     'sell_success': 0, 'sell_fail': 0,
                     'peak_correct': 0, 'peak_wrong': 0,
-                    'bottom_correct': 0, 'bottom_wrong': 0
+                    'bottom_correct': 0, 'bottom_wrong': 0,
+                    'last_update': datetime.now().isoformat()
                 }
+            
+            # إضافة الصفقة الحالية مع timestamp
+            trade_record = {
+                'timestamp': datetime.now().isoformat(),
+                'profit': profit,
+                'quality': trade_quality,
+                'buy_votes': buy_votes,
+                'sell_votes': sell_votes
+            }
+            
+            if 'trades' not in data:
+                data['trades'] = []
+            data['trades'].append(trade_record)
+            
+            # الاحتفاظ بآخر 1000 صفقة فقط
+            if len(data['trades']) > 1000:
+                data['trades'] = data['trades'][-1000:]
             
             # تعلم من البيع
             if trade_quality in ['GREAT', 'GOOD', 'OK']:
