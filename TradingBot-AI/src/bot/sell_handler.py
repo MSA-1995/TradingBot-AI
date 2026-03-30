@@ -127,10 +127,10 @@ def process_sell(result, exchange, ctx):
             if advisor_learning_data:
                 storage.save_learning_data('advisors', advisor_learning_data)
             
-            print(f"🎓 التعلم محفوظ في الداتابيز")
+            print(f"🎓 Learning saved to database")
             
         except Exception as e:
-            print(f"⚠️ خطأ في حفظ التعلم: {e}")
+            print(f"⚠️ Learning save error: {e}")
         
         quality_emoji = '🟢' if trade_quality in ['GREAT', 'GOOD'] else ('🟡' if trade_quality == 'OK' else '🔴')
         print(f"{quality_emoji} Trade Quality: {trade_quality} | Profit: {profit:+.2f}% | Held: {hours_held:.1f}h")
