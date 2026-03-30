@@ -70,7 +70,7 @@ def save_status_message_id(message_id):
             with open(STATUS_MESSAGE_ID_FILE, 'w') as f:
                 f.write(str(message_id))
             STATUS_MESSAGE_ID = str(message_id)
-            print(f"💾 Saved status message ID to file: {message_id}")
+            #print(f"💾 Saved status message ID to file: {message_id}")
         except Exception as e:
             print(f"❌ Error saving status message ID to file: {e}")
 
