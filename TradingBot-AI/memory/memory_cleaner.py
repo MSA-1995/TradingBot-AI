@@ -8,15 +8,14 @@ try:
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
-    print("⚠️ psutil not available, using fallback memory detection")
 
 class MemoryCleaner:
     """ينظف الذاكرة بذكاء بدون يؤثر على التداول"""
     
-    def __init__(self, cleanup_interval, memory_threshold):
+    def __init__(self, cleanup_interval=300, memory_threshold=90):
         self.last_cleanup = time.time()
-        self.cleanup_interval = cleanup_interval
-        self.memory_threshold = memory_threshold
+        self.cleanup_interval = cleanup_interval  # 5 دقائق
+        self.memory_threshold = memory_threshold  # 90% للـ Koyeb
         self.safe_operations = [
             'compress_old_data',
             'clear_expired_cache',
@@ -28,7 +27,7 @@ class MemoryCleaner:
         """يحدد إذا كان وقت التنظيف"""
         current_time = time.time()
         
-        # ننظف إذا مر أكثر من دقيقتين كحد أدنى
+        # ننظف إذا مر أكثر من 5 دقائق كحد أدنى
         time_condition = (current_time - self.last_cleanup) > self.cleanup_interval
         
         # إذا كان psutil متاح، نستخدمه لقياس الذاكرة
@@ -63,11 +62,14 @@ class MemoryCleaner:
             
             self.last_cleanup = time.time()
             
+            memory_saved = self._estimate_memory_saved()
+            
             return {
                 'compressed_items': compressed_count,
                 'cache_items_cleared': cache_cleared,
                 'temp_variables_cleared': temp_cleared,
-                'memory_saved_mb': self._estimate_memory_saved()
+                'memory_saved_mb': memory_saved,
+                'status': 'Success'
             }
             
         except Exception as e:
@@ -82,10 +84,10 @@ class MemoryCleaner:
         cache = context['memory_cache']
         old_keys = []
         
-        # نبحث عن بيانات قديمة
+        # نبحث عن بيانات قديمة (أكثر من 5 دقائق)
         for key, data in cache.cache.items():
             if 'candles' in key or 'analysis' in key:
-                if time.time() - data.get('expiry', 0) > 600:  # أكثر من 10 دقائق
+                if time.time() - data.get('expiry', 0) > 300:  # أكثر من 5 دقائق
                     old_keys.append(key)
         
         # نضغطهم
@@ -135,15 +137,22 @@ class MemoryCleaner:
                         pass
         
         # تنظيف المتغيرات المؤقتة في الذاكرة العامة
-        import gc
-        gc.collect()  # جمع القمامة مرتين للتأكد
+        gc.collect()  # جمع القمامة مرة واحدة للتأكد
         
         return cleared
     
     def _estimate_memory_saved(self):
         """يقدر الذاكرة التي تم توفيرها"""
-        # تقدير تقريبي
-        return f"~15-25MB"
+        if PSUTIL_AVAILABLE:
+            try:
+                memory = psutil.virtual_memory()
+                # تقدير تقريبي بناءً على النسبة المتاحة
+                return round(memory.available * 0.05 / (1024 * 1024), 2)  # 5% من المتاحة
+            except:
+                pass
+        
+        # fallback: قيمة افتراضية
+        return "~15-25MB"
     
     def get_memory_status(self):
         """يعطي حالة الذاكرة"""
@@ -153,8 +162,9 @@ class MemoryCleaner:
                 return {
                     'total_mb': memory.total // (1024 * 1024),
                     'available_mb': memory.available // (1024 * 1024),
+                    'used_mb': memory.used // (1024 * 1024),
                     'used_percent': memory.percent,
-                    'need_cleanup': memory.percent > 80
+                    'need_cleanup': memory.percent > self.memory_threshold
                 }
             except:
                 pass
