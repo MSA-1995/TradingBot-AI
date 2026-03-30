@@ -123,61 +123,70 @@ class Meta:
         # --- نهاية الكود الحساس ---
 
         # --- 5. تصويت المستشارين ---
-        buy_votes = {}
+        buy_vote_count = 0
+        total_advisors = 0
+        vote_breakdown = {}
+        
         try:
             dl_client = self.advisor_manager.get('dl_client') if self.advisor_manager else None
             if dl_client and hasattr(dl_client, 'vote_buy_now'):
                 mtf = analysis_data.get('mtf', {})
                 trend = mtf.get('trend', 'neutral')
                 trend_numeric = 1 if trend == 'bullish' else (-1 if trend == 'bearish' else 0)
-                buy_vote = dl_client.vote_buy_now(
+                
+                # جلب التصويت من كل مستشار
+                buy_votes, market_status = dl_client.vote_buy_now(
                     rsi=rsi, macd=macd_diff, volume_ratio=volume_ratio,
-                    trend=trend_numeric, mtf_score=mtf.get('total', 0)
+                    price_momentum=analysis_data.get('price_momentum', 0),
+                    confidence=temp_conf,
+                    liquidity_metrics=analysis_data.get('liquidity_metrics'),
+                    market_sentiment=analysis_data.get('market_sentiment'),
+                    candle_analysis=analysis_data.get('candle_analysis')
                 )
-                if buy_vote:
-                    buy_votes['dl_client'] = buy_vote.get('score', 0)
-        except Exception:
+                
+                if buy_votes:
+                    total_advisors = len(buy_votes)
+                    buy_vote_count = sum(1 for v in buy_votes.values() if v == 1)
+                    vote_breakdown = buy_votes
+        except Exception as e:
+            print(f"⚠️ Buy voting error: {e}")
             pass
 
-        # --- 6. القرار النهائي ---
-        if temp_conf >= MIN_CONFIDENCE:
-            if buy_votes:
-                consultant_avg = sum(buy_votes.values()) / len(buy_votes)
-                final_vote = (temp_conf + consultant_avg) / 2
-            else:
-                final_vote = temp_conf
+        # --- 6. القرار النهائي بناءً على الشموع + التصويت ---
+        min_votes_needed = mood_details.get('min_votes_needed', 4)
+        total_advisors = mood_details.get('total_advisors', 7)
+        
+        # --- صائد القيعان (الزناد: 3 شموع + فوليوم) ---
+        candle_condition = reversal.get('candle_signal', False)
+        volume_condition = volume_ratio > VOLUME_SPIKE_FACTOR
+        trigger_activated = candle_condition and volume_condition
 
-            min_required = mood_details.get('min_buy_consensus', 57)
-            
-            # --- صائد القيعان (الزناد: فوليوم + شمعة مؤكدة) ---
-            candle_condition = reversal.get('candle_signal', False) # candle_signal now means confirmed pattern
-            volume_condition = volume_ratio > VOLUME_SPIKE_FACTOR
-            trigger_activated = candle_condition and volume_condition
-
-            if final_vote >= min_required:
-                if trigger_activated:
-                    action = "BUY"
-                    reason = f"Bottom Hunter Triggered | Conf:{final_vote:.0f}% >= {min_required}% | {', '.join(reasons)}"
-                else:
-                    action = "DISPLAY"
-                    reason = f"Wait Bottom Hunter (Vol:{volume_condition}, Candle:{candle_condition}) | Conf:{final_vote:.0f}% | {', '.join(reasons)}"
+        # القرار: الشموع مؤكدة + تصويت كافي + السوق غير هابط
+        if trigger_activated and buy_vote_count >= min_votes_needed:
+            if market_mood != "Bearish":
+                action = "BUY"
+                reason = f"BUY | Candles✓ Votes:{buy_vote_count}/{total_advisors} | {', '.join(reasons[:3])}"
             else:
                 action = "DISPLAY"
-                reason = f"Conf:{temp_conf}% | {', '.join(reasons) if reasons else 'Monitoring'}"
+                reason = f"BUY Blocked - Bearish Market | Votes:{buy_vote_count}/{total_advisors}"
         else:
+            missing = []
+            if not trigger_activated:
+                missing.append(f"Candles({candle_condition})")
+            if buy_vote_count < min_votes_needed:
+                missing.append(f"Votes({buy_vote_count}/{min_votes_needed})")
             action = "DISPLAY"
-            reason = f"Conf:{temp_conf}% | {', '.join(reasons) if reasons else 'Monitoring'}"
-
-        if market_mood == "Bearish" and action == "BUY":
-            action = "DISPLAY"
-            reason = "Market Bearish - holding off buy"
-            temp_conf = max(20, temp_conf - 30)
+            reason = f"Wait | {', '.join(missing)}"
 
         decision = {
             'action': action,
             'reason': reason,
             'confidence': temp_conf,
-            'news_summary': news_summary  # للعرض فقط في الواجهة
+            'news_summary': news_summary,  # للعرض فقط في الواجهة
+            # معلومات التصويت للعرض
+            'buy_vote_count': buy_vote_count,
+            'total_consultants': total_advisors,
+            'buy_vote_percentage': int((buy_vote_count / total_advisors * 100)) if total_advisors > 0 else 0
         }
 
         if action == 'BUY':
@@ -213,7 +222,7 @@ class Meta:
         peak_analysis = analysis.get('peak', {})
         candle_condition   = peak_analysis.get('candle_signal', False) # candle_signal now means confirmed pattern
 
-        volume_spike_factor_sell = VOLUME_SPIKE_FACTOR + 0.5
+        volume_spike_factor_sell = VOLUME_SPIKE_FACTOR + 0.5  # 1.5 + 0.5 = 2.0
         volume_condition = analysis.get('volume_ratio', 1.0) > volume_spike_factor_sell
 
         trigger_activated = candle_condition and volume_condition
@@ -269,41 +278,53 @@ class Meta:
         sell_conf = min(max(sell_conf, 0), 99)
 
         # --- 3. تصويت المستشارين (القرار النهائي) ---
-        sell_votes = {}
+        sell_vote_count = 0
+        total_advisors = 0
+        vote_breakdown = {}
+        
         try:
             dl_client = self.advisor_manager.get('dl_client') if self.advisor_manager else None
-            # نفترض وجود دالة vote_sell_now للتصويت على البيع
             if dl_client and hasattr(dl_client, 'vote_sell_now'):
-                mtf_data = analysis.get('mtf', {}) # استخدام البيانات من التحليل الشامل
+                mtf_data = analysis.get('mtf', {})
                 trend = mtf_data.get('trend', 'neutral')
                 trend_numeric = 1 if trend == 'bullish' else (-1 if trend == 'bearish' else 0)
                 
-                sell_vote = dl_client.vote_sell_now(
-                    rsi=rsi, macd=macd_diff, volume_ratio=volume_ratio,
-                    trend=trend_numeric, mtf_score=mtf_data.get('total', 0),
-                    profit=profit_percent # إضافة الربح كعامل مهم في قرار البيع
+                # حساب ساعات الاحتفاظ
+                buy_time = position.get('buy_time')
+                hours_held = 24  # default
+                if buy_time:
+                    try:
+                        from datetime import datetime
+                        buy_datetime = datetime.fromisoformat(buy_time)
+                        hours_held = (datetime.now() - buy_datetime).total_seconds() / 3600
+                    except:
+                        pass
+                
+                # جلب التصويت من كل مستشار
+                sell_votes = dl_client.vote_sell_now(
+                    macd=macd_diff, volume_ratio=volume_ratio,
+                    trend=trend_numeric, hours_held=hours_held
                 )
-                if sell_vote:
-                    sell_votes['dl_client'] = sell_vote.get('score', 0)
+                
+                if sell_votes:
+                    total_advisors = len(sell_votes)
+                    sell_vote_count = sum(1 for v in sell_votes.values() if v == 1)
+                    vote_breakdown = sell_votes
         except Exception as e:
             print(f"⚠️ Meta sell voting error: {e}")
             pass
 
-        # --- 4. القرار الملكي النهائي (Peak Hunter) ---
-        if sell_votes:
-            consultant_avg = sum(sell_votes.values()) / len(sell_votes)
-            final_vote = (sell_conf + consultant_avg) / 2
-        else:
-            final_vote = sell_conf
-
-        min_required_conf = mood_details.get('min_sell_consensus', 55)
-
-        if final_vote >= min_required_conf:
+        # --- 4. القرار الملكي النهائي: الشموع + التصويت ---
+        min_votes_needed = mood_details.get('min_votes_needed', 4)
+        total_advisors = mood_details.get('total_advisors', 7)
+        
+        # قرار البيع: الشموع مؤكدة + تصويت كافي
+        if sell_vote_count >= min_votes_needed:
             action = 'SELL'
-            reason = f"Peak Hunter SELL | Conf {final_vote:.0f}% | {', '.join(sell_reasons)}"
+            reason = f"SELL | Candles✓ Votes:{sell_vote_count}/{total_advisors} | {', '.join(sell_reasons[:3])}"
         else:
             action = 'HOLD'
-            reason = f"Triggered but low conf ({final_vote:.0f}%) | Holding"
+            reason = f"Hold | Votes:{sell_vote_count}/{min_votes_needed} | {sell_reasons[0] if sell_reasons else 'Waiting'}"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent}
 
@@ -329,16 +350,16 @@ class Meta:
         mood_details = {}
         if up_count >= 2:
             mood_details['mood'] = "Bullish"
-            mood_details['min_buy_consensus'] = 42
-            mood_details['min_sell_consensus'] = 70
+            mood_details['min_votes_needed'] = 3  # 3/7 موافقين
+            mood_details['total_advisors'] = 7
         elif down_count >= 2:
             mood_details['mood'] = "Bearish"
-            mood_details['min_buy_consensus'] = 71
-            mood_details['min_sell_consensus'] = 33
+            mood_details['min_votes_needed'] = 5  # 5/7 موافقين
+            mood_details['total_advisors'] = 7
         else:
             mood_details['mood'] = "Neutral"
-            mood_details['min_buy_consensus'] = 57
-            mood_details['min_sell_consensus'] = 50
+            mood_details['min_votes_needed'] = 4  # 4/7 موافقين
+            mood_details['total_advisors'] = 7
         
         return mood_details
 
