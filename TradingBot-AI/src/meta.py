@@ -193,18 +193,12 @@ class Meta:
         if trigger_activated and buy_vote_count >= min_votes_needed:
             if market_mood != "Bearish":
                 action = "BUY"
-                reason = f"BUY | Score:{candle_score}/100 Votes:{buy_vote_count}/{total_advisors} | {', '.join(reasons[:3])}"
+                reason = f"BUY | Score:{candle_score}/100 | {', '.join(reasons[:3])}"
             else:
                 action = "DISPLAY"
                 reason = f"Blocked (Bearish) | Score:{candle_score}"
         else:
-            missing = []
-            if not trigger_activated:
-                missing.append(f"Score({candle_score}/{MIN_CONFIDENCE})")
-            if buy_vote_count < min_votes_needed:
-                missing.append(f"Votes({buy_vote_count}/{min_votes_needed})")
-            action = "DISPLAY"
-            reason = f"Wait | {', '.join(missing)}"
+            reason = f"Wait | Score({candle_score}/{MIN_CONFIDENCE})"
 
         decision = {
             'action': action,
@@ -350,10 +344,10 @@ class Meta:
         # قرار البيع: نقاط ≥ MIN_CONFIDENCE + تصويت كافي
         if sell_vote_count >= min_votes_needed:
             action = 'SELL'
-            reason = f"SELL | Score:{peak_score}/100 Votes:{sell_vote_count}/{total_advisors} | {', '.join(sell_reasons[:3])}"
+            reason = f"SELL | Score:{peak_score}/100 | {', '.join(sell_reasons[:3])}"
         else:
             action = 'HOLD'
-            reason = f"Hold | Score:{peak_score}/{MIN_CONFIDENCE} Votes:{sell_vote_count}/{min_votes_needed}"
+            reason = f"Hold | Score:{peak_score}/{MIN_CONFIDENCE}"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
