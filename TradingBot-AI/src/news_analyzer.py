@@ -122,13 +122,13 @@ class NewsAnalyzer:
             emoji = "📈"
             status = "Very Bullish"
         elif score > 2:
-            emoji = "✅"
+            emoji = "🟢"
             status = "Bullish"
         elif score < -5:
             emoji = "📉"
             status = "Very Bearish"
         elif score < -2:
-            emoji = "❌"
+            emoji = "🔴"
             status = "Bearish"
         else:
             emoji = "⚪"
