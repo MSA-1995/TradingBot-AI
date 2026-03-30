@@ -97,7 +97,9 @@ def process_buy(result, exchange, ctx):
                 'buy_vote_percentage': decision.get('buy_vote_percentage', 0),
                 'buy_vote_count': decision.get('buy_vote_count', 0),
                 'total_consultants': decision.get('total_consultants', 0),
-                'reasons': [result.get('confidence', 0), result.get('rsi', 0)]
+                'reasons': [result.get('confidence', 0), result.get('rsi', 0)],
+                'fib_score': decision.get('fib_score', 0),
+                'fib_level': decision.get('fib_level', None)
             },
             'advisor_votes': buy_votes_from_decision
         })
