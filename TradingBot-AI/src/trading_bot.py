@@ -295,7 +295,8 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'price': current_price,
                         'profit': calculate_profit_percent(current_price, position['buy_price']),
                         'reason': decision.get('reason'),
-                        'position': position
+                        'position': position,
+                        'advisor_votes': decision.get('sell_votes', {})  # للأرشفة والتعلم
                     }
             else: # HOLD
                 with symbols_data_lock:
