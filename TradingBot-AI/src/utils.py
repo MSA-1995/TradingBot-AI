@@ -1,10 +1,54 @@
 """
 🛠️ Utilities Module
-Helper functions
+Helper functions + Trading functions
 """
 
 from datetime import datetime, timedelta
 import time
+
+# ================================================================
+# 💰 TRADING FUNCTIONS (من trading.py)
+# ================================================================
+
+def execute_buy(exchange, symbol, amount_usd, price, confidence):
+    """Execute buy order"""
+    try:
+        amount = amount_usd / price
+        order = exchange.create_market_buy_order(symbol, amount)
+        
+        return {
+            'success': True,
+            'order': order,
+            'amount': amount,
+            'price': price,
+            'confidence': confidence
+        }
+    except Exception as e:
+        print(f"❌ Buy error {symbol}: {e}")
+        return {'success': False, 'error': str(e)}
+
+def execute_sell(exchange, symbol, amount, reason=""):
+    """Execute sell order"""
+    try:
+        order = exchange.create_market_sell_order(symbol, amount)
+        
+        return {
+            'success': True,
+            'order': order,
+            'reason': reason
+        }
+    except Exception as e:
+        print(f"❌ Sell error {symbol}: {e}")
+        return {'success': False, 'error': str(e)}
+
+def calculate_sell_value(amount, price):
+    """Calculate sell value"""
+    return amount * price
+
+
+# ================================================================
+# 🛠️ HELPER FUNCTIONS
+# ================================================================
 
 def save_open_positions(storage, symbols_data, symbols_data_lock):
     """Wrapper function to time the saving of open positions."""
