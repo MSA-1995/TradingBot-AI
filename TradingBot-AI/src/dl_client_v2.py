@@ -608,38 +608,41 @@ class DeepLearningClientV2:
             return {}
 
     def vote_sell_now(self, macd, volume_ratio, trend, hours_held):
-        """يصوت المستشار على البيع الفوري بناءً على معايير محددة"""
-        score = 0
-        reasons = []
+        """
+        المستشارين يصوتون: هل نبيع؟ (SELL/SKIP)
+        Returns: sell_votes (dict with each consultant's vote: 1=SELL, 0=SKIP)
+        """
+        votes = {}
 
-        # 1. مؤشر MACD السلبي
-        if macd < -0.1:
-            score += 20
-            reasons.append("Negative MACD")
+        # 1. Exit Strategy (القناص):
+        # يوافق على البيع إذا RSI عالي جداً أو MACD سلبي قوي
+        votes['exit'] = 1 if (macd < -0.5 or volume_ratio > 1.5) else 0
 
-        # 2. نسبة حجم البيع المرتفعة
-        if volume_ratio > 1.5:
-            score += 15
-            reasons.append("High Sell Volume")
+        # 2. MTF vote (صائد الانفجار):
+        # يوافق إذا كان الاتجاه هابط
+        votes['mtf'] = 1 if trend == -1 else 0
 
-        # 3. اتجاه هابط
-        if trend == -1: # -1 يمثل الاتجاه الهابط
-            score += 25
-            reasons.append("Downtrend")
+        # 3. Risk vote (محافظ):
+        # يوافق إذا السوق في منطقة تشبع شرائي خطيرة
+        votes['risk'] = 1 if (macd < -1 or volume_ratio > 2.0) else 0
 
-        # 4. الاحتفاظ بالصفقة لفترة طويلة في اتجاه هابط
-        if hours_held > 48 and trend == -1: # -1 يمثل الاتجاه الهابط
-            score += 30  # عامل قوي جداً
-            reasons.append("Long hold in downtrend")
+        # 4. Pattern vote (الأنماط):
+        # يوافق إذا كان الاتجاه هابط أو الاحتفاظ فترة طويلة
+        votes['pattern'] = 1 if (trend == -1 or (hours_held > 48 and volume_ratio < 0.8)) else 0
 
-        # إذا لم تتحقق أي من الشروط، لا يوجد تصويت للبيع
-        if score == 0:
-            return None
+        # 5. CNN vote (الزخم):
+        # يوافق مع الزخم السلبي القوي
+        votes['cnn'] = 1 if (macd < -1 and volume_ratio > 1.0) else 0
 
-        return {
-            "score": min(score, 100),  # تأكد من أن النتيجة لا تتجاوز 100
-            "reasons": ", ".join(reasons)
-        }
+        # 6. Anomaly vote (كاشف الفخاخ):
+        # يرفض البيع إذا كان انخفاض طبيعي (وليس تصريف)
+        votes['anomaly'] = 1 if (volume_ratio > 1.5 and trend == -1) else 0
+
+        # 7. Liquidity vote (الشيخ - محلل السيولة):
+        # يرفض البيع إذا السيولة ضعيفة (قد يكون فخ)
+        votes['liquidity'] = 1 if (volume_ratio > 1.2) else 0
+
+        return votes
     
     def vote_buy_now(self, rsi, macd, volume_ratio, trend, mtf_score):
         """يصوت المستشار على الشراء الفوري بناءً على معايير محددة"""
