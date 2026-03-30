@@ -53,7 +53,11 @@ def save_status_message_id(message_id):
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)", ('status_message_id', message_id))
+            cursor.execute("""
+                INSERT INTO bot_settings (key, value)
+                VALUES (%s, %s)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+            """, ('status_message_id', message_id))
             conn.commit()
             conn.close()
             STATUS_MESSAGE_ID = message_id
