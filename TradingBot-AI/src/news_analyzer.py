@@ -133,4 +133,4 @@ class NewsAnalyzer:
         else:
             emoji = "⚪"
             status = "Neutral"
-        return f"{emoji} {status} ({pos}+ {neg}- / {total})"
+        return f"{emoji} {status}"
