@@ -610,6 +610,59 @@ class DatabaseStorage:
                 # The transaction is handled by commit() or rollback() in the try/except blocks.
                 self._put_conn(conn)
     
+    def save_learning_data(self, learning_type, data):
+        """حفظ بيانات التعلم (الملك والمستشارين)"""
+        conn = None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO ai_decisions (symbol, decision, confidence, data)
+                VALUES (%s, %s, %s, %s)
+            """, (
+                f'learning_{learning_type}',
+                'learning_update',
+                0,
+                self.json.dumps({
+                    'learning_type': learning_type,
+                    'learning_data': data
+                })
+            ))
+            conn.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"❌ DB save learning error: {e}")
+            if conn: conn.rollback()
+            return False
+        finally:
+            if conn:
+                self._put_conn(conn)
+    
+    def load_learning_data(self, learning_type):
+        """تحميل بيانات التعلم"""
+        conn = None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
+            cursor.execute("""
+                SELECT data FROM ai_decisions 
+                WHERE symbol = %s AND decision = 'learning_update'
+                ORDER BY timestamp DESC LIMIT 1
+            """, (f'learning_{learning_type}',))
+            result = cursor.fetchone()
+            cursor.close()
+            if result and result.get('data'):
+                return result['data'].get('learning_data', {})
+            return {}
+        except Exception as e:
+            print(f"❌ DB load learning error: {e}")
+            return {}
+        finally:
+            if conn:
+                conn.rollback()
+                self._put_conn(conn)
+    
     def load_ai_decisions(self, limit=10):
         """Loads AI decisions, ensuring the connection is always returned."""
         conn = None
