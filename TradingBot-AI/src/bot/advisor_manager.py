@@ -38,8 +38,8 @@ class AdvisorManager:
             self.__class__._advisors['dl_client'] = dl_client
             
         self._creators = {
-            'DeepLearningClientV2': lambda: DeepLearningClientV2(),
-            'dl_client': lambda: DeepLearningClientV2(), # اسم بديل
+            'DeepLearningClientV2': lambda: DeepLearningClientV2(database_url=os.getenv('DATABASE_URL')) if os.getenv('DATABASE_URL') else None,
+            'dl_client': lambda: DeepLearningClientV2(database_url=os.getenv('DATABASE_URL')) if os.getenv('DATABASE_URL') else None, # اسم بديل
             'RiskManager': lambda: RiskManager(storage),
             'ExitStrategyModel': lambda: ExitStrategyModel(storage),
             'AnomalyDetector': lambda: AnomalyDetector(storage),
