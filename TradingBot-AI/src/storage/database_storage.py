@@ -611,16 +611,26 @@ class DatabaseStorage:
                 self._put_conn(conn)
     
     def save_learning_data(self, learning_type, data):
-        """حفظ بيانات التعلم (الملك والمستشارين)"""
+        """حفظ بيانات التعلم (الملك والمستشارين)
+        
+        Args:
+            learning_type: 'king' أو 'advisors'
+            data: قاموس البيانات
+        """
         conn = None
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
+            
+            # اختصار الأسماء لأن symbol عمود VARCHAR(10)
+            short_names = {'king': 'lk', 'advisors': 'la'}
+            short_name = short_names.get(learning_type, learning_type[:2])
+            
             cursor.execute("""
                 INSERT INTO ai_decisions (symbol, decision, confidence, data)
                 VALUES (%s, %s, %s, %s)
             """, (
-                f'learning_{learning_type}',
+                short_name,
                 'learning_update',
                 0,
                 self.json.dumps({
@@ -643,13 +653,16 @@ class DatabaseStorage:
         """تحميل بيانات التعلم"""
         conn = None
         try:
+            short_names = {'king': 'lk', 'advisors': 'la'}
+            short_name = short_names.get(learning_type, learning_type[:2])
+            
             conn = self._get_conn()
             cursor = conn.cursor(cursor_factory=self.RealDictCursor)
             cursor.execute("""
                 SELECT data FROM ai_decisions 
                 WHERE symbol = %s AND decision = 'learning_update'
                 ORDER BY timestamp DESC LIMIT 1
-            """, (f'learning_{learning_type}',))
+            """, (short_name,))
             result = cursor.fetchone()
             cursor.close()
             if result and result.get('data'):
