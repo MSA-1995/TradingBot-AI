@@ -3,10 +3,19 @@
 Processes BUY results, sends notifications, and saves position data.
 """
 
+import sys
+import os
+
+# إضافة مسار src للاستيراد
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.dirname(current_dir)
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
+
 from datetime import datetime
 from colorama import Fore, Style
 
-from trading import execute_buy
+from utils import execute_buy
 from notifications import send_buy_notification
 
 
