@@ -184,23 +184,23 @@ class Meta:
         min_votes_needed = mood_details.get('min_votes_needed', 4)
         total_advisors = mood_details.get('total_advisors', 7)
         
-        # --- صائد القيعان (الزناد: 3 شموع + فوليوم) ---
-        candle_condition = reversal.get('candle_signal', False)
-        volume_condition = volume_ratio > VOLUME_SPIKE_FACTOR
-        trigger_activated = candle_condition and volume_condition
+        # --- صائد القيعان: نظام النقاط الذكي ---
+        candle_condition = reversal.get('candle_signal', False)  # True إذا نقاط ≥ 60
+        candle_score = reversal.get('confidence', 0)  # نقاط الشموع (0-100)
+        trigger_activated = candle_condition  # النقاط تكفي (ما نحتاج فيلتر ثاني)
 
-        # القرار: الشموع مؤكدة + تصويت كافي + السوق غير هابط
+        # القرار: نقاط ≥ 60 + تصويت كافي + السوق غير هابط
         if trigger_activated and buy_vote_count >= min_votes_needed:
             if market_mood != "Bearish":
                 action = "BUY"
-                reason = f"BUY | Candles✓ Votes:{buy_vote_count}/{total_advisors} | {', '.join(reasons[:3])}"
+                reason = f"BUY | Score:{candle_score}/100 Votes:{buy_vote_count}/{total_advisors} | {', '.join(reasons[:3])}"
             else:
                 action = "DISPLAY"
-                reason = f"BUY Blocked - Bearish Market | Votes:{buy_vote_count}/{total_advisors}"
+                reason = f"Blocked (Bearish) | Score:{candle_score}"
         else:
             missing = []
             if not trigger_activated:
-                missing.append(f"Candles({candle_condition})")
+                missing.append(f"Score({candle_score}/{MIN_CONFIDENCE})")
             if buy_vote_count < min_votes_needed:
                 missing.append(f"Votes({buy_vote_count}/{min_votes_needed})")
             action = "DISPLAY"
@@ -344,17 +344,18 @@ class Meta:
             print(f"⚠️ Meta sell voting error: {e}")
             pass
 
-        # --- 4. القرار الملكي النهائي: الشموع + التصويت ---
+        # --- 4. القرار الملكي النهائي: نقاط + التصويت ---
         min_votes_needed = mood_details.get('min_votes_needed', 4)
         total_advisors = mood_details.get('total_advisors', 7)
+        peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
         
-        # قرار البيع: الشموع مؤكدة + تصويت كافي
+        # قرار البيع: نقاط ≥ MIN_CONFIDENCE + تصويت كافي
         if sell_vote_count >= min_votes_needed:
             action = 'SELL'
-            reason = f"SELL | Candles✓ Votes:{sell_vote_count}/{total_advisors} | {', '.join(sell_reasons[:3])}"
+            reason = f"SELL | Score:{peak_score}/100 Votes:{sell_vote_count}/{total_advisors} | {', '.join(sell_reasons[:3])}"
         else:
             action = 'HOLD'
-            reason = f"Hold | Votes:{sell_vote_count}/{min_votes_needed} | {sell_reasons[0] if sell_reasons else 'Waiting'}"
+            reason = f"Hold | Score:{peak_score}/{MIN_CONFIDENCE} Votes:{sell_vote_count}/{min_votes_needed}"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
