@@ -8,7 +8,7 @@
 
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 
 
@@ -356,7 +356,7 @@ class TimeAnalyzer:
     
     def analyze(self):
         """تحليل الوقت الحالي"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         return {
             'hour_utc': now.hour,
@@ -373,7 +373,7 @@ class TimeAnalyzer:
     
     def _is_in_session(self, session):
         """هل الوقت الحالي ضمن الجلسة؟"""
-        hour = datetime.utcnow().hour
+        hour = datetime.now(timezone.utc).hour
         start, end = self.peak_hours.get(session, (0, 24))
         return start <= hour < end
     
@@ -397,7 +397,7 @@ class TimeAnalyzer:
     
     def _get_recommendation(self):
         """توصية بناءً على الوقت"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         hour, day = now.hour, now.weekday()
         
         # نهاية الأسبوع
@@ -420,7 +420,7 @@ class TimeAnalyzer:
     
     def get_time_features(self):
         """ميزات زمنية للـ ML"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return {
             'hour': now.hour,
             'hour_sin': math.sin(2 * math.pi * now.hour / 24),
