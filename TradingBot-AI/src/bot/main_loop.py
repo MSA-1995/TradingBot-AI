@@ -282,7 +282,7 @@ def run_main_loop(exchange, ctx):
             try:
                 cleanup_status = memory_optimizer.periodic_cleanup()
                 if cleanup_status != "No cleanup needed":
-                    print(f"🧹 Memory optimized: {cleanup_status}")
+                    pass  # Memory cleanup completed silently
             except Exception as e:
                 print(f"⚠️ Memory optimizer error: {e}")
 
