@@ -180,6 +180,19 @@ class StorageManager:
         except:
             return []
     
+    # ========== Learning Data ==========
+    def save_learning_data(self, learning_type, data):
+        """حفظ بيانات التعلم (الملك والمستشارين)"""
+        if hasattr(self.storage, 'save_learning_data'):
+            return self.storage.save_learning_data(learning_type, data)
+        return False
+    
+    def load_learning_data(self, learning_type):
+        """تحميل بيانات التعلم"""
+        if hasattr(self.storage, 'load_learning_data'):
+            return self.storage.load_learning_data(learning_type)
+        return {}
+    
     # ========== Auto Cleanup ==========
     def cleanup_old_data(self):
         """حذف البيانات القديمة تلقائياً"""
