@@ -8,6 +8,9 @@ import gc
 import psutil
 import pickle
 import os
+import json
+
+LEARNING_FILE = 'data/king_learning.json'
 
 class Meta:
     def __init__(self, advisor_manager=None, storage=None):
@@ -182,11 +185,11 @@ class Meta:
             'action': action,
             'reason': reason,
             'confidence': temp_conf,
-            'news_summary': news_summary,  # للعرض فقط في الواجهة
-            # معلومات التصويت للعرض
+            'news_summary': news_summary,
             'buy_vote_count': buy_vote_count,
             'total_consultants': total_advisors,
-            'buy_vote_percentage': int((buy_vote_count / total_advisors * 100)) if total_advisors > 0 else 0
+            'buy_vote_percentage': int((buy_vote_count / total_advisors * 100)) if total_advisors > 0 else 0,
+            'buy_votes': vote_breakdown  # للأرشفة والتعلم
         }
 
         if action == 'BUY':
@@ -326,7 +329,7 @@ class Meta:
             action = 'HOLD'
             reason = f"Hold | Votes:{sell_vote_count}/{min_votes_needed} | {sell_reasons[0] if sell_reasons else 'Waiting'}"
 
-        return {'action': action, 'reason': reason, 'profit': profit_percent}
+        return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
     def _get_market_mood(self, analysis):
         """Analyzes BTC, ETH, BNB changes to determine the overall market mood and required consensus."""
@@ -397,3 +400,79 @@ class Meta:
             amount = MIN_TRADE_AMOUNT
         
         return amount
+
+    # =========================================================
+    # 🎓 التعلم المباشر للملك - يتعلم من كل صفقة
+    # =========================================================
+    def learn_from_trade(self, profit, trade_quality, buy_votes, sell_votes):
+        """
+        التعلم المباشر من كل صفقة
+        يتعلم الملك من أخطائه بدون أوزان متفاوتة
+        """
+        try:
+            os.makedirs('data', exist_ok=True)
+            
+            # تحميل بيانات التعلم
+            if os.path.exists(LEARNING_FILE):
+                with open(LEARNING_FILE, 'r') as f:
+                    data = json.load(f)
+            else:
+                data = {
+                    'buy_success': 0, 'buy_fail': 0,
+                    'sell_success': 0, 'sell_fail': 0,
+                    'peak_correct': 0, 'peak_wrong': 0,
+                    'bottom_correct': 0, 'bottom_wrong': 0
+                }
+            
+            # تعلم من البيع
+            if trade_quality in ['GREAT', 'GOOD', 'OK']:
+                data['sell_success'] += 1
+                if sell_votes and len([v for v in sell_votes.values() if v == 1]) >= 4:
+                    data['peak_correct'] += 1
+            elif trade_quality in ['RISKY', 'TRAP']:
+                data['sell_fail'] += 1
+                if sell_votes and len([v for v in sell_votes.values() if v == 1]) >= 4:
+                    data['peak_wrong'] += 1
+            
+            # تعلم من الشراء
+            if profit > 0.5:
+                data['buy_success'] += 1
+                if buy_votes and len([v for v in buy_votes.values() if v == 1]) >= 3:
+                    data['bottom_correct'] += 1
+            elif profit < -0.5:
+                data['buy_fail'] += 1
+                if buy_votes and len([v for v in buy_votes.values() if v == 1]) >= 3:
+                    data['bottom_wrong'] += 1
+            
+            # حفظ البيانات
+            with open(LEARNING_FILE, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            # طباعة التعلم
+            total = data['buy_success'] + data['buy_fail'] + data['sell_success'] + data['sell_fail']
+            if total > 0:
+                success = data['buy_success'] + data['sell_success']
+                accuracy = (success / total) * 100
+                print(f"👑 الملك تعلم: {trade_quality} | دقة: {accuracy:.0f}% ({success}/{total})")
+            
+        except Exception as e:
+            print(f"⚠️ خطأ في تعلم الملك: {e}")
+    
+    def get_learning_stats(self):
+        """إحصائيات تعلم الملك"""
+        try:
+            if os.path.exists(LEARNING_FILE):
+                with open(LEARNING_FILE, 'r') as f:
+                    data = json.load(f)
+                total = data['buy_success'] + data['buy_fail'] + data['sell_success'] + data['sell_fail']
+                success = data['buy_success'] + data['sell_success']
+                return {
+                    'total': total,
+                    'success': success,
+                    'accuracy': (success / total * 100) if total > 0 else 0,
+                    'peak_accuracy': (data['peak_correct'] / (data['peak_correct'] + data['peak_wrong']) * 100) if (data['peak_correct'] + data['peak_wrong']) > 0 else 0,
+                    'bottom_accuracy': (data['bottom_correct'] / (data['bottom_correct'] + data['bottom_wrong']) * 100) if (data['bottom_correct'] + data['bottom_wrong']) > 0 else 0
+                }
+        except:
+            pass
+        return {'total': 0, 'success': 0, 'accuracy': 0, 'peak_accuracy': 0, 'bottom_accuracy': 0}
