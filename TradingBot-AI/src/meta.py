@@ -8,7 +8,6 @@ import gc
 import psutil
 import pickle
 import os
-from datetime import datetime
 
 class Meta:
     def __init__(self, advisor_manager=None, storage=None):
