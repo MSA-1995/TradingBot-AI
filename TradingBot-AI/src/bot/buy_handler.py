@@ -54,7 +54,7 @@ def process_buy(result, exchange, ctx):
         total_consultants = decision.get('total_consultants')
 
     send_buy_notification(
-        symbol, buy_result['amount'], result['price'], result['amount'],
+        symbol, buy_result['amount'], buy_result['price'], buy_result['amount'] * buy_result['price'],
         result['confidence'], tp_target, sl_target,
         buy_vote_percentage, buy_vote_count, total_consultants
     )
