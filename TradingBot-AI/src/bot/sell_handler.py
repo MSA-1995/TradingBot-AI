@@ -5,6 +5,8 @@ Processes SELL results and handles AI learning after a successful sell.
 
 from datetime import datetime
 from colorama import Fore, Style
+import json
+import os
 
 from trading import execute_sell, calculate_sell_value
 from notifications import send_sell_notification
@@ -14,7 +16,8 @@ def process_sell(result, exchange, ctx):
     """
     Process a SELL action result.
     ctx keys: SYMBOLS_DATA, symbols_data_lock, storage,
-              exit_strategy, pattern_recognizer, sell_cooldown
+              exit_strategy, pattern_recognizer, sell_cooldown,
+              meta, advisor_manager
     Returns: True if sell executed successfully, False otherwise.
     """
     symbol          = result['symbol']
@@ -22,6 +25,7 @@ def process_sell(result, exchange, ctx):
     symbols_data_lock = ctx['symbols_data_lock']
     storage         = ctx['storage']
     advisor_manager = ctx.get('advisor_manager')
+    meta            = ctx.get('meta')
     sell_cooldown   = ctx.get('sell_cooldown', {})
 
     print(f"{Fore.RED}🔴 SELL {symbol} | {result['reason']} | Profit: {result['profit']:+.2f}%{Style.RESET_ALL}")
@@ -30,7 +34,6 @@ def process_sell(result, exchange, ctx):
     if not sell_result['success']:
         return False
 
-    # Add to cooldown
     sell_cooldown[symbol] = datetime.now()
 
     sell_value = calculate_sell_value(result['amount'], result['price'])
@@ -41,9 +44,7 @@ def process_sell(result, exchange, ctx):
 
     position = result['position']
 
-    # AI Learning is now handled by the trainer based on trades_history.
-    # Instead of learning directly, we save the trade result to the database.
-    # The external trainer script will then use this data for asynchronous learning.
+    # AI Learning with instant evaluation
     try:
         hours_held = 24
         try:
@@ -52,14 +53,35 @@ def process_sell(result, exchange, ctx):
                 buy_time = datetime.fromisoformat(buy_time_str)
                 hours_held = (datetime.now() - buy_time).total_seconds() / 3600
         except:
-            pass # Use default hours_held
+            pass
 
+        profit = result.get('profit', 0)
+        
+        # تقييم فوري للصفقة
+        if profit >= 1.5:
+            trade_quality = 'GREAT'
+        elif profit >= 0.8:
+            trade_quality = 'GOOD'
+        elif profit >= 0.3:
+            trade_quality = 'OK'
+        elif profit >= -0.5:
+            trade_quality = 'RISKY'
+        else:
+            trade_quality = 'TRAP'
+
+        # جلب أصوات المستشارين
+        advisor_votes = position.get('advisor_votes', {})
+        
+        # حفظ بيانات الصفقة
         trade_data = {
             'symbol': symbol,
             'action': 'sell',
-            'profit_percent': result.get('profit'),
+            'profit_percent': profit,
+            'trade_quality': trade_quality,
             'sell_reason': result.get('reason'),
             'hours_held': hours_held,
+            'advisor_votes': advisor_votes,
+            'buy_votes': advisor_votes,  # نفس الأصوات للشراء
             'data': {
                 'buy_price': position.get('buy_price'),
                 'sell_price': result.get('price'),
@@ -67,13 +89,58 @@ def process_sell(result, exchange, ctx):
             }
         }
         storage.save_trade(trade_data)
+        
+        # =========================================================
+        # 🎓 التعلم المباشر للملك والمستشارين - حفظ في الداتابيز
+        # =========================================================
+        
+        # حفظ بيانات التعلم
+        try:
+            # تعلم الملك
+            king_learning_data = {
+                'king': {
+                    'buy_success': 1 if profit > 0.5 else 0,
+                    'buy_fail': 1 if profit < -0.5 else 0,
+                    'sell_success': 1 if trade_quality in ['GREAT', 'GOOD', 'OK'] else 0,
+                    'sell_fail': 1 if trade_quality in ['RISKY', 'TRAP'] else 0,
+                    'peak_correct': 1 if trade_quality in ['GREAT', 'GOOD', 'OK'] else 0,
+                    'peak_wrong': 1 if trade_quality in ['RISKY', 'TRAP'] else 0,
+                    'bottom_correct': 1 if profit > 0.5 else 0,
+                    'bottom_wrong': 1 if profit < -0.5 else 0
+                }
+            }
+            storage.save_learning_data('king', king_learning_data)
+            
+            # تعلم المستشارين
+            advisor_learning_data = {}
+            for advisor, voted in advisor_votes.items():
+                if trade_quality in ['GREAT', 'GOOD', 'OK']:
+                    advisor_learning_data[advisor] = {
+                        'sell_success': 1 if voted == 1 else 0,
+                        'sell_fail': 0 if voted == 1 else 1
+                    }
+                elif trade_quality in ['RISKY', 'TRAP']:
+                    advisor_learning_data[advisor] = {
+                        'sell_success': 0 if voted == 1 else 1,
+                        'sell_fail': 1 if voted == 1 else 0
+                    }
+            if advisor_learning_data:
+                storage.save_learning_data('advisors', advisor_learning_data)
+            
+            print(f"🎓 التعلم محفوظ في الداتابيز")
+            
+        except Exception as e:
+            print(f"⚠️ خطأ في حفظ التعلم: {e}")
+        
+        quality_emoji = '🟢' if trade_quality in ['GREAT', 'GOOD'] else ('🟡' if trade_quality == 'OK' else '🔴')
+        print(f"{quality_emoji} Trade Quality: {trade_quality} | Profit: {profit:+.2f}% | Held: {hours_held:.1f}h")
+        
     except Exception as e:
         print(f"⚠️ Error saving trade for {symbol}: {e}")
 
     with symbols_data_lock:
         SYMBOLS_DATA[symbol]['position'] = None
 
-    # Explicitly delete from persistent storage
     try:
         storage.delete_position(symbol)
         print(f"✅ {symbol} position deleted from database.")
