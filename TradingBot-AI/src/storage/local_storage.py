@@ -77,6 +77,29 @@ class LocalStorage:
             decisions = decisions[-100:]
         return self._save_json(filepath, decisions)
     
+    def save_learning_data(self, learning_type, data):
+        """حفظ بيانات التعلم (الملك والمستشارين)"""
+        filepath = os.path.join(self.base_path, 'learning', f'{learning_type}_learning.json')
+        existing = self._load_json(filepath, {})
+        if isinstance(existing, dict):
+            # دمج البيانات
+            for key, value in data.items():
+                if isinstance(value, dict) and key in existing:
+                    for k, v in value.items():
+                        if isinstance(v, int) and k in existing[key]:
+                            existing[key][k] += v
+                        else:
+                            existing[key][k] = v
+                else:
+                    existing[key] = value
+            return self._save_json(filepath, existing)
+        return self._save_json(filepath, data)
+    
+    def load_learning_data(self, learning_type):
+        """تحميل بيانات التعلم"""
+        filepath = os.path.join(self.base_path, 'learning', f'{learning_type}_learning.json')
+        return self._load_json(filepath, {})
+    
     def load_ai_decisions(self, limit=10):
         filepath = os.path.join(self.base_path, 'learning', 'ai_decisions.json')
         decisions = self._load_json(filepath, [])
