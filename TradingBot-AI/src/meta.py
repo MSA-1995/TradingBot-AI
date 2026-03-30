@@ -121,6 +121,31 @@ class Meta:
             direction = f"+{news_boost}" if news_boost > 0 else str(news_boost)
             reasons.append(f"News({direction})")
 
+        # --- 📊 5. فيبوناتشي (مستويات الدعم/المقاومة) ---
+        fib_score = 0
+        fib_level = None
+        try:
+            fib_analyzer = self.advisor_manager.get('FibonacciAnalyzer') if self.advisor_manager else None
+            if fib_analyzer:
+                is_at_support, support_boost = fib_analyzer.is_at_support(
+                    current_price=analysis_data.get('close', 0),
+                    analysis=analysis_data,
+                    volume_ratio=volume_ratio,
+                    symbol=symbol
+                )
+                if is_at_support:
+                    fib_score = support_boost
+                    temp_conf += support_boost
+                    support_info = fib_analyzer.get_support_level(
+                        analysis_data.get('close', 0), 
+                        analysis_data
+                    )
+                    if support_info:
+                        fib_level = support_info['level']
+                        reasons.append(f"Fib {fib_level}% (+{support_boost})")
+        except Exception as e:
+            print(f"⚠️ Fibonacci error: {e}")
+
         temp_conf = min(max(temp_conf, 0), 99)  # نضمن النطاق 0-99
 
         # --- نهاية الكود الحساس ---
@@ -189,7 +214,9 @@ class Meta:
             'buy_vote_count': buy_vote_count,
             'total_consultants': total_advisors,
             'buy_vote_percentage': int((buy_vote_count / total_advisors * 100)) if total_advisors > 0 else 0,
-            'buy_votes': vote_breakdown  # للأرشفة والتعلم
+            'buy_votes': vote_breakdown,  # للأرشفة والتعلم
+            'fib_score': fib_score,  # فيبوناتشي score
+            'fib_level': fib_level   # فيبوناتشي مستوى
         }
 
         if action == 'BUY':
