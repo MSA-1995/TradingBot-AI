@@ -33,7 +33,7 @@ ATR_MULTIPLIER = 2.0  # Multiplier for ATR to set stop-loss. Higher value = wide
 VOLUME_SPIKE_FACTOR = 2.0 # Multiplier for detecting significant volume spikes (e.g., 2.0 = 100% increase, balanced)
 PEAK_DROP_THRESHOLD = 1.5   # % هبوط من القمة يعتبر إشارة بيع (0.5% = وسط)
 BOTTOM_BOUNCE_THRESHOLD = 2.0  # % ارتداد من القاع يعتبر إشارة شراء (0.5% = وسط)
-REVERSAL_CANDLES = 50       # عدد الشموع للبحث عن القاع والقمةعدد الشموع للبحث عن القاع والقمة
+REVERSAL_CANDLES = 30       # عدد الشموع للبحث عن القاع والقمةعدد الشموع للبحث عن القاع والقمة
 
 # Performance & Memory Tuning
 BATCH_SIZE = 10          # Number of symbols to process in a single batch (Increased to match DB pool)
