@@ -3,12 +3,20 @@
 Processes SELL results and handles AI learning after a successful sell.
 """
 
+import sys
+import os
+
+# إضافة مسار src للاستيراد
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.dirname(current_dir)
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
+
 from datetime import datetime
 from colorama import Fore, Style
 import json
-import os
 
-from trading import execute_sell, calculate_sell_value
+from utils import execute_sell, calculate_sell_value
 from notifications import send_sell_notification
 
 
