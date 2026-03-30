@@ -38,9 +38,8 @@ from config import *
 
 # Modules
 from analysis import get_market_analysis
-from trading import execute_buy, execute_sell, calculate_sell_value
 from notifications import send_buy_notification, send_sell_notification, send_positions_report
-from utils import calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent, format_price
+from utils import execute_buy, execute_sell, calculate_sell_value, calculate_dynamic_confidence, get_active_positions_count, get_total_invested, should_send_report, calculate_profit_percent, format_price
 from storage import StorageManager
 from capital_manager import CapitalManager  # إدارة رأس المال
 
