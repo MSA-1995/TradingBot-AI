@@ -36,12 +36,14 @@ def get_ttl_hash(seconds=20):
 
 def analyze_reversal(df, rsi):
     """
-    تحليل الارتداد من القاع - نظام متوسط:
-    - يفحص الترند (5-10 شمعات)
-    - يفحص الزخم
-    - أنماط مؤكدة + فوليوم
+    تحليل الارتداد من القاع - نظام النقاط الذكي:
+    - الشمعات (0-25 نقطة)
+    - الترند (0-20 نقطة) - 5 شمعات
+    - الزخم (0-30 نقطة)
+    - التأكيد (0-15 نقطة)
+    - الفوليوم (0-10 نقطة)
     """
-    from config import BOTTOM_BOUNCE_THRESHOLD, REVERSAL_CANDLES
+    from config import BOTTOM_BOUNCE_THRESHOLD, REVERSAL_CANDLES, MIN_CONFIDENCE
 
     base_result = {
         'confidence': 0,
@@ -50,10 +52,11 @@ def analyze_reversal(df, rsi):
         'bounce_percent': 0,
         'is_reversing': False,
         'trend': 'neutral',
-        'momentum': 0
+        'momentum': 0,
+        'score_breakdown': {}  # تفصيل النقاط
     }
 
-    if df is None or len(df) < 10:
+    if df is None or len(df) < 8:
         return base_result
 
     if rsi > 75:
@@ -61,136 +64,169 @@ def analyze_reversal(df, rsi):
         return base_result
 
     try:
-        confidence = 0
+        total_score = 0
         reasons = []
+        score_breakdown = {}
         
-        # --- 1. فحص الترند (micro-trend) ---
-        lookback = min(10, len(df))
+        # =========================================================
+        # 📊 نظام النقاط الذكي (المجموع = 100 نقطة)
+        # =========================================================
+        
+        # --- 1. فحص الترند (5 شمعات) - 20 نقطة ---
+        lookback = min(5, len(df))
         trend_start = df.iloc[-lookback]['open']
         trend_end = df.iloc[-1]['close']
         trend_change = ((trend_end - trend_start) / trend_start) * 100
         
-        is_downtrend = trend_change < -1.0  # هبط 1% على الأقل
-        is_sideways = abs(trend_change) <= 1.0
-        
-        if is_downtrend:
+        if trend_change < -2.0:      # هبط أكثر من 2%
+            trend_score = 20
+            base_result['trend'] = 'strong_downtrend'
+        elif trend_change < -1.0:    # هبط أكثر من 1%
+            trend_score = 15
             base_result['trend'] = 'downtrend'
-            confidence += 15
-            reasons.append(f"Downtrend {trend_change:.1f}%")
-        elif is_sideways:
+        elif trend_change < -0.5:    # هبط شوي
+            trend_score = 10
+            base_result['trend'] = 'weak_downtrend'
+        elif abs(trend_change) <= 0.5:  # ثابت
+            trend_score = 5
             base_result['trend'] = 'sideways'
-            confidence += 5
-            reasons.append(f"Sideways {trend_change:.1f}%")
-        
-        # --- 2. فحص الزخم ---
-        if len(df) >= 5:
-            last_5 = df.tail(5)
-            momentum = last_5['close'].iloc[-1] - last_5['close'].iloc[0]
-            momentum_pct = (momentum / last_5['close'].iloc[0]) * 100
-            base_result['momentum'] = momentum_pct
+        else:
+            trend_score = 0
+            base_result['trend'] = 'uptrend'  # صاعد = ما يشتري
             
-            if momentum_pct < -1.5:
-                confidence += 10
-                reasons.append(f"Momentum Down {momentum_pct:.1f}%")
+        total_score += trend_score
+        score_breakdown['trend'] = trend_score
+        if trend_score > 0:
+            reasons.append(f"Trend {trend_change:.1f}% (+{trend_score})")
         
-        # --- 3. فحص RSI zone ---
-        if rsi < 30:
-            confidence += 20
-            reasons.append(f"RSI Oversold ({rsi:.0f})")
+        base_result['momentum'] = trend_change
+        
+        # --- 2. فحص الزخم (RSI) - 30 نقطة ---
+        if rsi < 25:
+            rsi_score = 30
+            reasons.append(f"RSI Very Low ({rsi:.0f}) (+30)")
+        elif rsi < 30:
+            rsi_score = 25
+            reasons.append(f"RSI Oversold ({rsi:.0f}) (+25)")
+        elif rsi < 35:
+            rsi_score = 18
+            reasons.append(f"RSI Low ({rsi:.0f}) (+18)")
         elif rsi < 40:
-            confidence += 10
-            reasons.append(f"RSI Low ({rsi:.0f})")
+            rsi_score = 10
+            reasons.append(f"RSI OK ({rsi:.0f}) (+10)")
+        elif rsi < 45:
+            rsi_score = 5
+            reasons.append(f"RSI Neutral ({rsi:.0f}) (+5)")
+        else:
+            rsi_score = 0
+            
+        total_score += rsi_score
+        score_breakdown['rsi'] = rsi_score
         
-        # --- 4. البحث عن نمط + تأكيد ---
+        # --- 3. فحص الشمعات (Pattern) - 25 نقطة ---
         candle_signal = False
+        pattern_score = 0
+        
         for i in range(2, min(6, len(df))):
             pattern_candle = df.iloc[-i]
-            confirmation_candle = df.iloc[-i+1]
             
-            if len(df) < i + 1:
-                continue
-            prev_to_pattern = df.iloc[-(i+1)]
-
             body = abs(pattern_candle['close'] - pattern_candle['open'])
             if body == 0:
                 continue
             
             candle_range = pattern_candle['high'] - pattern_candle['low']
+            if candle_range == 0:
+                continue
+                
             lower_shadow = pattern_candle['open'] - pattern_candle['low'] if pattern_candle['close'] >= pattern_candle['open'] else pattern_candle['close'] - pattern_candle['low']
             
-            # Hammer محسّن: ظل سفلي طويل + جسم صغير + لازم يكون بعد ترند هابط
+            # Hammer: ظل سفلي طويل
             is_hammer = (
-                lower_shadow >= 2.5 * body and 
-                body < candle_range * 0.35 and
-                lower_shadow > body  # ظل سفلي اكبر من الجسم
+                lower_shadow >= 2.0 * body and 
+                body < candle_range * 0.4 and
+                lower_shadow > body
             )
             
-            # Bullish Engulfing محسّن
-            is_engulfing = (
-                prev_to_pattern is not None and 
-                pattern_candle['close'] > pattern_candle['open'] and 
-                prev_to_pattern['close'] < prev_to_pattern['open'] and
-                pattern_candle['close'] > prev_to_pattern['open'] and 
-                pattern_candle['open'] < prev_to_pattern['close']
-            )
-            
-            pattern_found = None
             if is_hammer:
-                pattern_found = "Hammer"
-            elif is_engulfing:
-                pattern_found = "Engulfing"
-            
-            if pattern_found:
-                # تأكيد أقوى: لازم تغلق فوق قمة شمعة النمط + لازم تكون خضراء
-                is_confirmed = (
-                    confirmation_candle['close'] > confirmation_candle['open'] and 
-                    confirmation_candle['close'] > pattern_candle['high']
-                )
-                
-                if is_confirmed and (is_downtrend or is_sideways):
-                    candle_signal = True
-                    confidence += 20
-                    reasons.append(f"Confirm {pattern_found}")
-                    
-                    # فحص الفوليوم
-                    if confirmation_candle['volume_ratio'] > 1.5:
-                        confidence += 10
-                        reasons.append(f"Vol {confirmation_candle['volume_ratio']:.1f}x")
-                    
-                    break
+                candle_signal = True
+                pattern_score = 25
+                reasons.append("Hammer (+25)")
+                break
         
-        # --- 5. نسبة الارتداد من القاع ---
+        total_score += pattern_score
+        score_breakdown['pattern'] = pattern_score
+        
+        # --- 4. Confirmation (شمعة خضراء بعدها) - 15 نقطة ---
+        confirmation_score = 0
+        if candle_signal and len(df) >= 2:
+            next_candle = df.iloc[-1]  # الشمعة الحالية (التأكيد)
+            if next_candle['close'] > next_candle['open']:  # خضراء
+                confirmation_score = 15
+                reasons.append("Confirmation ✓ (+15)")
+        
+        total_score += confirmation_score
+        score_breakdown['confirmation'] = confirmation_score
+        
+        # --- 5. Volume - 10 نقطة ---
+        volume_score = 0
+        if len(df) >= 2:
+            current_vol = df.iloc[-1].get('volume_ratio', 1)
+            if current_vol > 1.5:
+                volume_score = 10
+                reasons.append(f"Vol {current_vol:.1f}x (+10)")
+            elif current_vol > 1.0:
+                volume_score = 5
+                reasons.append(f"Vol {current_vol:.1f}x (+5)")
+        
+        total_score += volume_score
+        score_breakdown['volume'] = volume_score
+        
+        # --- حساب نسبة الارتداد ---
         n = min(REVERSAL_CANDLES, len(df))
         low_n = df['low'].tail(n).min()
         current_price = df.iloc[-1]['close']
         bounce_percent = ((current_price - low_n) / low_n) * 100 if low_n > 0 else 0
         
-        if bounce_percent >= BOTTOM_BOUNCE_THRESHOLD:
-            confidence += 10
-            reasons.append(f"Bounce {bounce_percent:.1f}%")
-            base_result['is_reversing'] = True
-
+        # =========================================================
+        # 🎯 القرار النهائي
+        # =========================================================
+        candle_signal = total_score >= MIN_CONFIDENCE
+        
+        if total_score >= MIN_CONFIDENCE + 10:
+            reasons.append(f"✅ STRONG ({total_score}/100)")
+        elif total_score >= 60:
+            reasons.append(f"✅ SIGNAL ({total_score}/100)")
+        elif total_score >= 40:
+            reasons.append(f"⏳ WEAK ({total_score}/100)")
+        else:
+            reasons.append(f"❌ NO SIGNAL ({total_score}/100)")
+        
+        base_result['is_reversing'] = bounce_percent >= BOTTOM_BOUNCE_THRESHOLD
+        
         base_result.update({
-            'confidence': confidence,
+            'confidence': total_score,
             'candle_signal': candle_signal,
             'reasons': reasons,
             'bounce_percent': round(bounce_percent, 3),
+            'score_breakdown': score_breakdown
         })
         return base_result
 
     except Exception as e:
-        base_result['reasons'].append(f'Analysis Error: {e}')
+        base_result['reasons'].append(f'Error: {e}')
         return base_result
 
 
 def analyze_peak(df, rsi):
     """
-    تحليل الانعكاس من القمة - نظام متوسط:
-    - يفحص الترند (5-10 شمعات)
-    - يفحص الزخم
-    - أنماط مؤكدة + فوليوم
+    تحليل الانعكاس من القمة - نظام النقاط الذكي:
+    - الشمعات (0-25 نقطة)
+    - الترند (0-20 نقطة) - 5 شمعات
+    - الزخم (0-30 نقطة)
+    - التأكيد (0-15 نقطة)
+    - الفوليوم (0-10 نقطة)
     """
-    from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES
+    from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES, MIN_CONFIDENCE
 
     base_result = {
         'confidence': 0,
@@ -199,10 +235,11 @@ def analyze_peak(df, rsi):
         'drop_percent': 0,
         'is_peaking': False,
         'trend': 'neutral',
-        'momentum': 0
+        'momentum': 0,
+        'score_breakdown': {}
     }
 
-    if df is None or len(df) < 10:
+    if df is None or len(df) < 8:
         return base_result
 
     if rsi < 25:
@@ -210,128 +247,159 @@ def analyze_peak(df, rsi):
         return base_result
 
     try:
-        confidence = 0
+        total_score = 0
         reasons = []
+        score_breakdown = {}
         
-        # --- 1. فحص الترند (micro-trend) ---
-        lookback = min(10, len(df))
+        # =========================================================
+        # 📊 نظام النقاط الذكي (المجموع = 100 نقطة)
+        # =========================================================
+        
+        # --- 1. فحص الترند (5 شمعات) - 20 نقطة ---
+        lookback = min(5, len(df))
         trend_start = df.iloc[-lookback]['open']
         trend_end = df.iloc[-1]['close']
         trend_change = ((trend_end - trend_start) / trend_start) * 100
         
-        is_uptrend = trend_change > 1.0  # صعد 1% على الأقل
-        is_sideways = abs(trend_change) <= 1.0
-        
-        if is_uptrend:
+        if trend_change > 2.0:       # صعد أكثر من 2%
+            trend_score = 20
+            base_result['trend'] = 'strong_uptrend'
+        elif trend_change > 1.0:     # صعد أكثر من 1%
+            trend_score = 15
             base_result['trend'] = 'uptrend'
-            confidence += 15
-            reasons.append(f"Uptrend {trend_change:.1f}%")
-        elif is_sideways:
+        elif trend_change > 0.5:     # صعد شوي
+            trend_score = 10
+            base_result['trend'] = 'weak_uptrend'
+        elif abs(trend_change) <= 0.5:  # ثابت
+            trend_score = 5
             base_result['trend'] = 'sideways'
-            confidence += 5
-            reasons.append(f"Sideways {trend_change:.1f}%")
-        
-        # --- 2. فحص الزخم ---
-        if len(df) >= 5:
-            last_5 = df.tail(5)
-            momentum = last_5['close'].iloc[-1] - last_5['close'].iloc[0]
-            momentum_pct = (momentum / last_5['close'].iloc[0]) * 100
-            base_result['momentum'] = momentum_pct
+        else:
+            trend_score = 0
+            base_result['trend'] = 'downtrend'  # هابط = ما يبيع (لا قمة)
             
-            if momentum_pct > 1.5:
-                confidence += 10
-                reasons.append(f"Momentum Up {momentum_pct:.1f}%")
+        total_score += trend_score
+        score_breakdown['trend'] = trend_score
+        if trend_score > 0:
+            reasons.append(f"Trend +{trend_change:.1f}% (+{trend_score})")
         
-        # --- 3. فحص RSI zone ---
-        if rsi > 70:
-            confidence += 20
-            reasons.append(f"RSI Overbought ({rsi:.0f})")
+        base_result['momentum'] = trend_change
+        
+        # --- 2. فحص الزخم (RSI) - 30 نقطة ---
+        if rsi > 80:
+            rsi_score = 30
+            reasons.append(f"RSI Very High ({rsi:.0f}) (+30)")
+        elif rsi > 70:
+            rsi_score = 25
+            reasons.append(f"RSI Overbought ({rsi:.0f}) (+25)")
+        elif rsi > 65:
+            rsi_score = 18
+            reasons.append(f"RSI High ({rsi:.0f}) (+18)")
         elif rsi > 60:
-            confidence += 10
-            reasons.append(f"RSI High ({rsi:.0f})")
+            rsi_score = 10
+            reasons.append(f"RSI OK ({rsi:.0f}) (+10)")
+        elif rsi > 55:
+            rsi_score = 5
+            reasons.append(f"RSI Neutral ({rsi:.0f}) (+5)")
+        else:
+            rsi_score = 0
+            
+        total_score += rsi_score
+        score_breakdown['rsi'] = rsi_score
         
-        # --- 4. البحث عن نمط + تأكيد ---
+        # --- 3. فحص الشمعات (Pattern) - 25 نقطة ---
         candle_signal = False
+        pattern_score = 0
+        
         for i in range(2, min(6, len(df))):
             pattern_candle = df.iloc[-i]
-            confirmation_candle = df.iloc[-i+1]
             
-            if len(df) < i + 1:
-                continue
-            prev_to_pattern = df.iloc[-(i+1)]
-
             body = abs(pattern_candle['close'] - pattern_candle['open'])
             if body == 0:
                 continue
             
             candle_range = pattern_candle['high'] - pattern_candle['low']
+            if candle_range == 0:
+                continue
+                
             upper_shadow = pattern_candle['high'] - pattern_candle['close'] if pattern_candle['close'] >= pattern_candle['open'] else pattern_candle['high'] - pattern_candle['open']
             lower_shadow = pattern_candle['open'] - pattern_candle['low'] if pattern_candle['close'] >= pattern_candle['open'] else pattern_candle['close'] - pattern_candle['low']
             
-            # Shooting Star محسّن: ظل علوي طويل + جسم صغير + لازم يكون أحمر + بعد ترند صاعد
+            # Shooting Star: ظل علوي طويل + أحمر
             is_shooting_star = (
-                upper_shadow >= 2.5 * body and 
-                body < candle_range * 0.35 and
-                lower_shadow < body * 0.5 and
-                pattern_candle['close'] < pattern_candle['open']  # لازم يكون أحمر
+                upper_shadow >= 2.0 * body and 
+                body < candle_range * 0.4 and
+                pattern_candle['close'] < pattern_candle['open']  # أحمر
             )
             
-            # Bearish Engulfing محسّن
-            is_engulfing = (
-                prev_to_pattern is not None and 
-                pattern_candle['close'] < pattern_candle['open'] and 
-                prev_to_pattern['close'] > prev_to_pattern['open'] and
-                pattern_candle['close'] < prev_to_pattern['open'] and 
-                pattern_candle['open'] > prev_to_pattern['close']
-            )
-            
-            pattern_found = None
             if is_shooting_star:
-                pattern_found = "ShootingStar"
-            elif is_engulfing:
-                pattern_found = "Engulfing"
-            
-            if pattern_found:
-                # تأكيد أقوى: لازم تغلق تحت قاع شمعة النمط + لازم تكون حمراء
-                is_confirmed = (
-                    confirmation_candle['close'] < confirmation_candle['open'] and 
-                    confirmation_candle['close'] < pattern_candle['low']
-                )
-                
-                if is_confirmed and (is_uptrend or is_sideways):
-                    candle_signal = True
-                    confidence += 20
-                    reasons.append(f"Confirm {pattern_found}")
-                    
-                    # فحص الفوليوم
-                    if confirmation_candle['volume_ratio'] > 1.5:
-                        confidence += 10
-                        reasons.append(f"Vol {confirmation_candle['volume_ratio']:.1f}x")
-                    
-                    break
+                candle_signal = True
+                pattern_score = 25
+                reasons.append("Shooting Star (+25)")
+                break
         
-        # --- 5. نسبة الهبوط من القمة ---
+        total_score += pattern_score
+        score_breakdown['pattern'] = pattern_score
+        
+        # --- 4. Confirmation (شمعة حمراء بعدها) - 15 نقطة ---
+        confirmation_score = 0
+        if candle_signal and len(df) >= 2:
+            next_candle = df.iloc[-1]
+            if next_candle['close'] < next_candle['open']:  # حمراء
+                confirmation_score = 15
+                reasons.append("Confirmation ✓ (+15)")
+        
+        total_score += confirmation_score
+        score_breakdown['confirmation'] = confirmation_score
+        
+        # --- 5. Volume - 10 نقطة ---
+        volume_score = 0
+        if len(df) >= 2:
+            current_vol = df.iloc[-1].get('volume_ratio', 1)
+            if current_vol > 1.5:
+                volume_score = 10
+                reasons.append(f"Vol {current_vol:.1f}x (+10)")
+            elif current_vol > 1.0:
+                volume_score = 5
+                reasons.append(f"Vol {current_vol:.1f}x (+5)")
+        
+        total_score += volume_score
+        score_breakdown['volume'] = volume_score
+        
+        # --- حساب نسبة الهبوط من القمة ---
         n = min(REVERSAL_CANDLES, len(df))
         high_n = df['high'].tail(n).max()
         current_price = df.iloc[-1]['close']
         drop_percent = ((high_n - current_price) / high_n) * 100 if high_n > 0 else 0
         
-        if drop_percent >= PEAK_DROP_THRESHOLD:
-            confidence += 10
-            reasons.append(f"Drop {drop_percent:.1f}%")
-            base_result['is_peaking'] = True
-
+        # =========================================================
+        # 🎯 القرار النهائي
+        # =========================================================
+        candle_signal = total_score >= MIN_CONFIDENCE
+        
+        if total_score >= MIN_CONFIDENCE + 10:
+            reasons.append(f"✅ STRONG ({total_score}/100)")
+        elif total_score >= 60:
+            reasons.append(f"✅ SIGNAL ({total_score}/100)")
+        elif total_score >= 40:
+            reasons.append(f"⏳ WEAK ({total_score}/100)")
+        else:
+            reasons.append(f"❌ NO SIGNAL ({total_score}/100)")
+        
+        base_result['is_peaking'] = drop_percent >= PEAK_DROP_THRESHOLD
+        
         base_result.update({
-            'confidence': confidence,
+            'confidence': total_score,
             'candle_signal': candle_signal,
             'reasons': reasons,
             'drop_percent': round(drop_percent, 3),
+            'score_breakdown': score_breakdown
         })
         return base_result
 
     except Exception as e:
-        base_result['reasons'].append(f'Analysis Error: {e}')
+        base_result['reasons'].append(f'Error: {e}')
         return base_result
+
 
 def get_market_analysis(exchange, symbol, limit=120):
     """Get technical analysis for a symbol with multi-timeframe data"""
