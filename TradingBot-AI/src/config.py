@@ -5,7 +5,7 @@ All bot settings and constants
 
 # Trading Parameters
 
-MIN_CONFIDENCE = 45
+MIN_CONFIDENCE = 60
 MAX_POSITIONS = 20  # الحد الأقصى للصفقات المفتوحة (كل العملات)
 TOTAL_COINS_TO_SCAN = 20
 
@@ -30,10 +30,10 @@ USE_DYNAMIC_TRAILING_STOP = True  # Master switch for the feature
 ATR_PERIOD = 14  # Period for ATR calculation
 ATR_MULTIPLIER = 2.0  # Multiplier for ATR to set stop-loss. Higher value = wider stop-loss
 
-VOLUME_SPIKE_FACTOR = 1.0 # Multiplier for detecting significant volume spikes (e.g., 1.5 = 50% increase, sensitive)
+VOLUME_SPIKE_FACTOR = 0.8 # Multiplier for detecting significant volume spikes (lowered for more opportunities)
 PEAK_DROP_THRESHOLD = 1.5   # % هبوط من القمة يعتبر إشارة بيع (0.5% = وسط)
 BOTTOM_BOUNCE_THRESHOLD = 2.0  # % ارتداد من القاع يعتبر إشارة شراء (0.5% = وسط)
-REVERSAL_CANDLES = 30       # عدد الشموع للبحث عن القاع والقمة
+REVERSAL_CANDLES = 10       # عدد الشموع للبحث عن القاع والقمة (أسرع)
 
 # Performance & Memory Tuning
 BATCH_SIZE = 10          # Number of symbols to process in a single batch (Increased to match DB pool)
