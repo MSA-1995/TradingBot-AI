@@ -1,13 +1,14 @@
 # memory_cache.py - في الذاكرة فقط
 import time
 import gc
+import sys
 from typing import Dict, Any, Optional
 
 class MemoryCache:
     def __init__(self, default_expiry=300, max_items=100):
         self.cache = {}
         self.default_expiry = default_expiry
-        self.max_items = max_items  # حد أقصى للعناصر
+        self.max_items = max_items  # حد أقصى للعناصر (تم رفعه)
         self.hits = 0
         self.misses = 0
     
@@ -36,6 +37,8 @@ class MemoryCache:
             data = self.cache[key]
             if time.time() < data['expiry']:
                 self.hits += 1
+                # تحديث آخر وصول
+                self.cache[key]['last_access'] = time.time()
                 return data['value']
             else:
                 # انتهت الصلاحية، نمسحها
@@ -78,18 +81,18 @@ class MemoryCache:
         gc.collect()
     
     def _get_size(self, obj):
-        """يحسب حجم العنصر في الذاكرة"""
-        if isinstance(obj, (str, int, float)):
+        """يحسب حجم العنصر في الذاكرة بدقة"""
+        try:
+            return sys.getsizeof(obj)
+        except:
             return len(str(obj))
-        elif isinstance(obj, (list, dict)):
-            return len(str(obj)) // 4  # تقديري
-        return 1
     
     def get_stats(self):
         """يعطي إحصائيات الاستخدام"""
         total_size = sum(data['size'] for data in self.cache.values())
         return {
             'active_items': len(self.cache),
+            'max_items': self.max_items,
             'total_size': total_size,
             'hits': self.hits,
             'misses': self.misses,
@@ -102,3 +105,16 @@ class MemoryCache:
         gc.collect()
         self.hits = 0
         self.misses = 0
+    
+    def get_item(self, key):
+        """يجلب عنصر معين مع معلوماته"""
+        if key in self.cache:
+            data = self.cache[key]
+            if time.time() < data['expiry']:
+                return {
+                    'value': data['value'],
+                    'size': data['size'],
+                    'age': time.time() - data['last_access'],
+                    'expires_in': data['expiry'] - time.time()
+                }
+        return None
