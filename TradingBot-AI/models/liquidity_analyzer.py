@@ -55,7 +55,6 @@ class LiquidityAnalyzer:
             }
             
             # Cache
-            from datetime import datetime
             self.cache[symbol] = (result, datetime.now())
             
             return result
