@@ -8,6 +8,7 @@ import ta
 from datetime import datetime
 from functools import lru_cache
 import time
+from market_intelligence import get_market_regime, check_flash_crash, get_time_analysis, get_time_multiplier
 
 # [تحسين الذاكرة] تم حذف المتغير العام _market_cache
 
@@ -126,8 +127,10 @@ def analyze_reversal(df, rsi):
         # --- 3. فحص الشمعات (Pattern) - 25 نقطة ---
         candle_signal = False
         pattern_score = 0
+        pattern_name = ""
         
-        for i in range(2, min(6, len(df))):
+        # فحص أنماط متعددة
+        for i in range(2, min(8, len(df))):
             pattern_candle = df.iloc[-i]
             
             body = abs(pattern_candle['close'] - pattern_candle['open'])
@@ -137,21 +140,77 @@ def analyze_reversal(df, rsi):
             candle_range = pattern_candle['high'] - pattern_candle['low']
             if candle_range == 0:
                 continue
-                
-            lower_shadow = pattern_candle['open'] - pattern_candle['low'] if pattern_candle['close'] >= pattern_candle['open'] else pattern_candle['close'] - pattern_candle['low']
             
-            # Hammer: ظل سفلي طويل
+            upper_shadow = pattern_candle['high'] - max(pattern_candle['close'], pattern_candle['open'])
+            lower_shadow = min(pattern_candle['close'], pattern_candle['open']) - pattern_candle['low']
+            
+            is_green = pattern_candle['close'] > pattern_candle['open']
+            is_red = pattern_candle['close'] < pattern_candle['open']
+            
+            # 1. Hammer: ظل سفلي طويل (.signal bullish)
             is_hammer = (
                 lower_shadow >= 2.0 * body and 
-                body < candle_range * 0.4 and
+                body < candle_range * 0.3 and
                 lower_shadow > body
             )
             
             if is_hammer:
                 candle_signal = True
                 pattern_score = 25
-                reasons.append("Hammer (+25)")
+                pattern_name = "Hammer"
+                reasons.append(f"{pattern_name} (+25)")
                 break
+            
+            # 2. Bullish Engulfing: شمعة حمراء ثم خضراء أكبر
+            if i + 1 < len(df):
+                prev_candle = df.iloc[-i-1]
+                prev_is_red = prev_candle['close'] < prev_candle['open']
+                prev_body = abs(prev_candle['close'] - prev_candle['open'])
+                
+                is_bullish_engulfing = (
+                    prev_is_red and
+                    is_green and
+                    pattern_candle['close'] > prev_candle['open'] and
+                    pattern_candle['open'] < prev_candle['close'] and
+                    body > prev_body * 1.2
+                )
+                
+                if is_bullish_engulfing:
+                    candle_signal = True
+                    pattern_score = 25
+                    pattern_name = "Bullish Engulfing"
+                    reasons.append(f"{pattern_name} (+25)")
+                    break
+            
+            # 3. Morning Star: 3 شموع (حمراء كبيرة + صغيرة + خضراء كبيرة)
+            if i + 2 < len(df) and i <= 3:
+                c1 = df.iloc[-i-2]  # حمراء كبيرة
+                c2 = df.iloc[-i-1]  # صغيرة (star)
+                c3 = pattern_candle   # خضراء كبيرة
+                
+                c1_body = abs(c1['close'] - c1['open'])
+                c2_body = abs(c2['close'] - c2['open'])
+                c3_body = abs(c3['close'] - c3['open'])
+                
+                c1_range = c1['high'] - c1['low']
+                c2_range = c2['high'] - c2['low']
+                c3_range = c3['high'] - c3['low']
+                
+                is_morning_star = (
+                    c1['close'] < c1['open'] and  # حمراء
+                    c1_body > c1_range * 0.5 and   # جسم كبير
+                    c2_body < c2_range * 0.3 and   # نجمة صغيرة
+                    c3['close'] > c3['open'] and   # خضراء
+                    c3_body > c3_range * 0.5 and   # جسم كبير
+                    c3['close'] > c1['open']       # أغلق أعلى من بداية c1
+                )
+                
+                if is_morning_star:
+                    candle_signal = True
+                    pattern_score = 25
+                    pattern_name = "Morning Star"
+                    reasons.append(f"{pattern_name} (+25)")
+                    break
         
         total_score += pattern_score
         score_breakdown['pattern'] = pattern_score
@@ -309,8 +368,10 @@ def analyze_peak(df, rsi):
         # --- 3. فحص الشمعات (Pattern) - 25 نقطة ---
         candle_signal = False
         pattern_score = 0
+        pattern_name = ""
         
-        for i in range(2, min(6, len(df))):
+        # فحص أنماط متعددة للقمة
+        for i in range(2, min(8, len(df))):
             pattern_candle = df.iloc[-i]
             
             body = abs(pattern_candle['close'] - pattern_candle['open'])
@@ -320,22 +381,105 @@ def analyze_peak(df, rsi):
             candle_range = pattern_candle['high'] - pattern_candle['low']
             if candle_range == 0:
                 continue
-                
-            upper_shadow = pattern_candle['high'] - pattern_candle['close'] if pattern_candle['close'] >= pattern_candle['open'] else pattern_candle['high'] - pattern_candle['open']
-            lower_shadow = pattern_candle['open'] - pattern_candle['low'] if pattern_candle['close'] >= pattern_candle['open'] else pattern_candle['close'] - pattern_candle['low']
             
-            # Shooting Star: ظل علوي طويل + أحمر
+            upper_shadow = pattern_candle['high'] - max(pattern_candle['close'], pattern_candle['open'])
+            lower_shadow = min(pattern_candle['close'], pattern_candle['open']) - pattern_candle['low']
+            
+            is_green = pattern_candle['close'] > pattern_candle['open']
+            is_red = pattern_candle['close'] < pattern_candle['open']
+            
+            # 1. Shooting Star: ظل علوي طويل + أحمر
             is_shooting_star = (
                 upper_shadow >= 2.0 * body and 
-                body < candle_range * 0.4 and
-                pattern_candle['close'] < pattern_candle['open']  # أحمر
+                body < candle_range * 0.3 and
+                is_red
             )
             
             if is_shooting_star:
                 candle_signal = True
                 pattern_score = 25
-                reasons.append("Shooting Star (+25)")
+                pattern_name = "Shooting Star"
+                reasons.append(f"{pattern_name} (+25)")
                 break
+            
+            # 2. Bearish Engulfing: شمعة خضراء ثم حمراء أكبر
+            if i + 1 < len(df):
+                prev_candle = df.iloc[-i-1]
+                prev_is_green = prev_candle['close'] > prev_candle['open']
+                prev_body = abs(prev_candle['close'] - prev_candle['open'])
+                
+                is_bearish_engulfing = (
+                    prev_is_green and
+                    is_red and
+                    pattern_candle['open'] > prev_candle['close'] and
+                    pattern_candle['close'] < prev_candle['open'] and
+                    body > prev_body * 1.2
+                )
+                
+                if is_bearish_engulfing:
+                    candle_signal = True
+                    pattern_score = 25
+                    pattern_name = "Bearish Engulfing"
+                    reasons.append(f"{pattern_name} (+25)")
+                    break
+            
+            # 3. Evening Star: 3 شموع (خضراء كبيرة + صغيرة + حمراء كبيرة)
+            if i + 2 < len(df) and i <= 3:
+                c1 = df.iloc[-i-2]  # خضراء كبيرة
+                c2 = df.iloc[-i-1]  # صغيرة (star)
+                c3 = pattern_candle   # حمراء كبيرة
+                
+                c1_body = abs(c1['close'] - c1['open'])
+                c2_body = abs(c2['close'] - c2['open'])
+                c3_body = abs(c3['close'] - c3['open'])
+                
+                c1_range = c1['high'] - c1['low']
+                c2_range = c2['high'] - c2['low']
+                c3_range = c3['high'] - c3['low']
+                
+                is_evening_star = (
+                    c1['close'] > c1['open'] and  # خضراء
+                    c1_body > c1_range * 0.5 and   # جسم كبير
+                    c2_body < c2_range * 0.3 and   # نجمة صغيرة
+                    c3['close'] < c3['open'] and   # حمراء
+                    c3_body > c3_range * 0.5 and   # جسم كبير
+                    c3['close'] < c1['open']       # أغلق أقل من بداية c1
+                )
+                
+                if is_evening_star:
+                    candle_signal = True
+                    pattern_score = 25
+                    pattern_name = "Evening Star"
+                    reasons.append(f"{pattern_name} (+25)")
+                    break
+            
+            # 4. Three Black Crows: 3 شموع حمراء متتالية
+            if i + 2 < len(df) and i <= 3:
+                c1 = df.iloc[-i-2]
+                c2 = df.iloc[-i-1]
+                c3 = pattern_candle
+                
+                c1_body = abs(c1['close'] - c1['open'])
+                c2_body = abs(c2['close'] - c2['open'])
+                c3_body = abs(c3['close'] - c3['open'])
+                
+                is_three_crows = (
+                    c1['close'] < c1['open'] and  # حمراء
+                    c2['close'] < c2['open'] and  # حمراء
+                    c3['close'] < c3['open'] and  # حمراء
+                    c1_body > 0 and
+                    c2_body > 0 and
+                    c3_body > 0 and
+                    c2['close'] < c1['close'] and  # كل واحدة أقل من السابقة
+                    c3['close'] < c2['close']
+                )
+                
+                if is_three_crows:
+                    candle_signal = True
+                    pattern_score = 25
+                    pattern_name = "Three Black Crows"
+                    reasons.append(f"{pattern_name} (+25)")
+                    break
         
         total_score += pattern_score
         score_breakdown['pattern'] = pattern_score
@@ -474,6 +618,15 @@ def get_market_analysis(exchange, symbol, limit=120):
         # Multi-timeframe analysis من نفس البيانات
         mtf_analysis = calculate_mtf_from_5m_data(df)
         
+        # Market Regime Detection - كاشف حالة السوق
+        market_regime = get_market_regime(df)
+        
+        # Flash Crash Protection - حماية من السقوط المفاجئ
+        flash_crash_protection = check_flash_crash(df, symbol)
+        
+        # Time Analysis - تحليل الوقت
+        time_analysis = get_time_analysis()
+        
         latest = df.iloc[-1]
         candles = df.tail(2).to_dict('records') if len(df) >= 2 else []
         
@@ -535,6 +688,9 @@ def get_market_analysis(exchange, symbol, limit=120):
             'price_momentum': latest['price_change'],
             'close': latest['close'],
             'mtf': mtf_analysis,  # إضافة تحليل multi-timeframe
+            'market_regime': market_regime,  # 🎯 حالة السوق الجديدة
+            'flash_crash_protection': flash_crash_protection,  # 🚨 حماية السقوط المفاجئ
+            'time_analysis': time_analysis,  # ⏰ تحليل الوقت
             # الإضافات الجديدة
             'atr': latest['atr'],
             'ema_9': latest['ema_9'],
