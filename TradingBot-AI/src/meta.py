@@ -248,17 +248,15 @@ class Meta:
 
         mood_details = self._get_market_mood(analysis)
 
-        # --- 2. صائد القمم (الزناد: فوليوم + شمعة مؤكدة) ---
+        # --- 2. صائد القمم (نظام النقاط الذكي) ---
         peak_analysis = analysis.get('peak', {})
-        candle_condition   = peak_analysis.get('candle_signal', False) # candle_signal now means confirmed pattern
+        peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
+        candle_condition = peak_analysis.get('candle_signal', False)
 
-        volume_spike_factor_sell = VOLUME_SPIKE_FACTOR + 0.5  # 1.5 + 0.5 = 2.0
-        volume_condition = analysis.get('volume_ratio', 1.0) > volume_spike_factor_sell
-
-        trigger_activated = candle_condition and volume_condition
+        trigger_activated = candle_condition
 
         if not trigger_activated:
-            return {'action': 'HOLD', 'reason': f'Waiting for Peak Hunter trigger (Vol:{volume_condition}, Candle:{candle_condition})', 'profit': profit_percent}
+            return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/{MIN_CONFIDENCE}', 'profit': profit_percent}
 
         print(f"🎯 {symbol}: PEAK HUNTER trigger activated. Proceeding to full council vote.")
 
