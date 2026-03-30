@@ -33,7 +33,7 @@ class MemoryCompressor:
             'compressed': compressed,
             'original_size': len(json_str),
             'compressed_size': len(compressed),
-            'ratio': len(compressed) / len(json_str)
+            'ratio': len(compressed) / len(json_str) if len(json_str) > 0 else 0
         }
     
     @staticmethod
@@ -72,3 +72,37 @@ class MemoryCompressor:
             'original_size': len(json_str),
             'compressed_size': len(compressed)
         }
+    
+    @staticmethod
+    def compress_partial(data, threshold=5000):
+        """ضغط جزئي للبيانات الكبيرة"""
+        if not data:
+            return data
+        
+        data_str = str(data)
+        if len(data_str) <= threshold:
+            return data  # لا داعي للضغط
+        
+        # ضغط جزئي - نضغط الجزء الكبير فقط
+        compressed = zlib.compress(data_str.encode('utf-8'), level=6)
+        
+        return {
+            'partial_compressed': compressed,
+            'original_size': len(data_str),
+            'compressed_size': len(compressed),
+            'ratio': len(compressed) / len(data_str)
+        }
+    
+    @staticmethod
+    def decompress_partial(data):
+        """فك الضغط الجزئي"""
+        if not data or not isinstance(data, dict):
+            return data
+        
+        if 'partial_compressed' in data:
+            try:
+                decompressed = zlib.decompress(data['partial_compressed'])
+                return decompressed.decode('utf-8')
+            except:
+                return None
+        return data
