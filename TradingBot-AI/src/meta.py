@@ -354,7 +354,7 @@ class Meta:
         trigger_activated = candle_condition and peak_score >= MIN_CONFIDENCE
 
         if not trigger_activated:
-            return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/{MIN_CONFIDENCE}', 'profit': profit_percent}
+            return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/100', 'profit': profit_percent}
 
         sell_conf = 20
         sell_reasons = []
@@ -446,10 +446,10 @@ class Meta:
         # قرار البيع: نقاط ≥ MIN_CONFIDENCE + تصويت كافي
         if sell_vote_count >= min_votes_needed:
             action = 'SELL'
-            reason = f"SELL | Score:{peak_score}/145 | {', '.join(sell_reasons[:3])}"
+            reason = f"SELL | Score:{peak_score}/100 | {', '.join(sell_reasons[:3])}"
         else:
             action = 'HOLD'
-            reason = f"Hold | Score:{peak_score}/145"
+            reason = f"Hold | Score:{peak_score}/100"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
