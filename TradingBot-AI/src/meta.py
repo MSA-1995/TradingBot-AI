@@ -446,10 +446,10 @@ class Meta:
         # قرار البيع: نقاط ≥ MIN_CONFIDENCE + تصويت كافي
         if sell_vote_count >= min_votes_needed:
             action = 'SELL'
-            reason = f"SELL | Score:{peak_score}/100 | {', '.join(sell_reasons[:3])}"
+            reason = f"SELL | Score:{peak_score}/145 | {', '.join(sell_reasons[:3])}"
         else:
             action = 'HOLD'
-            reason = f"Hold | Score:{peak_score}/{MIN_CONFIDENCE}"
+            reason = f"Hold | Score:{peak_score}/145"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
