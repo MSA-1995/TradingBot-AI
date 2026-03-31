@@ -301,8 +301,9 @@ def analyze_peak(df, rsi):
     if df is None or len(df) < 8:
         return base_result
 
-    if rsi < 25:
-        base_result['reasons'].append(f'RSI Oversold ({rsi:.0f})')
+    # عكس القاع: إذا RSI عالي جداً، ما نشتري (قمة)
+    if rsi > 75:
+        base_result['reasons'].append(f'RSI Overbought ({rsi:.0f})')
         return base_result
 
     try:
@@ -314,27 +315,28 @@ def analyze_peak(df, rsi):
         # 📊 نظام النقاط الذكي (المجموع = 100 نقطة)
         # =========================================================
         
-        # --- 1. فحص الترند (5 شمعات) - 20 نقطة ---
-        lookback = min(5, len(df))
-        trend_start = df.iloc[-lookback]['open']
+        # --- 1. فحص الترند (10 شمعات عكس القاع) - 20 نقطة ---
+        n = min(REVERSAL_CANDLES, len(df))  # نفس 10 للقاع
+        trend_start = df.iloc[-n]['open']
         trend_end = df.iloc[-1]['close']
         trend_change = ((trend_end - trend_start) / trend_start) * 100
-        
-        if trend_change > 2.0:       # صعد أكثر من 2%
+
+        # عكس القاع: صعود = قمة ممكنة
+        if trend_change > 3.0:       # صعد أكثر من 3%
             trend_score = 20
             base_result['trend'] = 'strong_uptrend'
-        elif trend_change > 1.0:     # صعد أكثر من 1%
+        elif trend_change > 2.0:     # صعد أكثر من 2%
             trend_score = 15
             base_result['trend'] = 'uptrend'
-        elif trend_change > 0.5:     # صعد شوي
+        elif trend_change > 1.0:     # صعد أكثر من 1%
             trend_score = 10
             base_result['trend'] = 'weak_uptrend'
-        elif abs(trend_change) <= 0.5:  # ثابت
+        elif abs(trend_change) <= 1.0:  # ثابت أو صعود خفيف
             trend_score = 5
             base_result['trend'] = 'sideways'
         else:
             trend_score = 0
-            base_result['trend'] = 'downtrend'  # هابط = ما يبيع (لا قمة)
+            base_result['trend'] = 'downtrend'  # هابط = ما في قمة
             
         total_score += trend_score
         score_breakdown['trend'] = trend_score
@@ -370,8 +372,8 @@ def analyze_peak(df, rsi):
         pattern_score = 0
         pattern_name = ""
         
-        # فحص أنماط متعددة للقمة
-        for i in range(2, min(8, len(df))):
+        # فحص أنماط متعددة للقمة (عكس القاع، 10 شمعات)
+        for i in range(2, min(n, len(df))):
             pattern_candle = df.iloc[-i]
             
             body = abs(pattern_candle['close'] - pattern_candle['open'])
