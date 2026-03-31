@@ -353,7 +353,7 @@ class Meta:
         peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
         candle_condition = peak_analysis.get('candle_signal', False)
 
-        trigger_activated = candle_condition
+        trigger_activated = candle_condition or peak_score >= MIN_CONFIDENCE
 
         if not trigger_activated:
             return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/{MIN_CONFIDENCE}', 'profit': profit_percent}
