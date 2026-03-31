@@ -77,8 +77,9 @@ def process_sell(result, exchange, ctx):
         else:
             trade_quality = 'TRAP'
 
-        # جلب أصوات المستشارين
-        advisor_votes = position.get('advisor_votes', {})
+        # جلب أصوات المستشارين للبيع (من result) والشراء (من position)
+        sell_votes = result.get('sell_votes', {})
+        buy_votes = position.get('advisor_votes', {})
         
         # حفظ بيانات الصفقة
         trade_data = {
@@ -88,8 +89,8 @@ def process_sell(result, exchange, ctx):
             'trade_quality': trade_quality,
             'sell_reason': result.get('reason'),
             'hours_held': hours_held,
-            'advisor_votes': advisor_votes,
-            'buy_votes': advisor_votes,  # نفس الأصوات للشراء
+            'sell_votes': sell_votes,  # أصوات البيع
+            'buy_votes': buy_votes,    # أصوات الشراء
             'data': {
                 'buy_price': position.get('buy_price'),
                 'sell_price': result.get('price'),
@@ -119,9 +120,9 @@ def process_sell(result, exchange, ctx):
             }
             storage.save_learning_data('king', king_learning_data)
             
-            # تعلم المستشارين
+            # تعلم المستشارين (من أصوات البيع)
             advisor_learning_data = {}
-            for advisor, voted in advisor_votes.items():
+            for advisor, voted in sell_votes.items():
                 if trade_quality in ['GREAT', 'GOOD', 'OK']:
                     advisor_learning_data[advisor] = {
                         'sell_success': 1 if voted == 1 else 0,
