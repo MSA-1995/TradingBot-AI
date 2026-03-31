@@ -5,7 +5,7 @@ All bot settings and constants
 
 # Trading Parameters
 
-MIN_CONFIDENCE = 50
+MIN_CONFIDENCE = 60
 MAX_POSITIONS = 50  # الحد الأقصى للصفقات المفتوحة (كل العملات)
 TOTAL_COINS_TO_SCAN = 50
 
