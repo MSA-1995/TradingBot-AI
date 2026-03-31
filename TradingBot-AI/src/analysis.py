@@ -240,6 +240,95 @@ def analyze_reversal(df, rsi):
         total_score += volume_score
         score_breakdown['volume'] = volume_score
         
+        # --- 6. Volume Divergence - 10 نقاط ---
+        # السعر يصل قاع أ lower لكن الحجم يقل = بائعين متعبين = قاع حقيقي
+        vol_div_score = 0
+        if len(df) >= 10:
+            # مقارنة الحجم بين قاعين
+            recent_lows_idx = []
+            recent_vols = []
+            for i in range(-10, 0):
+                if i >= -len(df):
+                    candle = df.iloc[i]
+                    recent_lows_idx.append((i, candle['low']))
+                    recent_vols.append(candle.get('volume', 0))
+            
+            if len(recent_lows_idx) >= 5:
+                # إيجاد أخفض نقطتين
+                sorted_by_low = sorted(recent_lows_idx, key=lambda x: x[1])[:2]
+                if len(sorted_by_low) >= 2:
+                    idx1, low1 = sorted_by_low[0]
+                    idx2, low2 = sorted_by_low[1]
+                    
+                    vol1 = recent_vols[idx1 + 10] if (idx1 + 10) < len(recent_vols) else 0
+                    vol2 = recent_vols[idx2 + 10] if (idx2 + 10) < len(recent_vols) else 0
+                    
+                    # القاع الثاني أ lower + الحجم أ lower = بائعين متعبين
+                    if low2 < low1 and vol2 < vol1 * 0.8:
+                        vol_div_score = 10
+                        reasons.append("Volume Divergence (+10)")
+        
+        total_score += vol_div_score
+        score_breakdown['vol_divergence'] = vol_div_score
+        
+        # --- 7. Bullish RSI Divergence (الانزياح) - 15 نقطة ---
+        # السعر يصل قاع أ lower لكن RSI يصل قاع أعلى = قاع حقيقي
+        divergence_score = 0
+        if len(df) >= 20:
+            # البحث عن قاعين في آخر 20 شمعة
+            recent_lows = []
+            recent_rsis = []
+            
+            for i in range(-20, -1):
+                if i >= -len(df):
+                    candle = df.iloc[i]
+                    recent_lows.append(candle['low'])
+                    if 'rsi' in df.columns:
+                        recent_rsis.append(candle['rsi'])
+            
+            if len(recent_lows) >= 10 and len(recent_rsis) >= 10:
+                # إيجاد أخفض قاعين في السعر
+                price_window = recent_lows[-10:]
+                rsi_window = recent_rsis[-10:]
+                
+                # القاع الأول والثاني
+                first_low = min(price_window[:5])
+                second_low = min(price_window[5:])
+                
+                first_idx = price_window[:5].index(first_low)
+                second_idx = 5 + price_window[5:].index(second_low)
+                
+                first_rsi = rsi_window[first_idx]
+                second_rsi = rsi_window[second_idx]
+                
+                # Bullish Divergence: السعر أ lower، RSI أعلى
+                if second_low < first_low and second_rsi > first_rsi:
+                    rsi_diff = second_rsi - first_rsi
+                    if rsi_diff > 5:  # انزياح قوي
+                        divergence_score = 15
+                        reasons.append(f"Bullish Divergence ({rsi_diff:.0f}pts) (+15)")
+                    elif rsi_diff > 2:  # انزياح متوسط
+                        divergence_score = 10
+                        reasons.append(f"Weak Bullish Divergence ({rsi_diff:.0f}pts) (+10)")
+        
+        total_score += divergence_score
+        score_breakdown['divergence'] = divergence_score
+        
+        # --- 7. MACD Histogram Contraction (تقلص الزخم) - 10 نقاط ---
+        # Histogram يتقلص = القوة الهابطة تضعف = قاع قريب
+        macd_score = 0
+        if 'macd_histogram' in df.columns and len(df) >= 5:
+            hist_values = df['macd_histogram'].tail(5).tolist()
+            if len(hist_values) >= 3:
+                # Histogram سلبي但 يتقلص (يصبح أقرب لصفر)
+                if hist_values[-1] < 0 and hist_values[-3] < 0:
+                    if hist_values[-1] > hist_values[-3] * 0.7:  # يتقلص 30%+
+                        macd_score = 10
+                        reasons.append("MACD Strengthening (+10)")
+        
+        total_score += macd_score
+        score_breakdown['macd_strong'] = macd_score
+        
         # --- حساب نسبة الارتداد ---
         n = min(REVERSAL_CANDLES, len(df))
         low_n = df['low'].tail(n).min()
@@ -247,23 +336,24 @@ def analyze_reversal(df, rsi):
         bounce_percent = ((current_price - low_n) / low_n) * 100 if low_n > 0 else 0
         
         # =========================================================
-        # 🎯 القرار النهائي
+        # 🎯 القرار النهائي (المجموع = 145 نقطة)
         # =========================================================
-        candle_signal = total_score >= MIN_CONFIDENCE
+        confidence_percent = min(int((total_score / 145) * 100), 100)
+        candle_signal = confidence_percent >= MIN_CONFIDENCE
         
-        if total_score >= MIN_CONFIDENCE + 10:
-            reasons.append(f"✅ STRONG ({total_score}/100)")
-        elif total_score >= 60:
-            reasons.append(f"✅ SIGNAL ({total_score}/100)")
-        elif total_score >= 40:
-            reasons.append(f"⏳ WEAK ({total_score}/100)")
+        if confidence_percent >= MIN_CONFIDENCE + 10:
+            reasons.append(f"✅ STRONG ({confidence_percent}/100)")
+        elif confidence_percent >= 60:
+            reasons.append(f"✅ SIGNAL ({confidence_percent}/100)")
+        elif confidence_percent >= 40:
+            reasons.append(f"⏳ WEAK ({confidence_percent}/100)")
         else:
-            reasons.append(f"❌ NO SIGNAL ({total_score}/100)")
+            reasons.append(f"❌ NO SIGNAL ({confidence_percent}/100)")
         
         base_result['is_reversing'] = bounce_percent >= BOTTOM_BOUNCE_THRESHOLD
         
         base_result.update({
-            'confidence': total_score,
+            'confidence': confidence_percent,
             'candle_signal': candle_signal,
             'reasons': reasons,
             'bounce_percent': round(bounce_percent, 3),
@@ -511,6 +601,94 @@ def analyze_peak(df, rsi):
         total_score += volume_score
         score_breakdown['volume'] = volume_score
         
+        # --- 6. Volume Divergence - 10 نقاط ---
+        # السعر يصل قمة أعلى لكن الحجم يقل = قوة مختفية = قمة حقيقية
+        vol_div_score = 0
+        if len(df) >= 10:
+            # مقارنة الحجم بين قمتين
+            recent_highs_idx = []
+            recent_vols = []
+            for i in range(-10, 0):
+                if i >= -len(df):
+                    candle = df.iloc[i]
+                    recent_highs_idx.append((i, candle['high']))
+                    recent_vols.append(candle.get('volume', 0))
+            
+            if len(recent_highs_idx) >= 5:
+                # إيجاد أعلى نقطتين
+                sorted_by_high = sorted(recent_highs_idx, key=lambda x: x[1], reverse=True)[:2]
+                if len(sorted_by_high) >= 2:
+                    idx1, high1 = sorted_by_high[0]
+                    idx2, high2 = sorted_by_high[1]
+                    
+                    vol1 = recent_vols[idx1 + 10] if (idx1 + 10) < len(recent_vols) else 0
+                    vol2 = recent_vols[idx2 + 10] if (idx2 + 10) < len(recent_vols) else 0
+                    
+                    # القمة الثانية أعلى + الحجم أ lower = قوة مختفية
+                    if high2 > high1 and vol2 < vol1 * 0.8:
+                        vol_div_score = 10
+                        reasons.append("Volume Divergence (+10)")
+        
+        total_score += vol_div_score
+        score_breakdown['vol_divergence'] = vol_div_score
+        
+        # --- 7. RSI Divergence (الانزياح) - 15 نقطة ---
+        # السعر يصل قمة أعلى لكن RSI يصل قمة أ lower = قمة حقيقية
+        divergence_score = 0
+        if len(df) >= 20:
+            # البحث عن قمتين في آخر 20 شمعة
+            recent_highs = []
+            recent_rsis = []
+            
+            for i in range(-20, -1):
+                if i >= -len(df):
+                    candle = df.iloc[i]
+                    recent_highs.append(candle['high'])
+                    if 'rsi' in df.columns:
+                        recent_rsis.append(candle['rsi'])
+            
+            if len(recent_highs) >= 10 and len(recent_rsis) >= 10:
+                # إيجاد أعلى قمتين في السعر
+                price_window = recent_highs[-10:]
+                rsi_window = recent_rsis[-10:]
+                
+                # القمة الأولى والثانية
+                first_high = max(price_window[:5])
+                second_high = max(price_window[5:])
+                
+                first_idx = price_window[:5].index(first_high)
+                second_idx = 5 + price_window[5:].index(second_high)
+                
+                first_rsi = rsi_window[first_idx]
+                second_rsi = rsi_window[second_idx]
+                
+                # Bearish Divergence: السعر أعلى، RSI أ lower
+                if second_high > first_high and second_rsi < first_rsi:
+                    rsi_diff = first_rsi - second_rsi
+                    if rsi_diff > 5:  # انزياح قوي
+                        divergence_score = 15
+                        reasons.append(f"RSI Divergence ({rsi_diff:.0f}pts) (+15)")
+                    elif rsi_diff > 2:  # انزياح متوسط
+                        divergence_score = 10
+                        reasons.append(f"RSI Weak Divergence ({rsi_diff:.0f}pts) (+10)")
+        
+        total_score += divergence_score
+        score_breakdown['divergence'] = divergence_score
+        
+        # --- 7. MACD Histogram Contraction (تقلص الزخم) - 10 نقاط ---
+        macd_score = 0
+        if 'macd_histogram' in df.columns and len(df) >= 5:
+            hist_values = df['macd_histogram'].tail(5).tolist()
+            if len(hist_values) >= 3:
+                # Histogram يتقلص (يصبح أقرب لصفر)
+                if hist_values[-1] > 0 and hist_values[-3] > 0:
+                    if hist_values[-1] < hist_values[-3] * 0.7:  # تقلص 30%+
+                        macd_score = 10
+                        reasons.append("MACD Weakening (+10)")
+        
+        total_score += macd_score
+        score_breakdown['macd_weak'] = macd_score
+        
         # --- حساب نسبة الهبوط من القمة ---
         n = min(REVERSAL_CANDLES, len(df))
         high_n = df['high'].tail(n).max()
@@ -518,23 +696,25 @@ def analyze_peak(df, rsi):
         drop_percent = ((high_n - current_price) / high_n) * 100 if high_n > 0 else 0
         
         # =========================================================
-        # 🎯 القرار النهائي
+        # 🎯 القرار النهائي (المجموع = 145 نقطة)
         # =========================================================
-        candle_signal = total_score >= MIN_CONFIDENCE
+        # تحويل النتيجة إلى نسبة مئوية (0-100)
+        confidence_percent = min(int((total_score / 145) * 100), 100)
+        candle_signal = confidence_percent >= MIN_CONFIDENCE
         
-        if total_score >= MIN_CONFIDENCE + 10:
-            reasons.append(f"✅ STRONG ({total_score}/100)")
-        elif total_score >= 60:
-            reasons.append(f"✅ SIGNAL ({total_score}/100)")
-        elif total_score >= 40:
-            reasons.append(f"⏳ WEAK ({total_score}/100)")
+        if confidence_percent >= MIN_CONFIDENCE + 10:
+            reasons.append(f"✅ STRONG ({confidence_percent}/100)")
+        elif confidence_percent >= 60:
+            reasons.append(f"✅ SIGNAL ({confidence_percent}/100)")
+        elif confidence_percent >= 40:
+            reasons.append(f"⏳ WEAK ({confidence_percent}/100)")
         else:
-            reasons.append(f"❌ NO SIGNAL ({total_score}/100)")
+            reasons.append(f"❌ NO SIGNAL ({confidence_percent}/100)")
         
         base_result['is_peaking'] = drop_percent >= PEAK_DROP_THRESHOLD
         
         base_result.update({
-            'confidence': total_score,
+            'confidence': confidence_percent,
             'candle_signal': candle_signal,
             'reasons': reasons,
             'drop_percent': round(drop_percent, 3),
