@@ -631,7 +631,7 @@ class DatabaseStorage:
                 VALUES (%s, %s, %s, %s)
             """, (
                 short_name,
-                'learning_update',
+                'learn',  # اختصار من 15 حرف لـ 5
                 0,
                 self.json.dumps({
                     'learning_type': learning_type,
@@ -660,7 +660,7 @@ class DatabaseStorage:
             cursor = conn.cursor(cursor_factory=self.RealDictCursor)
             cursor.execute("""
                 SELECT data FROM ai_decisions 
-                WHERE symbol = %s AND decision = 'learning_update'
+                WHERE symbol = %s AND decision = 'learn'
                 ORDER BY timestamp DESC LIMIT 1
             """, (short_name,))
             result = cursor.fetchone()
