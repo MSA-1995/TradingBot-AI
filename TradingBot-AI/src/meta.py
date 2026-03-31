@@ -429,7 +429,7 @@ class Meta:
                         pass
                 
                 # جلب التصويت من كل مستشار
-                sell_votes = dl_client.vote_sell_now(rsi, macd_diff, volume_ratio, price_momentum, liquidity_metrics)
+                sell_votes = dl_client.vote_sell_now(rsi, macd_diff, volume_ratio, price_momentum)
                 
                 if sell_votes:
                     total_advisors = len(sell_votes)
