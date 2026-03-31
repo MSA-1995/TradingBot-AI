@@ -645,8 +645,8 @@ class DeepLearningClientV2:
 
         # 1. Exit Strategy (القناص) - معكوس الشراء:
         # الشراء: RSI < 40 أو (RSI < 50 و شمعة رفض/تراكم)
-        # البيع: RSI > 60 أو (RSI > 50 و شمعة قمة)
-        votes['exit'] = 1 if (rsi > 60 or (rsi > 50 and is_peak_candle)) else 0
+        # البيع: RSI > 65 أو (RSI > 55 و شمعة قمة)
+        votes['exit'] = 1 if (rsi > 65 or (rsi > 55 and is_peak_candle)) else 0
 
         # 2. MTF vote (صائد الانفجار) - معكوس الشراء:
         # الشراء: MACD > 0.3 و Volume > 1.2
