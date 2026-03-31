@@ -655,8 +655,8 @@ class DeepLearningClientV2:
 
         # 3. Risk vote (محافظ) - معكوس الشراء:
         # الشراء: RSI < 70
-        # البيع: RSI > 30
-        votes['risk'] = 1 if rsi > 30 else 0
+        # البيع: RSI > 50
+        votes['risk'] = 1 if rsi > 50 else 0
 
         # 4. Pattern vote (الأنماط) - معكوس الشراء:
         # الشراء: momentum > 0.2 أو شمعة رفض
@@ -668,10 +668,10 @@ class DeepLearningClientV2:
         # البيع: MACD < -0.8 و Volume < 1.0
         votes['cnn'] = 1 if (macd < -0.8 and volume_ratio < 1.0) else 0
 
-        # 6. Anomaly vote (كاشف الفخاخ) - نفس الشراء (كاشف فخاخ):
+        # 6. Anomaly vote (كاشف الفخاخ) - معكوس الشراء:
         # الشراء: Volume < 4.0 و RSI بين 20-80
-        # البيع: نفس الشرط (كاشف الفخاخ يعمل على كشف الشذوذ)
-        votes['anomaly'] = 1 if (volume_ratio < 4.0 and 20 < rsi < 80) else 0
+        # البيع: Volume < 2.0 و RSI بين 25-75
+        votes['anomaly'] = 1 if (volume_ratio < 2.0 and 25 < rsi < 75) else 0
 
         # 7. Liquidity vote (الشيخ - محلل السيولة) - معكوس الشراء:
         # الشراء: score ≥ 60 و Volume > 1.0
