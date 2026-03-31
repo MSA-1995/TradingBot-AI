@@ -233,25 +233,47 @@ class Meta:
             print(f"⚠️ Buy voting error: {e}")
             pass
 
-        # --- 6. القرار النهائي بناءً على الشموع + التصويت ---
+        # =========================================================
+        # 👑 6. الملك يقرر أولاً (Independent Decision)
+        # =========================================================
         min_votes_needed = mood_details.get('min_votes_needed', 4)
         total_advisors = mood_details.get('total_advisors', 7)
         
-        # --- صائد القيعان: نظام النقاط الذكي ---
-        candle_condition = reversal.get('candle_signal', False)  # True إذا نقاط ≥ 60
-        candle_score = reversal.get('confidence', 0)  # نقاط الشموع (0-100)
-        trigger_activated = candle_condition  # النقاط تكفي (ما نحتاج فيلتر ثاني)
-
-        # القرار: نقاط ≥ 60 + تصويت كافي + السوق غير هابط
-        if trigger_activated and buy_vote_count >= min_votes_needed:
-            if market_mood != "Bearish":
+        # نقاط الشموع من تحليل القاع
+        candle_score = reversal.get('confidence', 0)
+        
+        # ✅ قرار الملك: هل أريد الشراء؟
+        king_wants_to_buy = False
+        king_reason = ""
+        
+        # الشرط 1: نقاط كافية (Reversal ≥ MIN_CONFIDENCE)
+        if reversal.get('candle_signal', False):
+            king_wants_to_buy = True
+            king_reason = f"King: Reversal Signal ({candle_score}/100)"
+        
+        # الشرط 2: أو ثقة الملك عالية (temp_conf ≥ MIN_CONFIDENCE)
+        elif temp_conf >= MIN_CONFIDENCE:
+            king_wants_to_buy = True
+            king_reason = f"King: High Confidence ({temp_conf}/100)"
+        
+        # =========================================================
+        # 🗳️ 7. التصويت الفوري بعد قرار الملك
+        # =========================================================
+        if king_wants_to_buy and market_mood != "Bearish":
+            # الملك قال: أريد الشراء
+            # المستشارين: موافقين؟
+            if buy_vote_count >= min_votes_needed:
                 action = "BUY"
-                reason = f"BUY | Score:{candle_score}/100 | {', '.join(reasons[:3])}"
+                reason = f"BUY ✅ | King:{temp_conf} | Votes:{buy_vote_count}/{min_votes_needed} | {', '.join(reasons[:3])}"
             else:
                 action = "DISPLAY"
-                reason = f"Blocked (Bearish) | Score:{candle_score}"
+                reason = f"REJECTED ❌ | King wanted BUY | Votes:{buy_vote_count}/{min_votes_needed}"
+        elif king_wants_to_buy and market_mood == "Bearish":
+            action = "DISPLAY"
+            reason = f"Blocked (Bearish Market) | King:{temp_conf}"
         else:
-            reason = f"Wait | Score({candle_score}/{MIN_CONFIDENCE})"
+            # الملك مو راضي
+            reason = f"Wait | King Confidence:{temp_conf}/{MIN_CONFIDENCE}"
 
         decision = {
             'action': action,
@@ -330,8 +352,6 @@ class Meta:
 
         if not trigger_activated:
             return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/{MIN_CONFIDENCE}', 'profit': profit_percent}
-
-        print(f"🎯 {symbol}: PEAK HUNTER trigger activated. Proceeding to full council vote.")
 
         sell_conf = 20
         sell_reasons = []
