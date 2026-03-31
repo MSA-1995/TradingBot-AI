@@ -348,15 +348,16 @@ class Meta:
         
         mood_details = self._get_market_mood(analysis)
 
-        # --- 2. صائد القمم (نظام النقاط الذكي) ---
+        # --- 2. صائد القمم (نظام النقاط الذكي - متوازن) ---
         peak_analysis = analysis.get('peak', {})
         peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
         candle_condition = peak_analysis.get('candle_signal', False)
 
-        trigger_activated = candle_condition or peak_score >= MIN_CONFIDENCE
+        # متوازن: نقاط ≥50 أو شمعة قمة
+        trigger_activated = candle_condition or peak_score >= 50
 
         if not trigger_activated:
-            return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/{MIN_CONFIDENCE}', 'profit': profit_percent}
+            return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/110', 'profit': profit_percent}
 
         sell_conf = 20
         sell_reasons = []
@@ -368,10 +369,10 @@ class Meta:
         price_momentum = analysis.get('price_momentum', 0)
         liquidity_metrics = analysis.get('liquidity_metrics', {})
 
-        if rsi >= 70:
+        if rsi >= 68:  # تحسين: خفض من 70 إلى 68
             sell_conf += 25
             sell_reasons.append(f"RSI High ({rsi:.0f})")
-        elif rsi >= 60:
+        elif rsi >= 62:  # تحسين: خفض من 60 إلى 62
             sell_conf += 15
             sell_reasons.append(f"RSI Elevated ({rsi:.0f})")
 
@@ -442,18 +443,30 @@ class Meta:
             print(f"⚠️ Meta sell voting error: {e}")
             pass
 
-        # --- 4. القرار الملكي النهائي: نقاط + التصويت ---
+        # --- 4. القرار الملكي النهائي: نقاط + التصويت (محسّن للسرعة) ---
         min_votes_needed = mood_details.get('min_votes_needed', 4)
         total_advisors = mood_details.get('total_advisors', 7)
         peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
         
-        # قرار البيع: نقاط ≥ MIN_CONFIDENCE + تصويت كافي
-        if sell_vote_count >= min_votes_needed:
-            action = 'SELL'
-            reason = f"SELL | Score:{peak_score}/110 | {', '.join(sell_reasons[:3])}"
+        # تحسين: إذا النقاط عالية جداً (≥65) أو RSI عالي (≥70)، نبيع بتصويت أقل
+        urgent_sell = peak_score >= 65 or rsi >= 70
+        
+        if urgent_sell:
+            # حالة طوارئ: نحتاج 3/7 فقط
+            if sell_vote_count >= 3:
+                action = 'SELL'
+                reason = f"URGENT SELL | Score:{peak_score}/110 | RSI:{rsi:.0f} | {', '.join(sell_reasons[:3])}"
+            else:
+                action = 'HOLD'
+                reason = f"Hold | Score:{peak_score}/110 | Need 3 votes (got {sell_vote_count})"
         else:
-            action = 'HOLD'
-            reason = f"Hold | Score:{peak_score}/110"
+            # حالة عادية: نحتاج التصويت الكامل
+            if sell_vote_count >= min_votes_needed:
+                action = 'SELL'
+                reason = f"SELL | Score:{peak_score}/110 | {', '.join(sell_reasons[:3])}"
+            else:
+                action = 'HOLD'
+                reason = f"Hold | Score:{peak_score}/110"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
