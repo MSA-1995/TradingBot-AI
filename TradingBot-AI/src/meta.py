@@ -540,6 +540,9 @@ class Meta:
                 time_multiplier = time_analysis.get('trading_recommendation', {}).get('size_multiplier', 1.0)
                 final_amount = final_amount * time_multiplier
                 
+                # 🚨 حد أدنى $12 بعد كل المضاعفات (Binance يحتاج $10)
+                final_amount = max(final_amount, MIN_TRADE_AMOUNT)
+                
                 amount = round(final_amount, 2)
                 
                 print(f"💰 {symbol}: ${avg_amount:.2f}→${amount} | Regime:{regime_multiplier}x | Time:{time_multiplier}x | Flash:{flash_risk}%")
