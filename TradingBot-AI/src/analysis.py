@@ -589,7 +589,7 @@ def analyze_peak(df, rsi):
     - MTF Confirmation: 10 نقاط
     - Volume + Divergence: 15 نقطة (مهم)
     """
-    from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES, MIN_CONFIDENCE
+    from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES, MIN_SELL_CONFIDENCE
 
     base_result = {
         'confidence': 0,
@@ -898,7 +898,7 @@ def analyze_peak(df, rsi):
         confidence_percent = min(total_score, 110)
         
         # إشارة القمة: نقاط كافية أو RSI عالي مع هبوط من القمة
-        is_candle_signal = confidence_percent >= MIN_CONFIDENCE or (rsi >= 70 and drop_percent >= PEAK_DROP_THRESHOLD)
+        is_candle_signal = confidence_percent >= MIN_SELL_CONFIDENCE or (rsi >= 75 and drop_percent >= PEAK_DROP_THRESHOLD)
         
         if trap_is_filter and is_candle_signal:
             is_candle_signal = False
