@@ -555,13 +555,13 @@ def analyze_reversal(df, rsi):
             reasons.append("🚫 Signal Blocked by Trap")
         
         if total_score >= MIN_CONFIDENCE + 10:
-            reasons.append(f"✅ STRONG ({total_score}/100)")
+            reasons.append(f"✅ STRONG ({total_score}/110)")
         elif total_score >= MIN_CONFIDENCE:
-            reasons.append(f"✅ SIGNAL ({total_score}/100)")
+            reasons.append(f"✅ SIGNAL ({total_score}/110)")
         elif total_score >= 40:
-            reasons.append(f"⏳ WEAK ({total_score}/100)")
+            reasons.append(f"⏳ WEAK ({total_score}/110)")
         else:
-            reasons.append(f"❌ NO SIGNAL ({total_score}/100)")
+            reasons.append(f"❌ NO SIGNAL ({total_score}/110)")
         
         base_result['is_reversing'] = bounce_percent >= BOTTOM_BOUNCE_THRESHOLD
         
@@ -905,13 +905,13 @@ def analyze_peak(df, rsi):
             reasons.append("🚫 Signal Blocked by Trap")
         
         if total_score >= MIN_CONFIDENCE + 10:
-            reasons.append(f"✅ STRONG ({total_score}/100)")
+            reasons.append(f"✅ STRONG ({total_score}/110)")
         elif total_score >= MIN_CONFIDENCE:
-            reasons.append(f"✅ SIGNAL ({total_score}/100)")
+            reasons.append(f"✅ SIGNAL ({total_score}/110)")
         elif total_score >= 40:
-            reasons.append(f"⏳ WEAK ({total_score}/100)")
+            reasons.append(f"⏳ WEAK ({total_score}/110)")
         else:
-            reasons.append(f"❌ NO SIGNAL ({total_score}/100)")
+            reasons.append(f"❌ NO SIGNAL ({total_score}/110)")
         
         base_result['is_peaking'] = drop_percent >= PEAK_DROP_THRESHOLD
         
