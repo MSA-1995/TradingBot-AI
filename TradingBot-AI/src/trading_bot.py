@@ -185,8 +185,8 @@ print("        📊 Multi-Timeframe + Risk Manager + Chart CNN")
 print("        🏆 Coin Ranking + Anomaly Detection")
 print("        🎯 Exit Strategy + Pattern Recognition")
 print("        📰 News Sentiment Analysis")
-print("        🔍 Top 10 from 20 Fixed Coins")
-print("        ✅ Version 11.0 - Deep Learning V3 🚀")
+print("        🔍 Top 10 from 50 Coins")
+print("        ✅ Version 11.0 - Deep Learning V3")
 print("  ✦•······················•✦•······················•✦\n")
 print("=" * 60)
 
@@ -235,7 +235,7 @@ if NEWS_ENABLED:
 
 print(f"💰 Amount: ~$15 (Dynamic)")
 print(f"🎯 TP: Dynamic | SL: Dynamic TSL (ATR Based, 1%-5%)")
-print(f"🎯 Min Buy Confidence: {MIN_CONFIDENCE}/100\n")
+print(f"🎯 Min Buy Confidence: {MIN_CONFIDENCE}/145\n")
 
 # Startup notification calls removed for simplification.
 # load_status_message_id()
