@@ -241,13 +241,13 @@ def analyze_mtf_confirmation(df):
 
 def analyze_reversal(df, rsi):
     """
-    تحليل الارتداد من القاع - نظام النقاط الذكي (المجموع = 100 نقطة):
-    - الشموع والأنماط: 25 نقطة
-    - RSI + MACD: 20 نقطة
-    - Market Structure: 20 نقطة
+    تحليل الارتداد من القاع - نظام النقاط الذكي المحسّن (المجموع = 110 نقطة):
+    - الشموع والأنماط: 30 نقطة (الأهم)
+    - RSI + MACD: 25 نقطة (أقوى)
+    - Market Structure: 15 نقطة (مساعد)
     - Support/Resistance: 15 نقطة
-    - MTF Confirmation: 10 نقطة
-    - Volume + Divergence: 10 نقطة
+    - MTF Confirmation: 10 نقاط
+    - Volume + Divergence: 15 نقطة (مهم)
     """
     from config import BOTTOM_BOUNCE_THRESHOLD, REVERSAL_CANDLES, MIN_CONFIDENCE
 
@@ -274,7 +274,7 @@ def analyze_reversal(df, rsi):
         reasons = []
         score_breakdown = {}
         
-        # --- 1. الشموع والأنماط - 25 نقطة ---
+        # --- 1. الشموع والأنماط - 30 نقطة (محسّن) ---
         candle_signal = False
         pattern_score = 0
         pattern_name = ""
@@ -301,10 +301,10 @@ def analyze_reversal(df, rsi):
             
             if is_hammer:
                 candle_signal = True
-                pattern_score = 25
+                pattern_score = 30
                 pattern_name = "Hammer"
                 pattern_found_idx = i
-                reasons.append(f"{pattern_name} (+25)")
+                reasons.append(f"{pattern_name} (+30)")
                 break
             
             if i + 1 < len(df):
@@ -321,10 +321,10 @@ def analyze_reversal(df, rsi):
                 
                 if is_bullish_engulfing:
                     candle_signal = True
-                    pattern_score = 25
+                    pattern_score = 30
                     pattern_name = "Bullish Engulfing"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+25)")
+                    reasons.append(f"{pattern_name} (+30)")
                     break
             
             if i + 2 < len(df) and i <= 3:
@@ -349,10 +349,10 @@ def analyze_reversal(df, rsi):
                 
                 if is_morning_star:
                     candle_signal = True
-                    pattern_score = 25
+                    pattern_score = 30
                     pattern_name = "Morning Star"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+25)")
+                    reasons.append(f"{pattern_name} (+30)")
                     break
             
             if i + 2 < len(df) and i <= 3:
@@ -372,10 +372,10 @@ def analyze_reversal(df, rsi):
                 
                 if is_three_soldiers:
                     candle_signal = True
-                    pattern_score = 25
+                    pattern_score = 30
                     pattern_name = "Three White Soldiers"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+25)")
+                    reasons.append(f"{pattern_name} (+30)")
                     break
             
             if i + 1 < len(df):
@@ -393,46 +393,53 @@ def analyze_reversal(df, rsi):
                 
                 if is_piercing:
                     candle_signal = True
-                    pattern_score = 25
+                    pattern_score = 30
                     pattern_name = "Piercing Line"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+25)")
+                    reasons.append(f"{pattern_name} (+30)")
                     break
         
         total_score += pattern_score
         score_breakdown['pattern'] = pattern_score
         
-        # --- 2. RSI + MACD - 20 نقطة ---
+        # --- 2. RSI + MACD - 25 نقطة (محسّن) ---
         rsi_score = 0
         if rsi < 25:
-            rsi_score = 12
-            reasons.append(f"RSI Very Low ({rsi:.0f}) (+12)")
+            rsi_score = 15
+            reasons.append(f"RSI Very Low ({rsi:.0f}) (+15)")
         elif rsi < 30:
-            rsi_score = 10
-            reasons.append(f"RSI Oversold ({rsi:.0f}) (+10)")
+            rsi_score = 12
+            reasons.append(f"RSI Oversold ({rsi:.0f}) (+12)")
         elif rsi < 35:
-            rsi_score = 7
-            reasons.append(f"RSI Low ({rsi:.0f}) (+7)")
+            rsi_score = 9
+            reasons.append(f"RSI Low ({rsi:.0f}) (+9)")
         elif rsi < 40:
-            rsi_score = 4
-            reasons.append(f"RSI OK ({rsi:.0f}) (+4)")
+            rsi_score = 6
+            reasons.append(f"RSI OK ({rsi:.0f}) (+6)")
         else:
             rsi_score = 0
         
         macd_score = 0
         if 'macd_histogram' in df.columns and len(df) >= 5:
             hist_values = df['macd_histogram'].tail(5).tolist()
-            if len(hist_values) >= 3 and hist_values[-1] < 0 and hist_values[-3] < 0:
-                if hist_values[-1] > hist_values[-3] * 0.7:
-                    macd_score = 8
-                    reasons.append("MACD Strengthening (+8)")
+            if len(hist_values) >= 3:
+                # تحسين: أي تحسن في MACD يُحتسب
+                if hist_values[-1] < 0 and hist_values[-3] < 0:
+                    if hist_values[-1] > hist_values[-3]:  # أي تحسن
+                        improvement_ratio = abs(hist_values[-1] - hist_values[-3]) / abs(hist_values[-3]) if hist_values[-3] != 0 else 0
+                        if improvement_ratio > 0.3:
+                            macd_score = 10
+                            reasons.append("MACD Strong Recovery (+10)")
+                        else:
+                            macd_score = 6
+                            reasons.append("MACD Improving (+6)")
         
         total_score += rsi_score + macd_score
         score_breakdown['rsi_macd'] = rsi_score + macd_score
         
-        # --- 3. Market Structure - 20 نقطة ---
+        # --- 3. Market Structure - 15 نقطة (مساعد) ---
         ms = analyze_market_structure(df)
-        ms_score = max(0, ms['score'])
+        ms_score = max(0, int(ms['score'] * 0.75))  # تقليل الوزن من 20 إلى 15
         if ms['structure'] in ('lower_highs_lower_lows', 'lower_lows'):
             ms_score = 0
         total_score += ms_score
@@ -458,16 +465,19 @@ def analyze_reversal(df, rsi):
         if mtf['reason']:
             reasons.append(f"⏱️ {mtf['reason']} ({mtf_score:+d})")
         
-        # --- 6. Volume + Divergence - 10 نقطة ---
+        # --- 6. Volume + Divergence - 15 نقطة (محسّن) ---
         vol_score = 0
         if len(df) >= 2:
             current_vol = df.iloc[-1].get('volume_ratio', 1)
-            if current_vol > 1.5:
-                vol_score = 5
-                reasons.append(f"Vol {current_vol:.1f}x (+5)")
+            if current_vol > 2.0:
+                vol_score = 8
+                reasons.append(f"Vol Very High {current_vol:.1f}x (+8)")
+            elif current_vol > 1.5:
+                vol_score = 6
+                reasons.append(f"Vol High {current_vol:.1f}x (+6)")
             elif current_vol > 1.0:
                 vol_score = 3
-                reasons.append(f"Vol {current_vol:.1f}x (+3)")
+                reasons.append(f"Vol Up {current_vol:.1f}x (+3)")
         
         div_score = 0
         if len(df) >= 20:
@@ -496,33 +506,37 @@ def analyze_reversal(df, rsi):
                 if second_low < first_low and second_rsi > first_rsi:
                     rsi_diff = second_rsi - first_rsi
                     if rsi_diff > 5:
-                        div_score = 5
-                        reasons.append(f"Bullish Divergence (+5)")
+                        div_score = 7
+                        reasons.append(f"Strong Bullish Divergence (+7)")
                     elif rsi_diff > 2:
-                        div_score = 3
-                        reasons.append(f"Weak Bullish Divergence (+3)")
+                        div_score = 4
+                        reasons.append(f"Bullish Divergence (+4)")
         
         total_score += vol_score + div_score
         score_breakdown['volume_divergence'] = vol_score + div_score
         
-        # --- Trap Detection (تصفية لا خصم) ---
+        # --- Trap Detection (تصفية محسّنة - فحص آخر 3 شموع) ---
         trap_is_filter = False
         if len(df) >= 20:
-            current_candle = df.iloc[-1]
             avg_volume = df['volume'].tail(20).mean()
-            current_volume = current_candle['volume']
             
-            if avg_volume > 0 and current_volume > avg_volume * 3.0:
-                candle_body = abs(current_candle['close'] - current_candle['open'])
-                candle_range = current_candle['high'] - current_candle['low']
+            # فحص آخر 3 شموع للفخاخ
+            for check_idx in range(1, min(4, len(df) + 1)):
+                check_candle = df.iloc[-check_idx]
+                check_volume = check_candle['volume']
                 
-                if candle_range > 0 and candle_body > 0:
-                    upper_shadow = current_candle['high'] - max(current_candle['close'], current_candle['open'])
-                    lower_shadow = min(current_candle['close'], current_candle['open']) - current_candle['low']
+                if avg_volume > 0 and check_volume > avg_volume * 3.0:
+                    candle_body = abs(check_candle['close'] - check_candle['open'])
+                    candle_range = check_candle['high'] - check_candle['low']
                     
-                    if upper_shadow > candle_body * 3.0:
-                        trap_is_filter = True
-                        reasons.append("⚠️ Trap Warning")
+                    if candle_range > 0 and candle_body > 0:
+                        upper_shadow = check_candle['high'] - max(check_candle['close'], check_candle['open'])
+                        lower_shadow = min(check_candle['close'], check_candle['open']) - check_candle['low']
+                        
+                        if upper_shadow > candle_body * 3.0:
+                            trap_is_filter = True
+                            reasons.append(f"⚠️ Trap Detected (Candle-{check_idx})")
+                            break
         
         # --- حساب نسبة الارتداد ---
         n = min(REVERSAL_CANDLES, len(df))
@@ -531,9 +545,9 @@ def analyze_reversal(df, rsi):
         bounce_percent = ((current_price - low_n) / low_n) * 100 if low_n > 0 else 0
         
         # =========================================================
-        # 🎯 القرار النهائي (المجموع = 100 نقطة)
+        # 🎯 القرار النهائي (المجموع = 110 نقطة)
         # =========================================================
-        confidence_percent = min(total_score, 100)
+        confidence_percent = min(total_score, 110)
         is_candle_signal = confidence_percent >= MIN_CONFIDENCE
         
         if trap_is_filter and is_candle_signal:
@@ -567,13 +581,13 @@ def analyze_reversal(df, rsi):
 
 def analyze_peak(df, rsi):
     """
-    تحليل الانعكاس من القمة - نظام النقاط الذكي (المجموع = 100 نقطة):
-    - الشموع والأنماط: 25 نقطة
-    - RSI + MACD: 20 نقطة
-    - Market Structure: 20 نقطة
+    تحليل الانعكاس من القمة - نظام النقاط الذكي المحسّن (المجموع = 110 نقطة):
+    - الشموع والأنماط: 30 نقطة (الأهم)
+    - RSI + MACD: 25 نقطة (أقوى)
+    - Market Structure: 15 نقطة (مساعد)
     - Support/Resistance: 15 نقطة
-    - MTF Confirmation: 10 نقطة
-    - Volume + Divergence: 10 نقطة
+    - MTF Confirmation: 10 نقاط
+    - Volume + Divergence: 15 نقطة (مهم)
     """
     from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES, MIN_CONFIDENCE
 
@@ -596,7 +610,7 @@ def analyze_peak(df, rsi):
         reasons = []
         score_breakdown = {}
         
-        # --- 1. الشموع والأنماط - 25 نقطة ---
+        # --- 1. الشموع والأنماط - 30 نقطة (محسّن) ---
         candle_signal = False
         pattern_score = 0
         pattern_name = ""
@@ -625,10 +639,10 @@ def analyze_peak(df, rsi):
             
             if is_shooting_star:
                 candle_signal = True
-                pattern_score = 25
+                pattern_score = 30
                 pattern_name = "Shooting Star"
                 pattern_found_idx = i
-                reasons.append(f"{pattern_name} (+25)")
+                reasons.append(f"{pattern_name} (+30)")
                 break
             
             if i + 1 < len(df):
@@ -645,10 +659,10 @@ def analyze_peak(df, rsi):
                 
                 if is_bearish_engulfing:
                     candle_signal = True
-                    pattern_score = 25
+                    pattern_score = 30
                     pattern_name = "Bearish Engulfing"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+25)")
+                    reasons.append(f"{pattern_name} (+30)")
                     break
             
             if i + 2 < len(df) and i <= 3:
@@ -673,10 +687,10 @@ def analyze_peak(df, rsi):
                 
                 if is_evening_star:
                     candle_signal = True
-                    pattern_score = 25
+                    pattern_score = 30
                     pattern_name = "Evening Star"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+25)")
+                    reasons.append(f"{pattern_name} (+30)")
                     break
             
             if i + 2 < len(df) and i <= 3:
@@ -696,10 +710,10 @@ def analyze_peak(df, rsi):
                 
                 if is_three_crows:
                     candle_signal = True
-                    pattern_score = 25
+                    pattern_score = 30
                     pattern_name = "Three Black Crows"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+25)")
+                    reasons.append(f"{pattern_name} (+30)")
                     break
             
             if i + 1 < len(df):
@@ -717,54 +731,62 @@ def analyze_peak(df, rsi):
                 
                 if is_dark_cloud:
                     candle_signal = True
-                    pattern_score = 25
+                    pattern_score = 30
                     pattern_name = "Dark Cloud Cover"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+25)")
+                    reasons.append(f"{pattern_name} (+30)")
                     break
         
         total_score += pattern_score
         score_breakdown['pattern'] = pattern_score
         
-        # --- 2. RSI + MACD - 20 نقطة ---
+        # --- 2. RSI + MACD - 25 نقطة (محسّن) ---
         rsi_score = 0
-        if rsi > 80:
-            rsi_score = 12
-            reasons.append(f"RSI Very High ({rsi:.0f}) (+12)")
+        if rsi > 75:  # تحسين: خفض من 80 إلى 75
+            rsi_score = 15
+            reasons.append(f"RSI Very High ({rsi:.0f}) (+15)")
         elif rsi > 70:
-            rsi_score = 10
-            reasons.append(f"RSI Overbought ({rsi:.0f}) (+10)")
+            rsi_score = 12
+            reasons.append(f"RSI Overbought ({rsi:.0f}) (+12)")
         elif rsi > 65:
-            rsi_score = 7
-            reasons.append(f"RSI High ({rsi:.0f}) (+7)")
+            rsi_score = 9
+            reasons.append(f"RSI High ({rsi:.0f}) (+9)")
         elif rsi > 60:
-            rsi_score = 4
-            reasons.append(f"RSI OK ({rsi:.0f}) (+4)")
+            rsi_score = 6
+            reasons.append(f"RSI Elevated ({rsi:.0f}) (+6)")
         else:
             rsi_score = 0
         
         macd_score = 0
         if 'macd_histogram' in df.columns and len(df) >= 5:
             hist_values = df['macd_histogram'].tail(5).tolist()
-            if len(hist_values) >= 3 and hist_values[-1] > 0 and hist_values[-3] > 0:
-                if hist_values[-1] < hist_values[-3] * 0.7:
-                    macd_score = 8
-                    reasons.append("MACD Weakening (+8)")
+            if len(hist_values) >= 3:
+                # تحسين: أي ضعف في MACD يُحتسب
+                if hist_values[-1] > 0 and hist_values[-3] > 0:
+                    if hist_values[-1] < hist_values[-3]:  # ضعف
+                        weakness_ratio = abs(hist_values[-1] - hist_values[-3]) / abs(hist_values[-3]) if hist_values[-3] != 0 else 0
+                        if weakness_ratio > 0.3:
+                            macd_score = 10
+                            reasons.append("MACD Strong Weakening (+10)")
+                        else:
+                            macd_score = 6
+                            reasons.append("MACD Weakening (+6)")
         
         total_score += rsi_score + macd_score
         score_breakdown['rsi_macd'] = rsi_score + macd_score
         
-        # --- 3. Market Structure - 20 نقطة ---
+        # --- 3. Market Structure - 15 نقطة (مساعد) ---
         ms = analyze_market_structure(df)
         ms_score = 0
         if ms['structure'] in ('lower_highs_lower_lows', 'lower_lows'):
-            ms_score = 20
-            reasons.append(f"🏗️ {ms['reason']} (+20)")
+            ms_score = 15  # تقليل من 20 إلى 15
+            reasons.append(f"🏗️ {ms['reason']} (+15)")
         elif ms['structure'] == 'lower_highs':
-            ms_score = 10
-            reasons.append(f"🏗️ {ms['reason']} (+10)")
+            ms_score = 8  # تقليل من 10 إلى 8
+            reasons.append(f"🏗️ {ms['reason']} (+8)")
         elif ms['structure'] in ('higher_highs_higher_lows', 'higher_lows'):
             ms_score = 0
+        total_score += ms_score
         score_breakdown['market_structure'] = ms_score
         if ms['reason'] and ms_score == 0:
             reasons.append(f"🏗️ {ms['reason']} (0)")
@@ -790,16 +812,19 @@ def analyze_peak(df, rsi):
         if mtf['reason']:
             reasons.append(f"⏱️ {mtf['reason']} ({mtf_score:+d})")
         
-        # --- 6. Volume + Divergence - 10 نقطة ---
+        # --- 6. Volume + Divergence - 15 نقطة (محسّن) ---
         vol_score = 0
         if len(df) >= 2:
             current_vol = df.iloc[-1].get('volume_ratio', 1)
-            if current_vol > 1.5:
-                vol_score = 5
-                reasons.append(f"Vol {current_vol:.1f}x (+5)")
+            if current_vol > 2.0:
+                vol_score = 8
+                reasons.append(f"Vol Very High {current_vol:.1f}x (+8)")
+            elif current_vol > 1.5:
+                vol_score = 6
+                reasons.append(f"Vol High {current_vol:.1f}x (+6)")
             elif current_vol > 1.0:
                 vol_score = 3
-                reasons.append(f"Vol {current_vol:.1f}x (+3)")
+                reasons.append(f"Vol Up {current_vol:.1f}x (+3)")
         
         div_score = 0
         if len(df) >= 20:
@@ -828,33 +853,38 @@ def analyze_peak(df, rsi):
                 if second_high > first_high and second_rsi < first_rsi:
                     rsi_diff = first_rsi - second_rsi
                     if rsi_diff > 5:
-                        div_score = 5
-                        reasons.append(f"RSI Divergence (+5)")
+                        div_score = 7
+                        reasons.append(f"Strong Bearish Divergence (+7)")
                     elif rsi_diff > 2:
-                        div_score = 3
-                        reasons.append(f"Weak RSI Divergence (+3)")
+                        div_score = 4
+                        reasons.append(f"Bearish Divergence (+4)")
         
         total_score += vol_score + div_score
         score_breakdown['volume_divergence'] = vol_score + div_score
         
-        # --- Trap Detection (تصفية لا خصم) ---
+        # --- Trap Detection (تصفية محسّنة - فحص آخر 3 شموع) ---
         trap_is_filter = False
         if len(df) >= 20:
-            current_candle = df.iloc[-1]
             avg_volume = df['volume'].tail(20).mean()
-            current_volume = current_candle['volume']
             
-            if avg_volume > 0 and current_volume > avg_volume * 3.0:
-                candle_body = abs(current_candle['close'] - current_candle['open'])
-                candle_range = current_candle['high'] - current_candle['low']
+            # فحص آخر 3 شموع للفخاخ (فخ هبوط وهمي)
+            for check_idx in range(1, min(4, len(df) + 1)):
+                check_candle = df.iloc[-check_idx]
+                check_volume = check_candle['volume']
                 
-                if candle_range > 0 and candle_body > 0:
-                    upper_shadow = current_candle['high'] - max(current_candle['close'], current_candle['open'])
-                    lower_shadow = min(current_candle['close'], current_candle['open']) - current_candle['low']
+                if avg_volume > 0 and check_volume > avg_volume * 3.0:
+                    candle_body = abs(check_candle['close'] - check_candle['open'])
+                    candle_range = check_candle['high'] - check_candle['low']
                     
-                    if lower_shadow > candle_body * 3.0:
-                        trap_is_filter = True
-                        reasons.append("⚠️ Fake Dip Trap")
+                    if candle_range > 0 and candle_body > 0:
+                        upper_shadow = check_candle['high'] - max(check_candle['close'], check_candle['open'])
+                        lower_shadow = min(check_candle['close'], check_candle['open']) - check_candle['low']
+                        
+                        # فخ هبوط وهمي: ظل سفلي كبير مع حجم عالي
+                        if lower_shadow > candle_body * 3.0:
+                            trap_is_filter = True
+                            reasons.append(f"⚠️ Fake Dip Trap (Candle-{check_idx})")
+                            break
         
         # --- حساب نسبة الهبوط من القمة ---
         n = min(REVERSAL_CANDLES, len(df))
@@ -863,9 +893,9 @@ def analyze_peak(df, rsi):
         drop_percent = ((high_n - current_price) / high_n) * 100 if high_n > 0 else 0
         
         # =========================================================
-        # 🎯 القرار النهائي (المجموع = 100 نقطة)
+        # 🎯 القرار النهائي (المجموع = 110 نقطة)
         # =========================================================
-        confidence_percent = min(total_score, 100)
+        confidence_percent = min(total_score, 110)
         
         # إشارة القمة: نقاط كافية أو RSI عالي جداً مع هبوط من القمة
         is_candle_signal = confidence_percent >= MIN_CONFIDENCE or (rsi >= 75 and drop_percent >= PEAK_DROP_THRESHOLD)
