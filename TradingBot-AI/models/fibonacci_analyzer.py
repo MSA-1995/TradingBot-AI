@@ -107,6 +107,11 @@ class FibonacciAnalyzer:
     def is_at_support(self, current_price, analysis, tolerance=0.5, volume_ratio=1.0, symbol=''):
         """هل السعر عند مستوى دعم فيبوناتشي؟ (محسّن)"""
         try:
+            # 🚨 فحص RSI أولاً - إذا تشبع شرائي لا تضيف نقاط!
+            rsi = analysis.get('rsi', 50)
+            if rsi > 70:
+                return False, 0  # RSI عالي = خطر، لا تشتري
+            
             support = self.get_support_level(current_price, analysis)
             if not support:
                 return False, 0
