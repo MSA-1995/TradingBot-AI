@@ -453,8 +453,8 @@ class Meta:
 
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
-    def _get_market_mood(self, analysis):
-        """Analyzes BTC, ETH, BNB changes to determine the overall market mood and required consensus."""
+    def _get_market_mood(self, analysis, symbol="BTC/USDT"):
+        """Analyzes BTC, ETH, BNB + Fear & Greed Index to determine market mood."""
         btc_change = analysis.get('btc_change_1h', 0) if analysis else 0
         eth_change = analysis.get('eth_change_1h', 0) if analysis else 0
         bnb_change = analysis.get('bnb_change_1h', 0) if analysis else 0
@@ -472,20 +472,39 @@ class Meta:
         if bnb_change > threshold: up_count += 1
         elif bnb_change < -threshold: down_count += 1
 
+        # ========== إضافة Fear & Greed Index ==========
+        fng_adjustment = 0
+        try:
+            mood_analyzer = self.advisor_manager.get('MarketMoodAnalyzer') if self.advisor_manager else None
+            if mood_analyzer:
+                mood_result = mood_analyzer.get_mood_adjustment(symbol)
+                fng_adjustment = mood_result.get('adjustment', 0)
+                fng_reason = mood_result.get('reason', '')
+                if fng_adjustment != 0:
+                    # Fear (خوف) = فرصة شراء، Greed (طمع) = حذر
+                    if fng_adjustment > 0:
+                        up_count += 1  # الخوف = فرصة
+                    elif fng_adjustment < 0:
+                        down_count += 1  # الطمع = حذر
+        except:
+            pass
+        # ===============================================
+
         mood_details = {}
         if up_count >= 2:
             mood_details['mood'] = "Bullish"
-            mood_details['min_votes_needed'] = 3  # 3/7 موافقين
+            mood_details['min_votes_needed'] = 3
             mood_details['total_advisors'] = 7
         elif down_count >= 2:
             mood_details['mood'] = "Bearish"
-            mood_details['min_votes_needed'] = 5  # 5/7 موافقين
+            mood_details['min_votes_needed'] = 5
             mood_details['total_advisors'] = 7
         else:
             mood_details['mood'] = "Neutral"
-            mood_details['min_votes_needed'] = 4  # 4/7 موافقين
+            mood_details['min_votes_needed'] = 4
             mood_details['total_advisors'] = 7
         
+        mood_details['fng_adjustment'] = fng_adjustment
         return mood_details
 
     def _calculate_smart_amount(self, symbol, confidence, analysis):
