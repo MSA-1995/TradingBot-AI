@@ -274,7 +274,7 @@ def analyze_reversal(df, rsi):
         reasons = []
         score_breakdown = {}
         
-        # --- 1. الشموع والأنماط - 30 نقطة (محسّن) ---
+        # --- 1. الشموع والأنماط - 40 نقطة (أقوى للشراء السريع) ---
         candle_signal = False
         pattern_score = 0
         pattern_name = ""
@@ -301,10 +301,10 @@ def analyze_reversal(df, rsi):
             
             if is_hammer:
                 candle_signal = True
-                pattern_score = 30
+                pattern_score = 40
                 pattern_name = "Hammer"
                 pattern_found_idx = i
-                reasons.append(f"{pattern_name} (+30)")
+                reasons.append(f"{pattern_name} (+40)")
                 break
             
             if i + 1 < len(df):
@@ -321,10 +321,10 @@ def analyze_reversal(df, rsi):
                 
                 if is_bullish_engulfing:
                     candle_signal = True
-                    pattern_score = 30
+                    pattern_score = 40
                     pattern_name = "Bullish Engulfing"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+30)")
+                    reasons.append(f"{pattern_name} (+40)")
                     break
             
             if i + 2 < len(df) and i <= 3:
@@ -349,10 +349,10 @@ def analyze_reversal(df, rsi):
                 
                 if is_morning_star:
                     candle_signal = True
-                    pattern_score = 30
+                    pattern_score = 40
                     pattern_name = "Morning Star"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+30)")
+                    reasons.append(f"{pattern_name} (+40)")
                     break
             
             if i + 2 < len(df) and i <= 3:
@@ -372,10 +372,10 @@ def analyze_reversal(df, rsi):
                 
                 if is_three_soldiers:
                     candle_signal = True
-                    pattern_score = 30
+                    pattern_score = 40
                     pattern_name = "Three White Soldiers"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+30)")
+                    reasons.append(f"{pattern_name} (+40)")
                     break
             
             if i + 1 < len(df):
@@ -393,10 +393,10 @@ def analyze_reversal(df, rsi):
                 
                 if is_piercing:
                     candle_signal = True
-                    pattern_score = 30
+                    pattern_score = 40
                     pattern_name = "Piercing Line"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+30)")
+                    reasons.append(f"{pattern_name} (+40)")
                     break
         
         total_score += pattern_score
@@ -610,7 +610,7 @@ def analyze_peak(df, rsi):
         reasons = []
         score_breakdown = {}
         
-        # --- 1. الشموع والأنماط - 30 نقطة (محسّن) ---
+        # --- 1. الشموع والأنماط - 40 نقطة (أقوى للبيع السريع) ---
         candle_signal = False
         pattern_score = 0
         pattern_name = ""
@@ -639,10 +639,10 @@ def analyze_peak(df, rsi):
             
             if is_shooting_star:
                 candle_signal = True
-                pattern_score = 30
+                pattern_score = 40
                 pattern_name = "Shooting Star"
                 pattern_found_idx = i
-                reasons.append(f"{pattern_name} (+30)")
+                reasons.append(f"{pattern_name} (+40)")
                 break
             
             if i + 1 < len(df):
@@ -659,10 +659,10 @@ def analyze_peak(df, rsi):
                 
                 if is_bearish_engulfing:
                     candle_signal = True
-                    pattern_score = 30
+                    pattern_score = 40
                     pattern_name = "Bearish Engulfing"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+30)")
+                    reasons.append(f"{pattern_name} (+40)")
                     break
             
             if i + 2 < len(df) and i <= 3:
@@ -687,10 +687,10 @@ def analyze_peak(df, rsi):
                 
                 if is_evening_star:
                     candle_signal = True
-                    pattern_score = 30
+                    pattern_score = 40
                     pattern_name = "Evening Star"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+30)")
+                    reasons.append(f"{pattern_name} (+40)")
                     break
             
             if i + 2 < len(df) and i <= 3:
@@ -710,10 +710,10 @@ def analyze_peak(df, rsi):
                 
                 if is_three_crows:
                     candle_signal = True
-                    pattern_score = 30
+                    pattern_score = 40
                     pattern_name = "Three Black Crows"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+30)")
+                    reasons.append(f"{pattern_name} (+40)")
                     break
             
             if i + 1 < len(df):
@@ -731,27 +731,27 @@ def analyze_peak(df, rsi):
                 
                 if is_dark_cloud:
                     candle_signal = True
-                    pattern_score = 30
+                    pattern_score = 40
                     pattern_name = "Dark Cloud Cover"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+30)")
+                    reasons.append(f"{pattern_name} (+40)")
                     break
         
         total_score += pattern_score
         score_breakdown['pattern'] = pattern_score
         
-        # --- 2. RSI + MACD - 25 نقطة (محسّن) ---
+        # --- 2. RSI + MACD - 25 نقطة (محسّن للسرعة) ---
         rsi_score = 0
-        if rsi > 75:  # تحسين: خفض من 80 إلى 75
+        if rsi > 72:  # تحسين: خفض من 75 إلى 72
             rsi_score = 15
             reasons.append(f"RSI Very High ({rsi:.0f}) (+15)")
-        elif rsi > 70:
+        elif rsi > 68:  # تحسين: خفض من 70 إلى 68
             rsi_score = 12
             reasons.append(f"RSI Overbought ({rsi:.0f}) (+12)")
-        elif rsi > 65:
+        elif rsi > 63:  # تحسين: خفض من 65 إلى 63
             rsi_score = 9
             reasons.append(f"RSI High ({rsi:.0f}) (+9)")
-        elif rsi > 60:
+        elif rsi > 58:  # تحسين: خفض من 60 إلى 58
             rsi_score = 6
             reasons.append(f"RSI Elevated ({rsi:.0f}) (+6)")
         else:
@@ -897,8 +897,8 @@ def analyze_peak(df, rsi):
         # =========================================================
         confidence_percent = min(total_score, 110)
         
-        # إشارة القمة: نقاط كافية أو RSI عالي جداً مع هبوط من القمة
-        is_candle_signal = confidence_percent >= MIN_CONFIDENCE or (rsi >= 75 and drop_percent >= PEAK_DROP_THRESHOLD)
+        # إشارة القمة: نقاط كافية أو RSI عالي مع هبوط من القمة
+        is_candle_signal = confidence_percent >= MIN_CONFIDENCE or (rsi >= 70 and drop_percent >= PEAK_DROP_THRESHOLD)
         
         if trap_is_filter and is_candle_signal:
             is_candle_signal = False
