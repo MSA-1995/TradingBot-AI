@@ -66,7 +66,7 @@ class ExitStrategyModel:
             return {'action': 'HOLD', 'reason': 'Error in analysis'}
     
     def _check_smart_tp(self, symbol, profit_percent, position, analysis, mtf, history):
-        """فحص TP الذكي"""
+        """فحص TP الذكي - محسّن"""
         try:
             # TP الافتراضي
             tp_target = position.get('tp_target', 1.0)
@@ -86,19 +86,29 @@ class ExitStrategyModel:
                 macd_diff = analysis.get('macd_diff', 0)
                 trend = mtf.get('trend', 'neutral')
                 
-                # لو السوق قوي، ننتظر (شروط أوسع)
+                # لو السوق قوي، ننتظر (شروط وسطية محسّنة)
                 market_strong = (
                     (rsi < 70 and macd_diff > 0) or  # RSI معقول و MACD إيجابي
-                    (trend in ['bullish', 'strong_bullish']) or  # الاتجاه صاعد
-                    (profit_percent < tp_target + 0.3)  # قريب من الحد الأدنى
+                    (trend in ['bullish', 'strong_bullish'])  # الاتجاه صاعد
                 )
                 
-                if market_strong:
+                # لكن إذا الربح كبير جداً (> TP + 0.5%)، نبيع مباشرة
+                if profit_percent >= tp_target + 0.5:
+                    return {
+                        'action': 'SELL',
+                        'reason': f'HIGH PROFIT {profit_percent:.1f}%',
+                        'profit': profit_percent,
+                        'confidence': 95
+                    }
+                
+                # إذا السوق قوي والربح قريب من TP، ننتظر
+                if market_strong and profit_percent < tp_target + 0.3:
                     return {
                         'action': 'HOLD',
                         'reason': f'TP {tp_target}% reached but market strong'
                     }
                 
+                # وإلا نبيع
                 return {
                     'action': 'SELL',
                     'reason': f'SMART TP {tp_target}%',
@@ -116,14 +126,14 @@ class ExitStrategyModel:
         return {'action': 'HOLD'}
     
     def _check_smart_bearish(self, symbol, profit_percent, mtf, analysis, history):
-        """فحص Bearish Exit الذكي"""
+        """فحص Bearish Exit الذكي - محسّن"""
         try:
             trend = mtf.get('trend', 'neutral')
             
             # Bearish قوي
             if trend in ['bearish', 'strong_bearish']:
                 # لو الربح إيجابي، نبيع
-                if profit_percent > 0.1:
+                if profit_percent > 0.3:
                     return {
                         'action': 'SELL',
                         'reason': 'BEARISH TREND',
@@ -132,7 +142,7 @@ class ExitStrategyModel:
                     }
                 
                 # لو الخسارة صغيرة والسوق bearish جداً
-                if profit_percent > -1 and trend == 'strong_bearish':
+                if profit_percent > -0.8 and trend == 'strong_bearish':
                     return {
                         'action': 'SELL',
                         'reason': 'STRONG BEARISH',
@@ -145,7 +155,7 @@ class ExitStrategyModel:
             macd_diff = analysis.get('macd_diff', 0)
             
             # إشارات bearish قوية
-            if rsi > 70 and macd_diff < -5 and profit_percent > 0:
+            if rsi > 70 and macd_diff < -3 and profit_percent > 0.2:
                 return {
                     'action': 'SELL',
                     'reason': 'OVERBOUGHT + BEARISH MACD',
