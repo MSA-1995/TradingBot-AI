@@ -320,6 +320,8 @@ class Meta:
 
     def should_sell(self, symbol, position, current_price, analysis, mtf, candles=None):
         """القرار الذكي: هل نبيع؟ (صائد القمم الجديد)"""
+        from config import MIN_SELL_CONFIDENCE
+        
         buy_price = position['buy_price']
         profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
 
@@ -353,8 +355,8 @@ class Meta:
         peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
         candle_condition = peak_analysis.get('candle_signal', False)
 
-        # متوازن: نقاط ≥55 أو شمعة قمة قوية
-        trigger_activated = candle_condition or peak_score >= 55
+        # متوازن: نقاط ≥MIN_SELL_CONFIDENCE أو شمعة قمة قوية
+        trigger_activated = candle_condition or peak_score >= MIN_SELL_CONFIDENCE
 
         if not trigger_activated:
             return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/110', 'profit': profit_percent}
