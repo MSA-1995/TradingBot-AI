@@ -28,8 +28,21 @@ def execute_buy(exchange, symbol, amount_usd, price, confidence):
         return {'success': False, 'error': str(e)}
 
 def execute_sell(exchange, symbol, amount, reason=""):
-    """Execute sell order"""
+    """Execute sell order with balance check"""
     try:
+        # تحقق من الرصيد المتاح قبل البيع
+        balance = exchange.fetch_balance()
+        base_currency = symbol.split('/')[0]
+        available_amount = balance.get(base_currency, {}).get('free', 0)
+        
+        if available_amount < amount:
+            # بيع الرصيد المتاح فقط
+            amount = available_amount
+            if amount <= 0:
+                print(f"⚠️ No balance to sell {symbol}")
+                return {'success': False, 'error': 'No balance available'}
+            print(f"⚠️ Adjusted sell amount to available balance: {amount}")
+        
         order = exchange.create_market_sell_order(symbol, amount)
         
         return {
