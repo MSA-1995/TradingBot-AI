@@ -6,7 +6,7 @@ All bot settings and constants
 # Trading Parameters
 
 MIN_CONFIDENCE = 50  # الحد الأدنى للشراء (50/110)
-MIN_SELL_CONFIDENCE = 50  # الحد الأدنى للبيع (55/110) - أعلى للصبر وحلب العملة
+MIN_SELL_CONFIDENCE = 60  # الحد الأدنى للبيع (60/110) - أعلى للصبر وحلب العملة
 MAX_POSITIONS = 50  # الحد الأقصى للصفقات المفتوحة (كل العملات)
 TOTAL_COINS_TO_SCAN = 50
 
