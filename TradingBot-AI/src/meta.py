@@ -264,12 +264,12 @@ class Meta:
         # الشرط 1: نقاط كافية (Reversal ≥ MIN_CONFIDENCE)
         if reversal.get('candle_signal', False):
             king_wants_to_buy = True
-            king_reason = f"King: Reversal Signal ({candle_score}/100)"
+            king_reason = f"King: Reversal Signal ({candle_score}/110)"
         
         # الشرط 2: أو ثقة الملك عالية (temp_conf ≥ MIN_CONFIDENCE)
         elif temp_conf >= MIN_CONFIDENCE:
             king_wants_to_buy = True
-            king_reason = f"King: High Confidence ({temp_conf}/100)"
+            king_reason = f"King: High Confidence ({temp_conf}/110)"
         
         # =========================================================
         # 🗳️ 7. التصويت الفوري بعد قرار الملك
@@ -450,10 +450,10 @@ class Meta:
         # قرار البيع: نقاط ≥ MIN_CONFIDENCE + تصويت كافي
         if sell_vote_count >= min_votes_needed:
             action = 'SELL'
-            reason = f"SELL | Score:{peak_score}/100 | {', '.join(sell_reasons[:3])}"
+            reason = f"SELL | Score:{peak_score}/110 | {', '.join(sell_reasons[:3])}"
         else:
             action = 'HOLD'
-            reason = f"Hold | Score:{peak_score}/{MIN_CONFIDENCE}"
+            reason = f"Hold | Score:{peak_score}/110"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
