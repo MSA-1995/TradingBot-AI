@@ -410,14 +410,6 @@ class Meta:
             sell_conf += 15
             sell_reasons.append("EMA Death Cross")
 
-        # The 'peak_analysis' variable is already defined above
-        peak_confidence = peak_analysis.get('confidence', 0)
-        peak_reasons = peak_analysis.get('reasons', [])
-
-        if peak_confidence > 0:
-            sell_conf += peak_confidence
-            sell_reasons.extend(peak_reasons)
-
         # --- 📰 تعديل ثقة البيع بالأخبار (مُعدِّل فقط، لا يحكم) ---
         # للبيع: أخبار إيجابية = تخفض رغبة البيع | أخبار سلبية = ترفعها
         news_boost, news_summary = self._get_news_confidence_modifier(symbol)
@@ -492,27 +484,26 @@ class Meta:
         # --- 4. القرار الملكي النهائي: نقاط + التصويت (مع صبر لحلب العملة) ---
         min_votes_needed = mood_details.get('min_votes_needed', 4)
         total_advisors = mood_details.get('total_advisors', 7)
-        peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
         
-        # تحسين: إذا النقاط عالية جداً (≥70) أو RSI عالي جداً (≥75)، نبيع بتصويت أقل
-        urgent_sell = peak_score >= 70 or rsi >= 75
+        # تحسين: إذا النقاط عالية جداً (≥MIN_SELL_CONFIDENCE+10) أو RSI عالي جداً (≥75)، نبيع بتصويت أقل
+        urgent_sell = sell_conf >= MIN_SELL_CONFIDENCE + 10 or rsi >= 75
         
         if urgent_sell:
             # حالة طوارئ: نحتاج 3/7 فقط
             if sell_vote_count >= 3:
                 action = 'SELL'
-                reason = f"URGENT SELL | Score:{peak_score}/110 | RSI:{rsi:.0f} | {', '.join(sell_reasons[:3])}"
+                reason = f"URGENT SELL | Score:{sell_conf}/110 | RSI:{rsi:.0f} | {', '.join(sell_reasons[:3])}"
             else:
                 action = 'HOLD'
-                reason = f"Hold | Score:{peak_score}/110 | Need 3 votes (got {sell_vote_count})"
+                reason = f"Hold | Score:{sell_conf}/110 | Need 3 votes (got {sell_vote_count})"
         else:
             # حالة عادية: نحتاج التصويت الكامل
             if sell_vote_count >= min_votes_needed:
                 action = 'SELL'
-                reason = f"SELL | Score:{peak_score}/110 | {', '.join(sell_reasons[:3])}"
+                reason = f"SELL | Score:{sell_conf}/110 | {', '.join(sell_reasons[:3])}"
             else:
                 action = 'HOLD'
-                reason = f"Hold | Score:{peak_score}/110"
+                reason = f"Hold | Score:{sell_conf}/110"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
