@@ -274,7 +274,7 @@ class Meta:
         # =========================================================
         # 🗳️ 7. التصويت الفوري بعد قرار الملك
         # =========================================================
-        if king_wants_to_buy and market_mood != "Bearish":
+        if king_wants_to_buy:
             # الملك قال: أريد الشراء
             # المستشارين: موافقين؟
             if buy_vote_count >= min_votes_needed:
@@ -283,9 +283,6 @@ class Meta:
             else:
                 action = "DISPLAY"
                 reason = f"King:{temp_conf}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed} (Need {min_votes_needed})"
-        elif king_wants_to_buy and market_mood == "Bearish":
-            action = "DISPLAY"
-            reason = f"Blocked (Bearish Market) | King:{temp_conf}"
         else:
             # الملك مو راضي
             reason = f"King Confidence:{temp_conf}/{MIN_CONFIDENCE} | Need {min_votes_needed} votes"
@@ -353,7 +350,8 @@ class Meta:
         peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
         candle_condition = peak_analysis.get('candle_signal', False)
 
-        trigger_activated = candle_condition
+        # البيع يتطلب: شمعة قمة + نقاط كافية (لتجنب البيع المبكر)
+        trigger_activated = candle_condition and peak_score >= MIN_CONFIDENCE
 
         if not trigger_activated:
             return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/{MIN_CONFIDENCE}', 'profit': profit_percent}
