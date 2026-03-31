@@ -240,7 +240,35 @@ def analyze_reversal(df, rsi):
         total_score += volume_score
         score_breakdown['volume'] = volume_score
         
-        # --- 6. Volume Divergence - 10 نقاط ---
+        # --- 6. Trap Detection (Volume Spike + Wick Rejection) - 15 نقاط ---
+        trap_score = 0
+        if len(df) >= 20:
+            current_candle = df.iloc[-1]
+            avg_volume = df['volume'].tail(20).mean()
+            current_volume = current_candle['volume']
+            
+            # Volume Spike Detection (> 3x average = potential trap)
+            if avg_volume > 0 and current_volume > avg_volume * 3.0:
+                candle_body = abs(current_candle['close'] - current_candle['open'])
+                candle_range = current_candle['high'] - current_candle['low']
+                
+                if candle_range > 0:
+                    upper_shadow = current_candle['high'] - max(current_candle['close'], current_candle['open'])
+                    lower_shadow = min(current_candle['close'], current_candle['open']) - current_candle['low']
+                    
+                    # Wick Rejection: long upper shadow (> 3x body) = trap
+                    if candle_body > 0 and upper_shadow > candle_body * 3.0:
+                        trap_score = -15  # Penalty for detected trap
+                        reasons.append(f"⚠️ Trap Detected (Vol {current_volume/avg_volume:.1f}x + Long Wick) (-15)")
+                    elif candle_body > 0 and lower_shadow > candle_body * 3.0:
+                        # Long lower shadow = rejection (good for bottom)
+                        trap_score = 10
+                        reasons.append(f"✅ Rejection Detected (Long Lower Wick) (+10)")
+        
+        total_score += trap_score
+        score_breakdown['trap_detection'] = trap_score
+        
+        # --- 7. Volume Divergence - 10 نقاط ---
         # السعر يصل قاع أ lower لكن الحجم يقل = بائعين متعبين = قاع حقيقي
         vol_div_score = 0
         if len(df) >= 10:
@@ -601,7 +629,35 @@ def analyze_peak(df, rsi):
         total_score += volume_score
         score_breakdown['volume'] = volume_score
         
-        # --- 6. Volume Divergence - 10 نقاط ---
+        # --- 6. Trap Detection (Volume Spike + Wick Rejection) - 15 نقاط ---
+        trap_score = 0
+        if len(df) >= 20:
+            current_candle = df.iloc[-1]
+            avg_volume = df['volume'].tail(20).mean()
+            current_volume = current_candle['volume']
+            
+            # Volume Spike Detection (> 3x average = potential trap)
+            if avg_volume > 0 and current_volume > avg_volume * 3.0:
+                candle_body = abs(current_candle['close'] - current_candle['open'])
+                candle_range = current_candle['high'] - current_candle['low']
+                
+                if candle_range > 0:
+                    upper_shadow = current_candle['high'] - max(current_candle['close'], current_candle['open'])
+                    lower_shadow = min(current_candle['close'], current_candle['open']) - current_candle['low']
+                    
+                    # Wick Rejection: long upper shadow (> 3x body) = trap at peak
+                    if candle_body > 0 and upper_shadow > candle_body * 3.0:
+                        trap_score = 15  # Good signal for peak detection
+                        reasons.append(f"✅ Wick Rejection at Peak (Long Upper Wick) (+15)")
+                    elif candle_body > 0 and lower_shadow > candle_body * 3.0:
+                        # Long lower shadow at peak = fake dip trap
+                        trap_score = -15
+                        reasons.append(f"⚠️ Fake Dip Trap (Long Lower Wick) (-15)")
+        
+        total_score += trap_score
+        score_breakdown['trap_detection'] = trap_score
+        
+        # --- 7. Volume Divergence - 10 نقاط ---
         # السعر يصل قمة أعلى لكن الحجم يقل = قوة مختفية = قمة حقيقية
         vol_div_score = 0
         if len(df) >= 10:
