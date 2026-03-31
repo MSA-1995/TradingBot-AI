@@ -533,7 +533,7 @@ def analyze_reversal(df, rsi):
         # =========================================================
         # 🎯 القرار النهائي (المجموع = 100 نقطة)
         # =========================================================
-        confidence_percent = min(int((total_score / 100) * 100), 100)
+        confidence_percent = min(total_score, 100)
         is_candle_signal = confidence_percent >= MIN_CONFIDENCE
         
         if trap_is_filter and is_candle_signal:
@@ -589,10 +589,6 @@ def analyze_peak(df, rsi):
     }
 
     if df is None or len(df) < 8:
-        return base_result
-
-    if rsi > 75:
-        base_result['reasons'].append(f'RSI Overbought ({rsi:.0f})')
         return base_result
 
     try:
@@ -869,8 +865,10 @@ def analyze_peak(df, rsi):
         # =========================================================
         # 🎯 القرار النهائي (المجموع = 100 نقطة)
         # =========================================================
-        confidence_percent = min(int((total_score / 100) * 100), 100)
-        is_candle_signal = confidence_percent >= MIN_CONFIDENCE
+        confidence_percent = min(total_score, 100)
+        
+        # إشارة القمة: نقاط كافية أو RSI عالي جداً مع هبوط من القمة
+        is_candle_signal = confidence_percent >= MIN_CONFIDENCE or (rsi >= 75 and drop_percent >= PEAK_DROP_THRESHOLD)
         
         if trap_is_filter and is_candle_signal:
             is_candle_signal = False
