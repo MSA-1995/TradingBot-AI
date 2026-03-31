@@ -288,7 +288,7 @@ class Meta:
             reason = f"Blocked (Bearish Market) | King:{temp_conf}"
         else:
             # الملك مو راضي
-            reason = f"Wait | King Confidence:{temp_conf}/{MIN_CONFIDENCE}"
+            reason = f"King Confidence:{temp_conf}/{MIN_CONFIDENCE} | Need {min_votes_needed} votes"
 
         decision = {
             'action': action,
