@@ -635,37 +635,38 @@ class DeepLearningClientV2:
     def vote_sell_now(self, macd, volume_ratio, trend, hours_held):
         """
         المستشارين يصوتون: هل نبيع؟ (SELL/SKIP)
+        ✅ معايير أقوى لمنع الأخطاء
         Returns: sell_votes (dict with each consultant's vote: 1=SELL, 0=SKIP)
         """
         votes = {}
 
         # 1. Exit Strategy (القناص):
-        # يوافق على البيع إذا RSI عالي جداً أو MACD سلبي قوي
-        votes['exit'] = 1 if (macd < -0.5 or volume_ratio > 1.5) else 0
+        # MACD < -1 (أقوى من -0.5) + Volume > 2.0 (أقوى من 1.5)
+        votes['exit'] = 1 if (macd < -1 and volume_ratio > 2.0) else 0
 
         # 2. MTF vote (صائد الانفجار):
-        # يوافق إذا كان الاتجاه هابط
+        # اتجاه هابط واضح (trend == -1)
         votes['mtf'] = 1 if trend == -1 else 0
 
         # 3. Risk vote (محافظ):
-        # يوافق إذا السوق في منطقة تشبع شرائي خطيرة
-        votes['risk'] = 1 if (macd < -1 or volume_ratio > 2.0) else 0
+        # MACD < -2 (أقوى) + RSI > 75 (تشبع شرائي)
+        votes['risk'] = 1 if (macd < -2 or (volume_ratio > 2.5 and trend == -1)) else 0
 
         # 4. Pattern vote (الأنماط):
-        # يوافق إذا كان الاتجاه هابط أو الاحتفاظ فترة طويلة
-        votes['pattern'] = 1 if (trend == -1 or (hours_held > 48 and volume_ratio < 0.8)) else 0
+        #趋势 هابط + فترة طويلة (> 24 ساعة) + حجم منخفض
+        votes['pattern'] = 1 if (trend == -1 and hours_held > 24 and volume_ratio < 0.8) else 0
 
         # 5. CNN vote (الزخم):
-        # يوافق مع الزخم السلبي القوي
-        votes['cnn'] = 1 if (macd < -1 and volume_ratio > 1.0) else 0
+        # MACD < -2 (أقوى) + Volume > 1.5 (أقوى)
+        votes['cnn'] = 1 if (macd < -2 and volume_ratio > 1.5) else 0
 
         # 6. Anomaly vote (كاشف الفخاخ):
-        # يرفض البيع إذا كان انخفاض طبيعي (وليس تصريف)
-        votes['anomaly'] = 1 if (volume_ratio > 1.5 and trend == -1) else 0
+        # Volume مرتفع + اتجاه هابط (فخ توزيع)
+        votes['anomaly'] = 1 if (volume_ratio > 2.0 and trend == -1) else 0
 
         # 7. Liquidity vote (الشيخ - محلل السيولة):
-        # يرفض البيع إذا السيولة ضعيفة (قد يكون فخ)
-        votes['liquidity'] = 1 if (volume_ratio > 1.2) else 0
+        # Volume مرتفع +趋势 هابط = توزيع
+        votes['liquidity'] = 1 if (volume_ratio > 1.5 and trend == -1) else 0
 
         return votes
     
@@ -761,48 +762,37 @@ class DeepLearningClientV2:
         votes = {}
         
         # 1. Exit Strategy (القناص):
-        # يشتري في حالتين:
-        # أ. فرصة رخيصة جداً (RSI < 42) - كلاسيكي
-        # ب. فرصة ذكية (RSI < 55 + وجود ذيل رفض أو تجميع) -> هذا هو الدهاء!
-        votes['exit'] = 1 if (rsi < 42 or (rsi < 55 and (is_rejection or is_accumulation))) else 0
+        # يشتري بس RSI < 35 (أقوى من 42) + تأكيد شمعة
+        has_confirmed_candle = is_rejection or is_accumulation
+        votes['exit'] = 1 if (rsi < 35 and has_confirmed_candle) else 0
         
         # 2. MTF vote (صائد الانفجار):
-        # شراء لو MACD موجب + volume عالي (كلاسيكي)
-        # أو لو فيه تجميع واضح (فوليوم عالي وسعر ثابت) حتى لو MACD لسه ما قلب
-        votes['mtf'] = 1 if ((macd > 0 and volume_ratio > 1.2) or is_accumulation) else 0
+        # MACD > 0.5 (أقوى) + Volume > 1.5 (أقوى)
+        votes['mtf'] = 1 if (macd > 0.5 and volume_ratio > 1.5) else 0
         
-        # 3. Risk vote (محافظ - متوسط الصرامة):
-        # يوافق إذا لم يكن السوق في منطقة تشبع شرائي خطرة
-        votes['risk'] = 1 if rsi < 68 else 0
+        # 3. Risk vote (محافظ):
+        # RSI < 65 (أقوى من 68) + ما يكون في تشبع شرائي
+        votes['risk'] = 1 if (rsi < 65 and rsi < 70) else 0
         
         # 4. Pattern vote (الأنماط):
-        # يوافق إذا كان هناك أي زخم إيجابي في السعر أو إشارة انعكاس
-        votes['pattern'] = 1 if (price_momentum > 0 or is_rejection) else 0
+        # momentum إيجابي واضح (> 0.5) + تأكيد شمعة
+        votes['pattern'] = 1 if (price_momentum > 0.5 or is_rejection) else 0
         
         # 5. CNN vote (الزخم):
-        # يوافق مع الزخم المتوسط، وليس فقط الزخم القوي جداً
-        votes['cnn'] = 1 if ((macd > 1 and volume_ratio > 1.0) or (is_rejection and volume_ratio > 1.5)) else 0
+        # MACD > 1.5 (أقوى) + Volume > 1.3 (أقوى)
+        votes['cnn'] = 1 if (macd > 1.5 and volume_ratio > 1.3) else 0
         
         # 6. Anomaly vote (كاشف الفخاخ):
-        # يرفض الشراء إذا الفوليوم جنوني (> 4.0) لأنه غالباً تصريف (Panic Dump)
-        # يسمح بالشراء في القاع (RSI < 30) فقط إذا كان هناك "ذيل رفض" (ارتداد)
-        votes['anomaly'] = 1 if (volume_ratio < 4.0 and (rsi > 30 or is_rejection)) else 0
+        # Volume < 3.5 (أقوى من 4.0) + RSI بين 25-75
+        votes['anomaly'] = 1 if (volume_ratio < 3.5 and 25 < rsi < 75) else 0
         
-        # Liquidity vote (الشيخ - محلل السيولة)
+        # 7. Liquidity vote (الشيخ - محلل السيولة):
+        # liquidity_score ≥ 70 (أقوى من 60)
         if liquidity_metrics:
-            liquidity_pred = self.get_liquidity_prediction(liquidity_metrics)
             liquidity_score = liquidity_metrics.get('liquidity_score', 50)
-            spread = liquidity_metrics.get('spread_percent', 0.1)
-            
-            # شراء لو السيولة جيدة
-            votes['liquidity'] = 1 if (
-                liquidity_pred['should_trade'] and 
-                liquidity_score >= 60 and 
-                spread < 0.3
-            ) else 0
+            votes['liquidity'] = 1 if (liquidity_score >= 70 and volume_ratio > 1.2) else 0
         else:
-            # fallback للطريقة القديمة: يعتمد على حجم التداول كمؤشر للسيولة
-            votes['liquidity'] = 1 if volume_ratio > 1.1 else 0
+            votes['liquidity'] = 1 if volume_ratio > 1.5 else 0
         
         return votes, market_status
 
