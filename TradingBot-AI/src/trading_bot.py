@@ -234,8 +234,8 @@ if NEWS_ENABLED:
     print(f"📰 News Sentiment Analyzer: ACTIVE")
 
 print(f"💰 Amount: ~$15 (Dynamic)")
-print(f"🎯 TP: Dynamic | SL: Dynamic TSL (ATR Based, 1%-5%)")
-print(f"🎯 Min Buy Confidence: {MIN_CONFIDENCE}/145\n")
+print(f"🎯 TP: Dynamic | SL: Dynamic TSL (ATR Based, -2%)")
+print(f"🎯 Min Buy Confidence: {MIN_CONFIDENCE}/100\n")
 
 # Startup notification calls removed for simplification.
 # load_status_message_id()
