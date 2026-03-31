@@ -884,7 +884,8 @@ def get_market_analysis(exchange, symbol, limit=120):
             'reversal': reversal_analysis,
             'peak': peak_analysis,
             'price_drop': price_drop, # إضافة تحليل هبوط السعر
-            # بيانات السيولة (مفروطة)
+            # بيانات السيولة (مع مفتاح + منشورة)
+            'liquidity_metrics': liquidity_metrics,
             **liquidity_metrics,
             # بيانات السوق العام (Top 3)
             'btc_change_1h': btc_change_1h,
