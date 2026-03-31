@@ -534,51 +534,21 @@ class DeepLearningClientV2:
             if risk_result['risk_level'] == 'high':
                 consultants_adjustment -= 5
             
-            # 👑 استشارة الملك (القرار النهائي)
-            brain_result = self.get_ai_brain_prediction(
-                rsi, macd, volume_ratio, price_momentum, confidence,
-                mtf_score=mtf_boost,
-                risk_score=risk_result['confidence_adjustment'],
-                anomaly_score=1 if anomaly_result['is_anomaly'] else 0,
-                exit_score=0,
-                pattern_score=pattern_result['confidence_adjustment'],
-                ranking_score=ranking_result['confidence_adjustment'],
-                cnn_score=cnn_result['confidence_adjustment']
-            )
-            
-            # الملك يقرر
-            if not brain_result['should_buy']:
-                return {
-                    'action': 'SKIP',
-                    'reason': 'AI Brain rejected',
-                    'confidence_adjustment': brain_result['confidence_boost']
-                }
-            
-            # حساب التعديل النهائي (المستشارين + الملك)
-            total_adjustment = consultants_adjustment + brain_result['confidence_boost']
-            
+            # الملك (Meta) يقرر في meta.py، هنا نرجع نتيجة المستشارين فقط
             return {
-                'action': 'BUY' if total_adjustment > 0 else 'SKIP',
-                'reason': 'Consultants approved' if total_adjustment > 0 else 'Low confidence',
-                'confidence_adjustment': total_adjustment,
+                'action': 'BUY' if consultants_adjustment > 0 else 'SKIP',
+                'reason': 'Consultants approved' if consultants_adjustment > 0 else 'Low confidence',
+                'confidence_adjustment': consultants_adjustment,
                 'mtf_boost': mtf_boost,
                 'risk_level': risk_result['risk_level'],
                 'pattern_type': pattern_result['pattern_type'],
                 'rank_score': ranking_result['rank_score'],
-                'cnn_pattern': cnn_result['pattern_detected'],
-                'brain_boost': brain_result['confidence_boost']
+                'cnn_pattern': cnn_result['pattern_detected']
             }
         
         except Exception as e:
             print(f"⚠️ Buy decision error: {e}")
             return {'action': 'SKIP', 'confidence_adjustment': 0}
-    
-    def get_sell_decision(self, symbol, position, current_price, analysis):
-        """
-        قرار البيع الشامل (غير مستخدم - البيع عبر ai_brain.should_sell فقط)
-        """
-        # هذه الدالة غير مستخدمة - البيع يتم عبر ai_brain.should_sell + التصويت
-        return {'action': 'HOLD', 'reason': 'Use ai_brain.should_sell instead'}
     
     def is_available(self):
         """فحص إذا الموديلات متوفرة"""
