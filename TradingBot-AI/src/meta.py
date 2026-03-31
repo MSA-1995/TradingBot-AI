@@ -428,8 +428,9 @@ class Meta:
                     except:
                         pass
                 
-                # جلب التصويت من كل مستشار
-                sell_votes = dl_client.vote_sell_now(rsi, macd_diff, volume_ratio, price_momentum)
+                # جلب التصويت من كل مستشار (مع تحليل شموع القمة)
+                candle_analysis = {'is_peak': peak_analysis.get('candle_signal', False)}
+                sell_votes = dl_client.vote_sell_now(rsi, macd_diff, volume_ratio, price_momentum, liquidity_metrics, candle_analysis)
                 
                 if sell_votes:
                     total_advisors = len(sell_votes)
