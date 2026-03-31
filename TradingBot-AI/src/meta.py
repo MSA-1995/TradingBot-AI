@@ -282,7 +282,7 @@ class Meta:
                 reason = f"BUY ✅ | King:{temp_conf} | Votes:{buy_vote_count}/{min_votes_needed} | {', '.join(reasons[:3])}"
             else:
                 action = "DISPLAY"
-                reason = f"REJECTED ❌ | King:{temp_conf}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed}"
+                reason = f"King:{temp_conf}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed} (Need {min_votes_needed})"
         elif king_wants_to_buy and market_mood == "Bearish":
             action = "DISPLAY"
             reason = f"Blocked (Bearish Market) | King:{temp_conf}"
