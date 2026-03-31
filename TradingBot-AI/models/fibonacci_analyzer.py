@@ -42,7 +42,89 @@ class FibonacciAnalyzer:
         except:
             return None
     
-    def get_support_level(self, current_price, analysis):
+    def get_resistance_level(self, current_price, analysis):
+        """تحديد أقرب مستوى مقاومة فيبوناتشي"""
+        try:
+            high = analysis.get('high_24h')
+            low = analysis.get('low_24h')
+            
+            if not high or not low or high <= low:
+                return None
+            
+            # حساب المستويات
+            levels = self.calculate_levels(high, low)
+            if not levels:
+                return None
+            
+            # إيجاد أقرب مستوى مقاومة فوق السعر الحالي
+            resistance_levels = {k: v for k, v in levels.items() if v > current_price}
+            
+            if not resistance_levels:
+                return None
+            
+            # أقرب مستوى مقاومة
+            closest_level = min(resistance_levels.items(), key=lambda x: x[1])
+            level_name = closest_level[0]
+            level_price = closest_level[1]
+            
+            # المسافة من السعر الحالي
+            distance_percent = ((level_price - current_price) / current_price) * 100
+            
+            return {
+                'level': level_name,
+                'price': level_price,
+                'distance': distance_percent,
+                'high': high,
+                'low': low,
+                'all_levels': levels
+            }
+        except Exception as e:
+            return None
+    
+    def is_at_resistance(self, current_price, analysis, tolerance=0.5, volume_ratio=1.0, symbol=''):
+        """هل السعر عند مستوى مقاومة فيبوناتشي؟ (للبيع)"""
+        try:
+            # 🚨 فحص RSI أولاً - إذا تشبع بيعي لا تضيف نقاط!
+            rsi = analysis.get('rsi', 50)
+            if rsi < 30:
+                return False, 0  # RSI منخفض = قد يرتد، لا تبيع
+            
+            resistance = self.get_resistance_level(current_price, analysis)
+            if not resistance:
+                return False, 0
+            
+            distance = resistance['distance']
+            level = resistance['level']
+            
+            # إذا السعر قريب من مستوى مقاومة (أقل من tolerance%)
+            if distance <= tolerance:
+                # حساب Boost الأساسي
+                if level in ['61.8', '50']:
+                    base_boost = 12  # boost قوي
+                elif level in ['38.2', '78.6']:
+                    base_boost = 8   # boost متوسط
+                else:
+                    base_boost = 5   # boost ضعيف
+                
+                # تعديل حسب قوة المستوى (من التاريخ)
+                level_strength = self.get_level_strength(level)
+                base_boost = int(base_boost * level_strength)
+                
+                # تعديل حسب Volume
+                if volume_ratio < 0.7:
+                    base_boost = int(base_boost * 1.3)  # volume ضعيف = مقاومة أقوى
+                elif volume_ratio > 1.5:
+                    base_boost = int(base_boost * 0.8)  # volume عالي = قد يخترق
+                
+                # تعديل حسب العملة
+                if 'BTC' in symbol or 'ETH' in symbol:
+                    base_boost = int(base_boost * 1.2)  # العملات الكبيرة أقوى
+                
+                return True, base_boost
+            
+            return False, 0
+        except:
+            return False, 0
         """تحديد أقرب مستوى دعم فيبوناتشي"""
         try:
             high = analysis.get('high_24h')
