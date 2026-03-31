@@ -610,7 +610,7 @@ def analyze_peak(df, rsi):
         reasons = []
         score_breakdown = {}
         
-        # --- 1. الشموع والأنماط - 40 نقطة (أقوى للبيع السريع) ---
+        # --- 1. الشموع والأنماط - 35 نقطة (متوازن مع تأكيد) ---
         candle_signal = False
         pattern_score = 0
         pattern_name = ""
@@ -639,10 +639,10 @@ def analyze_peak(df, rsi):
             
             if is_shooting_star:
                 candle_signal = True
-                pattern_score = 40
+                pattern_score = 35
                 pattern_name = "Shooting Star"
                 pattern_found_idx = i
-                reasons.append(f"{pattern_name} (+40)")
+                reasons.append(f"{pattern_name} (+35)")
                 break
             
             if i + 1 < len(df):
@@ -659,10 +659,10 @@ def analyze_peak(df, rsi):
                 
                 if is_bearish_engulfing:
                     candle_signal = True
-                    pattern_score = 40
+                    pattern_score = 35
                     pattern_name = "Bearish Engulfing"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+40)")
+                    reasons.append(f"{pattern_name} (+35)")
                     break
             
             if i + 2 < len(df) and i <= 3:
@@ -687,10 +687,10 @@ def analyze_peak(df, rsi):
                 
                 if is_evening_star:
                     candle_signal = True
-                    pattern_score = 40
+                    pattern_score = 35
                     pattern_name = "Evening Star"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+40)")
+                    reasons.append(f"{pattern_name} (+35)")
                     break
             
             if i + 2 < len(df) and i <= 3:
@@ -710,10 +710,10 @@ def analyze_peak(df, rsi):
                 
                 if is_three_crows:
                     candle_signal = True
-                    pattern_score = 40
+                    pattern_score = 35
                     pattern_name = "Three Black Crows"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+40)")
+                    reasons.append(f"{pattern_name} (+35)")
                     break
             
             if i + 1 < len(df):
@@ -731,10 +731,10 @@ def analyze_peak(df, rsi):
                 
                 if is_dark_cloud:
                     candle_signal = True
-                    pattern_score = 40
+                    pattern_score = 35
                     pattern_name = "Dark Cloud Cover"
                     pattern_found_idx = i
-                    reasons.append(f"{pattern_name} (+40)")
+                    reasons.append(f"{pattern_name} (+35)")
                     break
         
         total_score += pattern_score
