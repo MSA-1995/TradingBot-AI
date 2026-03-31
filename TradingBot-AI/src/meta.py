@@ -365,6 +365,8 @@ class Meta:
         macd_diff = analysis.get('macd_diff', 0)
         volume_ratio = analysis.get('volume_ratio', 1.0)
         ema_crossover = analysis.get('ema_crossover', 0)
+        price_momentum = analysis.get('price_momentum', 0)
+        liquidity_metrics = analysis.get('liquidity_metrics', {})
 
         if rsi >= 70:
             sell_conf += 25
@@ -428,8 +430,8 @@ class Meta:
                 
                 # جلب التصويت من كل مستشار
                 sell_votes = dl_client.vote_sell_now(
-                    macd=macd_diff, volume_ratio=volume_ratio,
-                    trend=trend_numeric, hours_held=hours_held
+                    rsi=rsi, macd=macd_diff, volume_ratio=volume_ratio,
+                    price_momentum=price_momentum, liquidity_metrics=liquidity_metrics
                 )
                 
                 if sell_votes:
