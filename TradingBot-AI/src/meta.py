@@ -372,18 +372,24 @@ class Meta:
         liquidity_metrics = analysis.get('liquidity_metrics', {})
 
         # --- 🎯 Profit Target (هدف الربح - حلب العملة) ---
-        if profit_percent >= 2.0:
-            sell_conf += 15
-            sell_reasons.append(f"Profit Target +{profit_percent:.1f}%")
+        if profit_percent >= 2.5:
+            sell_conf += 20
+            sell_reasons.append(f"Excellent Profit +{profit_percent:.1f}%")
+        elif profit_percent >= 2.0:
+            sell_conf += 18
+            sell_reasons.append(f"Great Profit +{profit_percent:.1f}%")
         elif profit_percent >= 1.5:
-            sell_conf += 12
+            sell_conf += 15
             sell_reasons.append(f"Good Profit +{profit_percent:.1f}%")
         elif profit_percent >= 1.0:
-            sell_conf += 8
+            sell_conf += 10
             sell_reasons.append(f"Target Profit +{profit_percent:.1f}%")
         elif profit_percent >= 0.5:
-            sell_conf += 4
+            sell_conf += 5
             sell_reasons.append(f"Small Profit +{profit_percent:.1f}%")
+        elif profit_percent < 0:
+            sell_conf -= 10
+            sell_reasons.append(f"Losing Position {profit_percent:.1f}%")
 
         if rsi >= 72:  # تحسين: رفع من 70 إلى 72 للصبر
             sell_conf += 25
