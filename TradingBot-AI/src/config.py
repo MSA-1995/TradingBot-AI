@@ -25,13 +25,8 @@ BASE_AMOUNT = 12
 # 1. تصويت المستشارين (-0.8% إلى -1.2%)
 # 2. Trailing Stop -2% من أعلى سعر (جدار نهائي)
 
-# Dynamic Trailing Stop-Loss
-USE_DYNAMIC_TRAILING_STOP = True  # Master switch for the feature
-ATR_PERIOD = 14  # Period for ATR calculation
-ATR_MULTIPLIER = 2.0  # Multiplier for ATR to set stop-loss. Higher value = wider stop-loss
-
 VOLUME_SPIKE_FACTOR = 0.8 # Multiplier for detecting significant volume spikes (lowered for more opportunities)
-PEAK_DROP_THRESHOLD = 1.5   # % هبوط من القمة يعتبر إشارة بيع (0.5% = وسط)
+PEAK_DROP_THRESHOLD = 2.0   # % هبوط من القمة يعتبر إشارة بيع (Dynamic Trailing Stop-Loss)
 BOTTOM_BOUNCE_THRESHOLD = 2.0  # % ارتداد من القاع يعتبر إشارة شراء (0.5% = وسط)
 REVERSAL_CANDLES = 10       # عدد الشموع للبحث عن القاع والقمة (أسرع)
 
@@ -53,7 +48,7 @@ REPORT_INTERVAL = 1800  # بالثواني، كل 30 دقيقة
 # 'file' is for local/testing (uses data/bot_status_message_id.txt)
 STATUS_STORAGE_METHOD = 'file' # or 'database'
 
-# قائمة العملات الثابتة (Top 50 by Market Cap - March 2026)
+# قائمة العملات المضمونة من Binance (أقوى 50 عملة بالحجم)
 SYMBOLS = [
     'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'BNB/USDT',
     'DOGE/USDT', 'TRX/USDT', 'ADA/USDT', 'LINK/USDT', 'SUI/USDT',
