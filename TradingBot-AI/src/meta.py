@@ -332,30 +332,20 @@ class Meta:
                 'reason': f'TRAILING STOP -{drop_from_high:.1f}%',
                 'profit': profit_percent
             }
-
+        
         # --- 🚨 1.5 Flash Crash Protection في البيع ---
         flash_crash = analysis.get('flash_crash_protection', {})
         flash_risk = flash_crash.get('risk_score', 0)
         
-        # خطر حرج - بيع فوراً
-        if flash_risk >= 70:
+        # خطر حرج أو عالي - بيع الكل فوراً
+        if flash_risk >= 50:
             return {
                 'action': 'SELL',
-                'reason': f'🚨 FLASH CRASH - Emergency Sell ({flash_risk}%)',
+                'reason': f'🚨 Flash Risk ({flash_risk}%) - Emergency Sell',
                 'profit': profit_percent,
                 'flash_risk': flash_risk
             }
         
-        # خطر عالي - بيع 50%
-        if flash_risk >= 50:
-            return {
-                'action': 'SELL',
-                'reason': f'⚠️ High Risk - Partial Sell ({flash_risk}%)',
-                'profit': profit_percent,
-                'flash_risk': flash_risk,
-                'partial_sell': 0.5
-            }
-
         mood_details = self._get_market_mood(analysis)
 
         # --- 2. صائد القمم (نظام النقاط الذكي) ---
