@@ -249,7 +249,7 @@ symbols_data_lock = threading.Lock()
 
 # Cooldown tracking: {symbol: sell_timestamp}
 sell_cooldown = {}
-COOLDOWN_MINUTES = 20
+COOLDOWN_MINUTES = 15
 
 # ========== PARALLEL ANALYSIS FUNCTION ==========
 def analyze_single_symbol(symbol, exchange_instance, active_count, available, invested, meta, preloaded_advisors):
