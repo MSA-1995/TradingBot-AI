@@ -353,8 +353,8 @@ class Meta:
         peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
         candle_condition = peak_analysis.get('candle_signal', False)
 
-        # متوازن: نقاط ≥50 أو شمعة قمة
-        trigger_activated = candle_condition or peak_score >= 50
+        # متوازن: نقاط ≥55 أو شمعة قمة قوية
+        trigger_activated = candle_condition or peak_score >= 55
 
         if not trigger_activated:
             return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/110', 'profit': profit_percent}
@@ -403,6 +403,30 @@ class Meta:
             sell_conf -= news_boost  # عكس الاتجاه: خبر إيجابي يخفف رغبة البيع
             direction = f"+{news_boost}" if news_boost > 0 else str(news_boost)
             sell_reasons.append(f"News({direction})")
+
+        # --- 📊 فيبوناتشي (مستويات المقاومة للبيع) ---
+        fib_score = 0
+        fib_level = None
+        try:
+            # 🚨 لا تستخدم Fibonacci إذا RSI منخفض (<30)
+            if rsi >= 30:
+                fib_analyzer = self.advisor_manager.get('FibonacciAnalyzer') if self.advisor_manager else None
+                if fib_analyzer:
+                    is_at_resistance, resistance_boost = fib_analyzer.is_at_resistance(
+                        current_price=current_price,
+                        analysis=analysis,
+                        volume_ratio=volume_ratio,
+                        symbol=symbol
+                    )
+                    if is_at_resistance:
+                        fib_score = resistance_boost
+                        sell_conf += resistance_boost
+                        resistance_info = fib_analyzer.get_resistance_level(current_price, analysis)
+                        if resistance_info:
+                            fib_level = resistance_info['level']
+                            sell_reasons.append(f"Fib Resistance {fib_level}% (+{resistance_boost})")
+        except Exception as e:
+            print(f"⚠️ Fibonacci resistance error: {e}")
 
         sell_conf = min(max(sell_conf, 0), 99)
 
