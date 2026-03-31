@@ -371,18 +371,32 @@ class Meta:
         price_momentum = analysis.get('price_momentum', 0)
         liquidity_metrics = analysis.get('liquidity_metrics', {})
 
-        if rsi >= 70:  # تحسين: رفع من 68 إلى 70 للصبر
+        # --- 🎯 Profit Target (هدف الربح - حلب العملة) ---
+        if profit_percent >= 2.0:
+            sell_conf += 15
+            sell_reasons.append(f"Profit Target +{profit_percent:.1f}%")
+        elif profit_percent >= 1.5:
+            sell_conf += 12
+            sell_reasons.append(f"Good Profit +{profit_percent:.1f}%")
+        elif profit_percent >= 1.0:
+            sell_conf += 8
+            sell_reasons.append(f"Target Profit +{profit_percent:.1f}%")
+        elif profit_percent >= 0.5:
+            sell_conf += 4
+            sell_reasons.append(f"Small Profit +{profit_percent:.1f}%")
+
+        if rsi >= 72:  # تحسين: رفع من 70 إلى 72 للصبر
             sell_conf += 25
             sell_reasons.append(f"RSI High ({rsi:.0f})")
-        elif rsi >= 65:  # تحسين: رفع من 62 إلى 65
+        elif rsi >= 68:  # تحسين: رفع من 65 إلى 68
             sell_conf += 15
             sell_reasons.append(f"RSI Elevated ({rsi:.0f})")
 
-        if macd_diff < 0:
+        if macd_diff < -1.0:  # تحسين: MACD سالب قوي فقط
             sell_conf += 15
             sell_reasons.append("MACD Bearish")
 
-        if volume_ratio < 0.7:
+        if volume_ratio < 0.5:  # تحسين: Volume منخفض جداً فقط
             sell_conf += 10
             sell_reasons.append(f"Vol Low ({volume_ratio:.1f}x)")
 
