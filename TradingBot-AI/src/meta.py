@@ -369,10 +369,10 @@ class Meta:
         price_momentum = analysis.get('price_momentum', 0)
         liquidity_metrics = analysis.get('liquidity_metrics', {})
 
-        if rsi >= 68:  # تحسين: خفض من 70 إلى 68
+        if rsi >= 70:  # تحسين: رفع من 68 إلى 70 للصبر
             sell_conf += 25
             sell_reasons.append(f"RSI High ({rsi:.0f})")
-        elif rsi >= 62:  # تحسين: خفض من 60 إلى 62
+        elif rsi >= 65:  # تحسين: رفع من 62 إلى 65
             sell_conf += 15
             sell_reasons.append(f"RSI Elevated ({rsi:.0f})")
 
@@ -443,13 +443,13 @@ class Meta:
             print(f"⚠️ Meta sell voting error: {e}")
             pass
 
-        # --- 4. القرار الملكي النهائي: نقاط + التصويت (محسّن للسرعة) ---
+        # --- 4. القرار الملكي النهائي: نقاط + التصويت (مع صبر لحلب العملة) ---
         min_votes_needed = mood_details.get('min_votes_needed', 4)
         total_advisors = mood_details.get('total_advisors', 7)
         peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
         
-        # تحسين: إذا النقاط عالية جداً (≥65) أو RSI عالي (≥70)، نبيع بتصويت أقل
-        urgent_sell = peak_score >= 65 or rsi >= 70
+        # تحسين: إذا النقاط عالية جداً (≥70) أو RSI عالي جداً (≥75)، نبيع بتصويت أقل
+        urgent_sell = peak_score >= 70 or rsi >= 75
         
         if urgent_sell:
             # حالة طوارئ: نحتاج 3/7 فقط
