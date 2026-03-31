@@ -139,14 +139,27 @@ class Meta:
         volume_ratio = analysis_data.get('volume_ratio', 1.0)
         ema_crossover = analysis_data.get('ema_crossover', 0)
 
+        # 🚨 فحص RSI أولاً - إذا تشبع شرائي (>75) لا تشتري!
+        if rsi > 75:
+            return {
+                'action': 'DISPLAY',
+                'reason': f'🚫 RSI Overbought ({rsi:.0f}) - No Buy',
+                'confidence': 0,
+                'rsi': rsi
+            }
+
         if rsi <= 35:
             temp_conf += 25
             reasons.append(f"RSI Low ({rsi:.0f})")
         elif 35 < rsi < 55:
             temp_conf += 15
             reasons.append(f"RSI OK ({rsi:.0f})")
+        elif 55 <= rsi <= 70:
+            # RSI محايد - لا يضيف نقاط لكن لا يمنع
+            pass
 
-        if macd_diff > 0.0:
+        # MACD: فقط إذا الفرق كبير (> 0.5) وليس أي رقم موجب
+        if macd_diff > 0.5:
             temp_conf += 15
             reasons.append("MACD Bullish")
 
@@ -178,24 +191,26 @@ class Meta:
         fib_score = 0
         fib_level = None
         try:
-            fib_analyzer = self.advisor_manager.get('FibonacciAnalyzer') if self.advisor_manager else None
-            if fib_analyzer:
-                is_at_support, support_boost = fib_analyzer.is_at_support(
-                    current_price=analysis_data.get('close', 0),
-                    analysis=analysis_data,
-                    volume_ratio=volume_ratio,
-                    symbol=symbol
-                )
-                if is_at_support:
-                    fib_score = support_boost
-                    temp_conf += support_boost
-                    support_info = fib_analyzer.get_support_level(
-                        analysis_data.get('close', 0), 
-                        analysis_data
+            # 🚨 لا تستخدم Fibonacci إذا RSI عالي (>70)
+            if rsi <= 70:
+                fib_analyzer = self.advisor_manager.get('FibonacciAnalyzer') if self.advisor_manager else None
+                if fib_analyzer:
+                    is_at_support, support_boost = fib_analyzer.is_at_support(
+                        current_price=analysis_data.get('close', 0),
+                        analysis=analysis_data,
+                        volume_ratio=volume_ratio,
+                        symbol=symbol
                     )
-                    if support_info:
-                        fib_level = support_info['level']
-                        reasons.append(f"Fib {fib_level}% (+{support_boost})")
+                    if is_at_support:
+                        fib_score = support_boost
+                        temp_conf += support_boost
+                        support_info = fib_analyzer.get_support_level(
+                            analysis_data.get('close', 0), 
+                            analysis_data
+                        )
+                        if support_info:
+                            fib_level = support_info['level']
+                            reasons.append(f"Fib {fib_level}% (+{support_boost})")
         except Exception as e:
             print(f"⚠️ Fibonacci error: {e}")
 
@@ -267,7 +282,7 @@ class Meta:
                 reason = f"BUY ✅ | King:{temp_conf} | Votes:{buy_vote_count}/{min_votes_needed} | {', '.join(reasons[:3])}"
             else:
                 action = "DISPLAY"
-                reason = f"REJECTED ❌ | King wanted BUY | Votes:{buy_vote_count}/{min_votes_needed}"
+                reason = f"REJECTED ❌ | King:{temp_conf}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed}"
         elif king_wants_to_buy and market_mood == "Bearish":
             action = "DISPLAY"
             reason = f"Blocked (Bearish Market) | King:{temp_conf}"
