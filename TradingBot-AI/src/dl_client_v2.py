@@ -614,33 +614,33 @@ class DeepLearningClientV2:
             is_peak_candle = candle_analysis.get('is_peak', False)
 
         # 1. Exit Strategy (القناص) - يصوت بالقمة مع صبر:
-        # RSI > 75 أو (RSI > 70 و شمعة قمة)
-        votes['exit'] = 1 if (rsi > 75 or (rsi > 70 and is_peak_candle)) else 0
+        # RSI > 72 أو (RSI > 68 و شمعة قمة)
+        votes['exit'] = 1 if (rsi > 72 or (rsi > 68 and is_peak_candle)) else 0
 
         # 2. MTF vote (صائد الانفجار) - يصوت عند ضعف واضح:
-        # MACD ضعيف جداً (< -0.5) أو Volume نزل كثير (< 0.5)
-        votes['mtf'] = 1 if (macd < -0.5 or volume_ratio < 0.5) else 0
+        # MACD ضعيف جداً (< -0.3) أو Volume نزل كثير (< 0.6)
+        votes['mtf'] = 1 if (macd < -0.3 or volume_ratio < 0.6) else 0
 
         # 3. Risk vote (محافظ) - يصوت عند RSI عالي جداً:
-        # RSI > 72 (تشبع شرائي واضح)
-        votes['risk'] = 1 if rsi > 72 else 0
+        # RSI > 70 (تشبع شرائي واضح)
+        votes['risk'] = 1 if rsi > 70 else 0
 
         # 4. Pattern vote (الأنماط) - يصوت عند ضعف واضح:
-        # momentum سالب قوي (< -1.0) أو شمعة قمة
-        votes['pattern'] = 1 if (price_momentum < -1.0 or is_peak_candle) else 0
+        # momentum سالب قوي (< -0.5) أو شمعة قمة
+        votes['pattern'] = 1 if (price_momentum < -0.5 or is_peak_candle) else 0
 
         # 5. CNN vote (الزخم) - يصوت عند ضعف واضح:
-        # MACD ضعيف جداً (< -1.0) أو Volume نزل كثير
-        votes['cnn'] = 1 if (macd < -1.0 or volume_ratio < 0.6) else 0
+        # MACD ضعيف جداً (< -0.5) أو Volume نزل كثير
+        votes['cnn'] = 1 if (macd < -0.5 or volume_ratio < 0.7) else 0
 
         # 6. Anomaly vote (كاشف الفخاخ) - يصوت إذا مافي فخ:
         # Volume طبيعي (< 4.0) و RSI مو متطرف
         votes['anomaly'] = 1 if (volume_ratio < 4.0 and 25 < rsi < 85) else 0
 
         # 7. Liquidity vote (الشيخ - محلل السيولة) - يصوت عند ضعف واضح:
-        # score نزل كثير (< 40) أو Volume نزل كثير
+        # score نزل كثير (< 45) أو Volume نزل كثير
         liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
-        votes['liquidity'] = 1 if (liquidity_score < 40 or volume_ratio < 0.6) else 0
+        votes['liquidity'] = 1 if (liquidity_score < 45 or volume_ratio < 0.7) else 0
 
         return votes
     
@@ -736,37 +736,37 @@ class DeepLearningClientV2:
         votes = {}
         
         # 1. Exit Strategy (القناص) - وسطي محسّن:
-        # RSI < 45 + تأكيد شمعة أو RSI < 55 بدون تأكيد
+        # RSI < 50 + تأكيد شمعة أو RSI < 60 بدون تأكيد
         has_confirmed_candle = is_rejection or is_accumulation
-        votes['exit'] = 1 if (rsi < 45 or (rsi < 55 and has_confirmed_candle)) else 0
+        votes['exit'] = 1 if (rsi < 50 or (rsi < 60 and has_confirmed_candle)) else 0
         
         # 2. MTF vote (صائد الانفجار) - وسطي محسّن:
-        # MACD > 0.1 + Volume > 1.1
-        votes['mtf'] = 1 if (macd > 0.1 and volume_ratio > 1.1) else 0
+        # MACD > 0 + Volume > 1.0
+        votes['mtf'] = 1 if (macd > 0 and volume_ratio > 1.0) else 0
         
         # 3. Risk vote (محافظ) - وسطي:
-        # RSI < 70 (ما يكون في تشبع شرائي)
-        votes['risk'] = 1 if rsi < 70 else 0
+        # RSI < 72 (ما يكون في تشبع شرائي)
+        votes['risk'] = 1 if rsi < 72 else 0
         
         # 4. Pattern vote (الأنماط) - وسطي محسّن:
-        # momentum إيجابي (> 0) أو تأكيد شمعة
-        votes['pattern'] = 1 if (price_momentum > 0 or is_rejection) else 0
+        # momentum إيجابي (> -0.5) أو تأكيد شمعة
+        votes['pattern'] = 1 if (price_momentum > -0.5 or is_rejection) else 0
         
         # 5. CNN vote (الزخم) - وسطي محسّن:
-        # MACD > 0.5 + Volume > 1.0
-        votes['cnn'] = 1 if (macd > 0.5 and volume_ratio > 1.0) else 0
+        # MACD > 0.2 + Volume > 0.9
+        votes['cnn'] = 1 if (macd > 0.2 and volume_ratio > 0.9) else 0
         
         # 6. Anomaly vote (كاشف الفخاخ) - وسطي محسّن:
-        # Volume < 5.0 + RSI بين 15-85
-        votes['anomaly'] = 1 if (volume_ratio < 5.0 and 15 < rsi < 85) else 0
+        # Volume < 6.0 + RSI بين 10-90
+        votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 90) else 0
         
         # 7. Liquidity vote (الشيخ - محلل السيولة) - وسطي محسّن:
-        # liquidity_score ≥ 55 + Volume > 0.9
+        # liquidity_score ≥ 50 + Volume > 0.8
         if liquidity_metrics:
             liquidity_score = liquidity_metrics.get('liquidity_score', 50)
-            votes['liquidity'] = 1 if (liquidity_score >= 55 and volume_ratio > 0.9) else 0
+            votes['liquidity'] = 1 if (liquidity_score >= 50 and volume_ratio > 0.8) else 0
         else:
-            votes['liquidity'] = 1 if volume_ratio > 0.9 else 0
+            votes['liquidity'] = 1 if volume_ratio > 0.8 else 0
         
         return votes, market_status
 
