@@ -733,17 +733,31 @@ class Meta:
                 last_trap_str = info.get('last_trap')
                 is_banned = False
 
-                if trap_count >= 5 and last_trap_str:
+                if trap_count >= 4 and last_trap_str:
                     try:
                         last_trap = datetime.fromisoformat(last_trap_str)
-                        if (datetime.now() - last_trap).total_seconds() / 3600 < 48:
+                        if (datetime.now() - last_trap).total_seconds() / 3600 < 2:
                             is_banned = True
                     except:
                         pass
                 elif trap_count >= 3 and last_trap_str:
                     try:
                         last_trap = datetime.fromisoformat(last_trap_str)
-                        if (datetime.now() - last_trap).total_seconds() / 3600 < 24:
+                        if (datetime.now() - last_trap).total_seconds() / 3600 < 1.5:
+                            is_banned = True
+                    except:
+                        pass
+                elif trap_count >= 2 and last_trap_str:
+                    try:
+                        last_trap = datetime.fromisoformat(last_trap_str)
+                        if (datetime.now() - last_trap).total_seconds() / 3600 < 1:
+                            is_banned = True
+                    except:
+                        pass
+                elif trap_count >= 1 and last_trap_str:
+                    try:
+                        last_trap = datetime.fromisoformat(last_trap_str)
+                        if (datetime.now() - last_trap).total_seconds() / 60 < 30:
                             is_banned = True
                     except:
                         pass
