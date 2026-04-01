@@ -656,7 +656,7 @@ class Meta:
             if 'blacklist' not in data:
                 data['blacklist'] = {}
             
-            if symbol and trade_quality == 'TRAP':
+            if symbol and trade_quality in ['TRAP', 'RISKY']:
                 if symbol not in data['blacklist']:
                     data['blacklist'][symbol] = {'trap_count': 0, 'last_trap': None}
                 data['blacklist'][symbol]['trap_count'] += 1
