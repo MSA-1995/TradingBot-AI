@@ -621,57 +621,19 @@ class Meta:
     # 🎓 التعلم المباشر للملك - يتعلم من كل صفقة
     # =========================================================
     def learn_from_trade(self, profit, trade_quality, buy_votes, sell_votes, symbol=None):
-        """
-        التعلم المباشر من كل صفقة
-        يتعلم الملك من أخطائه مع Time Decay (الحديث أهم)
-        """
+        """التعلم المباشر من كل صفقة - يحفظ في الداتابيز"""
         try:
-            os.makedirs('data', exist_ok=True)
-            
-            # تحميل بيانات التعلم
-            if os.path.exists(LEARNING_FILE):
-                with open(LEARNING_FILE, 'r') as f:
-                    data = json.load(f)
-            else:
-                data = {
-                    'trades': [],  # قائمة الصفقات مع timestamps
-                    'buy_success': 0, 'buy_fail': 0,
-                    'sell_success': 0, 'sell_fail': 0,
-                    'peak_correct': 0, 'peak_wrong': 0,
-                    'bottom_correct': 0, 'bottom_wrong': 0,
-                    'blacklist': {},  # {symbol: {'trap_count': X, 'last_trap': timestamp}}
-                    'last_update': datetime.now().isoformat()
-                }
-            
-            # إضافة الصفقة الحالية مع timestamp
-            trade_record = {
-                'timestamp': datetime.now().isoformat(),
-                'symbol': symbol,
-                'profit': profit,
-                'quality': trade_quality,
-                'buy_votes': buy_votes,
-                'sell_votes': sell_votes
-            }
-            
-            # 🚫 تحديث القائمة السوداء للعملات الفخ
-            if 'blacklist' not in data:
-                data['blacklist'] = {}
-            
+            # تحميل البيانات من الداتابيز
+            data = self._load_learning_data()
+
+            # تحديث القائمة السوداء
             if symbol and trade_quality in ['TRAP', 'RISKY']:
                 if symbol not in data['blacklist']:
                     data['blacklist'][symbol] = {'trap_count': 0, 'last_trap': None}
                 data['blacklist'][symbol]['trap_count'] += 1
                 data['blacklist'][symbol]['last_trap'] = datetime.now().isoformat()
                 print(f"🚫 {symbol} added to blacklist (Trap #{data['blacklist'][symbol]['trap_count']})")
-            
-            if 'trades' not in data:
-                data['trades'] = []
-            data['trades'].append(trade_record)
-            
-            # الاحتفاظ بآخر 1000 صفقة فقط
-            if len(data['trades']) > 1000:
-                data['trades'] = data['trades'][-1000:]
-            
+
             # تعلم من البيع
             if trade_quality in ['GREAT', 'GOOD', 'OK']:
                 data['sell_success'] += 1
@@ -681,7 +643,7 @@ class Meta:
                 data['sell_fail'] += 1
                 if sell_votes and len([v for v in sell_votes.values() if v == 1]) >= 4:
                     data['peak_wrong'] += 1
-            
+
             # تعلم من الشراء
             if profit > 0.5:
                 data['buy_success'] += 1
@@ -691,89 +653,108 @@ class Meta:
                 data['buy_fail'] += 1
                 if buy_votes and len([v for v in buy_votes.values() if v == 1]) >= 3:
                     data['bottom_wrong'] += 1
-            
-            # حفظ البيانات
-            with open(LEARNING_FILE, 'w') as f:
-                json.dump(data, f, indent=2)
-            
-            # طباعة التعلم
+
+            # حفظ في الداتابيز
+            self._save_learning_data(data)
+
             total = data['buy_success'] + data['buy_fail'] + data['sell_success'] + data['sell_fail']
             if total > 0:
                 success = data['buy_success'] + data['sell_success']
                 accuracy = (success / total) * 100
                 print(f"👑 King learned: {trade_quality} | Accuracy: {accuracy:.0f}% ({success}/{total})")
-            
+
         except Exception as e:
-            print(f"⚠️ خطأ في تعلم الملك: {e}")
+            print(f"⚠️ King learning error: {e}")
+
+    def _load_learning_data(self):
+        """تحميل بيانات التعلم من الداتابيز"""
+        default = {
+            'buy_success': 0, 'buy_fail': 0,
+            'sell_success': 0, 'sell_fail': 0,
+            'peak_correct': 0, 'peak_wrong': 0,
+            'bottom_correct': 0, 'bottom_wrong': 0,
+            'blacklist': {}
+        }
+        try:
+            if self.storage:
+                raw = self.storage.load_setting(DB_LEARNING_KEY)
+                if raw:
+                    return json.loads(raw)
+        except:
+            pass
+        # Fallback: قراءة من الملف المحلي لو موجود
+        try:
+            local_file = 'data/king_learning.json'
+            if os.path.exists(local_file):
+                with open(local_file, 'r') as f:
+                    file_data = json.load(f)
+                    # نقل البيانات للداتابيز
+                    self._save_learning_data(file_data)
+                    print("✅ Migrated king_learning.json to database")
+                    return file_data
+        except:
+            pass
+        return default
+
+    def _save_learning_data(self, data):
+        """حفظ بيانات التعلم في الداتابيز"""
+        try:
+            if self.storage:
+                self.storage.save_setting(DB_LEARNING_KEY, json.dumps(data))
+        except Exception as e:
+            print(f"⚠️ Error saving learning data: {e}")
     
     def get_learning_stats(self):
         """إحصائيات تعلم الملك"""
         try:
-            if os.path.exists(LEARNING_FILE):
-                with open(LEARNING_FILE, 'r') as f:
-                    data = json.load(f)
-                total = data['buy_success'] + data['buy_fail'] + data['sell_success'] + data['sell_fail']
-                success = data['buy_success'] + data['sell_success']
-                return {
-                    'total': total,
-                    'success': success,
-                    'accuracy': (success / total * 100) if total > 0 else 0,
-                    'peak_accuracy': (data['peak_correct'] / (data['peak_correct'] + data['peak_wrong']) * 100) if (data['peak_correct'] + data['peak_wrong']) > 0 else 0,
-                    'bottom_accuracy': (data['bottom_correct'] / (data['bottom_correct'] + data['bottom_wrong']) * 100) if (data['bottom_correct'] + data['bottom_wrong']) > 0 else 0
-                }
+            data = self._load_learning_data()
+            total = data['buy_success'] + data['buy_fail'] + data['sell_success'] + data['sell_fail']
+            success = data['buy_success'] + data['sell_success']
+            return {
+                'total': total,
+                'success': success,
+                'accuracy': (success / total * 100) if total > 0 else 0,
+                'peak_accuracy': (data['peak_correct'] / (data['peak_correct'] + data['peak_wrong']) * 100) if (data['peak_correct'] + data['peak_wrong']) > 0 else 0,
+                'bottom_accuracy': (data['bottom_correct'] / (data['bottom_correct'] + data['bottom_wrong']) * 100) if (data['bottom_correct'] + data['bottom_wrong']) > 0 else 0
+            }
         except:
             pass
         return {'total': 0, 'success': 0, 'accuracy': 0, 'peak_accuracy': 0, 'bottom_accuracy': 0}
     
     def _load_blacklist(self):
-        """تحميل القائمة السوداء من الملف المحلي (يُستدعى عند التشغيل وكل ساعة)"""
+        """تحميل القائمة السوداء من الداتابيز"""
         try:
-            if not os.path.exists(LEARNING_FILE):
-                self._blacklist_cache = {}
-                self._blacklist_cache_time = datetime.now()
-                return
-            
-            with open(LEARNING_FILE, 'r') as f:
-                data = json.load(f)
-            
+            data = self._load_learning_data()
             blacklist_data = data.get('blacklist', {})
             self._blacklist_cache = {}
-            
+
             for symbol, info in blacklist_data.items():
                 trap_count = info.get('trap_count', 0)
                 last_trap_str = info.get('last_trap')
-                
                 is_banned = False
-                
-                # 5+ فخاخ = ممنوع 48 ساعة
+
                 if trap_count >= 5 and last_trap_str:
                     try:
                         last_trap = datetime.fromisoformat(last_trap_str)
-                        hours_since = (datetime.now() - last_trap).total_seconds() / 3600
-                        if hours_since < 48:
+                        if (datetime.now() - last_trap).total_seconds() / 3600 < 48:
                             is_banned = True
                     except:
                         pass
-                
-                # 3-4 فخاخ = ممنوع 24 ساعة
                 elif trap_count >= 3 and last_trap_str:
                     try:
                         last_trap = datetime.fromisoformat(last_trap_str)
-                        hours_since = (datetime.now() - last_trap).total_seconds() / 3600
-                        if hours_since < 24:
+                        if (datetime.now() - last_trap).total_seconds() / 3600 < 24:
                             is_banned = True
                     except:
                         pass
-                
+
                 self._blacklist_cache[symbol] = is_banned
-            
+
             self._blacklist_cache_time = datetime.now()
-            
-            # طباعة القائمة السوداء
             banned_symbols = [s for s, banned in self._blacklist_cache.items() if banned]
             if banned_symbols:
                 print(f"🚫 Blacklist loaded: {', '.join(banned_symbols)}")
-            
+
         except Exception as e:
             print(f"⚠️ Error loading blacklist: {e}")
             self._blacklist_cache = {}
