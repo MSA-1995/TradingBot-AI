@@ -136,6 +136,20 @@ def process_sell(result, exchange, ctx):
                 'liquidity': liquidity_data
             }
         }
+        # تحديث ذاكرة العملة
+        try:
+            if hasattr(storage.storage, 'update_symbol_memory'):
+                storage.storage.update_symbol_memory(
+                    symbol=symbol,
+                    profit=profit,
+                    trade_quality=trade_quality,
+                    hours_held=hours_held,
+                    rsi=position.get('ai_data', {}).get('rsi', 50),
+                    volume_ratio=position.get('ai_data', {}).get('volume_ratio', 1)
+                )
+        except Exception as e:
+            print(f"⚠️ Symbol memory update error: {e}")
+
         storage.save_trade(trade_data)
         
         # =========================================================
