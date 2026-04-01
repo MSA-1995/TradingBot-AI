@@ -515,30 +515,22 @@ def analyze_reversal(df, rsi):
         total_score += vol_score + div_score
         score_breakdown['volume_divergence'] = vol_score + div_score
         
-        # --- Trap Detection (تصفية محسّنة - فحص آخر 3 شموع) ---
-        trap_is_filter = False
-        if len(df) >= 20:
-            avg_volume = df['volume'].tail(20).mean()
-            
-            # فحص آخر 3 شموع للفخاخ
-            for check_idx in range(1, min(4, len(df) + 1)):
-                check_candle = df.iloc[-check_idx]
-                check_volume = check_candle['volume']
-                
-                if avg_volume > 0 and check_volume > avg_volume * 3.0:
-                    candle_body = abs(check_candle['close'] - check_candle['open'])
-                    candle_range = check_candle['high'] - check_candle['low']
-                    
-                    if candle_range > 0 and candle_body > 0:
-                        upper_shadow = check_candle['high'] - max(check_candle['close'], check_candle['open'])
-                        lower_shadow = min(check_candle['close'], check_candle['open']) - check_candle['low']
-                        
-                        if upper_shadow > candle_body * 3.0:
-                            trap_is_filter = True
-                            reasons.append(f"⚠️ Trap Detected (Candle-{check_idx})")
-                            break
+        # --- 7. Bottom Confirmation - 10 نقطة (ذكي) ---
+        high_20 = df['high'].tail(20).max()
+        current_price_now = df.iloc[-1]['close']
+        drop_from_high = ((high_20 - current_price_now) / high_20) * 100 if high_20 > 0 else 0
+        if drop_from_high >= 3.0:
+            total_score += 10
+            score_breakdown['bottom_confirm'] = 10
+            reasons.append(f"Bottom Confirmed (-{drop_from_high:.1f}% from high) (+10)")
+        elif drop_from_high < 1.0:
+            total_score -= 10
+            score_breakdown['bottom_confirm'] = -10
+            reasons.append(f"Near High (-{drop_from_high:.1f}%) (-10)")
+        else:
+            score_breakdown['bottom_confirm'] = 0
         
-        # --- حساب نسبة الارتداد ---
+        # --- Trap Detection
         n = min(REVERSAL_CANDLES, len(df))
         low_n = df['low'].tail(n).min()
         current_price = df.iloc[-1]['close']
