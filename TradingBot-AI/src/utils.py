@@ -43,6 +43,15 @@ def execute_sell(exchange, symbol, amount, reason=""):
                 return {'success': False, 'error': 'No balance available'}
             print(f"⚠️ Adjusted sell amount to available balance: {amount}")
         
+        # فحص القيمة الإجمالية قبل البيع (Binance minimum: $10)
+        ticker = exchange.fetch_ticker(symbol)
+        current_price = ticker.get('last', 0)
+        sell_value = amount * current_price
+        
+        if sell_value < 10.0:
+            print(f"⚠️ Sell value ${sell_value:.2f} < $10 minimum - Skipping {symbol}")
+            return {'success': False, 'error': f'NOTIONAL: Value ${sell_value:.2f} below $10 minimum'}
+        
         order = exchange.create_market_sell_order(symbol, amount)
         
         return {
