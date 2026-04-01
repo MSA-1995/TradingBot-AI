@@ -105,7 +105,10 @@ def process_sell(result, exchange, ctx):
         
         # حفظ بيانات التعلم
         try:
-            # تعلم الملك
+            # تعلم الملك (مع symbol للقائمة السوداء)
+            if meta:
+                meta.learn_from_trade(profit, trade_quality, buy_votes, sell_votes, symbol=symbol)
+            
             king_learning_data = {
                 'king': {
                     'buy_success': 1 if profit > 0.5 else 0,
