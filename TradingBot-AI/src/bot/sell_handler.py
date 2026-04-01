@@ -81,6 +81,42 @@ def process_sell(result, exchange, ctx):
         sell_votes = result.get('sell_votes', {})
         buy_votes = position.get('advisor_votes', {})
         
+        # جلب بيانات الأخبار والسيولة لحفظها في بيانات الصفقة
+        news_data = {}
+        sentiment_data = {}
+        liquidity_data = {}
+        try:
+            news_analyzer = advisor_manager.get('NewsAnalyzer') if advisor_manager else None
+            if news_analyzer:
+                news_sentiment = news_analyzer.get_news_sentiment(symbol)
+                if news_sentiment:
+                    news_data = {
+                        'positive': news_sentiment.get('positive', 0),
+                        'negative': news_sentiment.get('negative', 0),
+                        'neutral': news_sentiment.get('neutral', 0),
+                        'total': news_sentiment.get('total', 0),
+                        'news_score': news_sentiment.get('news_score', 0)
+                    }
+                    sentiment_data = {
+                        'news_sentiment': news_sentiment.get('news_score', 0)
+                    }
+        except:
+            pass
+
+        # جلب بيانات السيولة من الصفقة
+        try:
+            ai_data = position.get('ai_data', {})
+            if ai_data:
+                liquidity_data = {
+                    'depth_ratio': ai_data.get('depth_ratio', 1.0),
+                    'spread_percent': ai_data.get('spread_percent', 0.1),
+                    'liquidity_score': ai_data.get('liquidity_score', 50),
+                    'price_impact': ai_data.get('price_impact', 0.5),
+                    'volume_consistency': ai_data.get('volume_consistency', 50)
+                }
+        except:
+            pass
+
         # حفظ بيانات الصفقة
         trade_data = {
             'symbol': symbol,
@@ -89,12 +125,15 @@ def process_sell(result, exchange, ctx):
             'trade_quality': trade_quality,
             'sell_reason': result.get('reason'),
             'hours_held': hours_held,
-            'sell_votes': sell_votes,  # أصوات البيع
-            'buy_votes': buy_votes,    # أصوات الشراء
+            'sell_votes': sell_votes,
+            'buy_votes': buy_votes,
             'data': {
                 'buy_price': position.get('buy_price'),
                 'sell_price': result.get('price'),
-                'ai_data': position.get('ai_data', {})
+                'ai_data': position.get('ai_data', {}),
+                'news': news_data,
+                'sentiment': sentiment_data,
+                'liquidity': liquidity_data
             }
         }
         storage.save_trade(trade_data)
