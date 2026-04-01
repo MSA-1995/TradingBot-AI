@@ -193,6 +193,19 @@ class StorageManager:
             return self.storage.load_learning_data(learning_type)
         return {}
     
+    # ========== Settings ==========
+    def save_setting(self, key, value):
+        """حفظ إعداد في الداتابيز"""
+        if hasattr(self.storage, 'save_setting'):
+            return self.storage.save_setting(key, value)
+        return False
+
+    def load_setting(self, key):
+        """تحميل إعداد من الداتابيز"""
+        if hasattr(self.storage, 'load_setting'):
+            return self.storage.load_setting(key)
+        return None
+
     # ========== Auto Cleanup ==========
     def cleanup_old_data(self):
         """حذف البيانات القديمة تلقائياً"""
