@@ -10,7 +10,8 @@ import pickle
 import os
 import json
 
-LEARNING_FILE = 'data/king_learning.json'
+DB_LEARNING_KEY = 'king_learning_data'
+DB_BLACKLIST_KEY = 'king_blacklist'
 
 class Meta:
     def __init__(self, advisor_manager=None, storage=None):
