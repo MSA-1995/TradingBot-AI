@@ -742,16 +742,16 @@ def analyze_peak(df, rsi):
         
         # --- 2. RSI + MACD - 25 نقطة (محسّن للسرعة) ---
         rsi_score = 0
-        if rsi > 72:  # تحسين: خفض من 75 إلى 72
+        if rsi > 68:  # متوازن: مو صارم ومو متساهل
             rsi_score = 15
             reasons.append(f"RSI Very High ({rsi:.0f}) (+15)")
-        elif rsi > 68:  # تحسين: خفض من 70 إلى 68
+        elif rsi > 63:
             rsi_score = 12
             reasons.append(f"RSI Overbought ({rsi:.0f}) (+12)")
-        elif rsi > 63:  # تحسين: خفض من 65 إلى 63
+        elif rsi > 58:
             rsi_score = 9
             reasons.append(f"RSI High ({rsi:.0f}) (+9)")
-        elif rsi > 58:  # تحسين: خفض من 60 إلى 58
+        elif rsi > 53:
             rsi_score = 6
             reasons.append(f"RSI Elevated ({rsi:.0f}) (+6)")
         else:
