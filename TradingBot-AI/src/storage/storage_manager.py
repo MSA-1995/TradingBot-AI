@@ -211,3 +211,12 @@ class StorageManager:
     def load_model(self, model_name):
         """تحميل نموذج (مثل Meta-Learner) من قاعدة البيانات أو ملف محلي"""
         return self.storage.load_model(model_name)
+    
+    def get_recent_trades_by_symbol(self, symbol, limit=10):
+        """جلب آخر صفقات لعملة محددة (للقائمة السوداء)"""
+        if hasattr(self.storage, 'get_recent_trades_by_symbol'):
+            return self.storage.get_recent_trades_by_symbol(symbol, limit)
+        # Fallback: filter from all trades
+        all_trades = self.get_all_trades()
+        symbol_trades = [t for t in all_trades if t.get('symbol') == symbol]
+        return symbol_trades[-limit:] if symbol_trades else []
