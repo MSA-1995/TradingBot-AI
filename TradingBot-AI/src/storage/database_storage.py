@@ -775,21 +775,19 @@ class DatabaseStorage:
             cursor = conn.cursor()
             
             queries = {
-                "trades (6m)": ("trades_history", "timestamp", 180),
-                "patterns (6m)": ("learned_patterns", "last_updated", 180),
-                "traps (6m)": ("trap_memory", "timestamp", 180),
-                "votes (6m)": ("consultant_votes", "timestamp", 180),
-                "AI decisions (30d)": ("ai_decisions", "timestamp", 30)
+                "trades (30d)": ("trades_history", "timestamp", 30),
+                "patterns (7d)": ("learned_patterns", "last_updated", 7),
+                "traps (30d)": ("trap_memory", "timestamp", 30),
+                "votes (30d)": ("consultant_votes", "timestamp", 30),
             }
             
             total_deleted = 0
             deleted_log = []
-            batch_size = 500 # Delete 500 rows at a time
+            batch_size = 500
 
             for key, (table, date_col, days) in queries.items():
                 table_total_deleted = 0
                 while True:
-                    # Construct and execute the DELETE command for a single batch
                     query = f"""DELETE FROM {table} WHERE ctid IN (
                                  SELECT ctid FROM {table} 
                                  WHERE {date_col} < NOW() - INTERVAL '{days} days' 
@@ -797,17 +795,45 @@ class DatabaseStorage:
                              );"""
                     cursor.execute(query)
                     count = cursor.rowcount
-                    conn.commit() # Commit after each batch to release locks
+                    conn.commit()
                     
                     if count == 0:
-                        break # No more old rows to delete in this table
+                        break
                     
                     table_total_deleted += count
-                    time.sleep(0.1) # Small sleep to yield to other processes
+                    time.sleep(0.1)
 
                 if table_total_deleted > 0:
                     deleted_log.append(f"{table_total_deleted} {key}")
                 total_deleted += table_total_deleted
+
+            # حذف ai_decisions القديمة مع حماية آخر سجل تعلم للملك والمستشارين
+            ai_total_deleted = 0
+            while True:
+                query = """
+                    DELETE FROM ai_decisions WHERE ctid IN (
+                        SELECT ctid FROM ai_decisions
+                        WHERE timestamp < NOW() - INTERVAL '30 days'
+                        AND id NOT IN (
+                            SELECT id FROM ai_decisions WHERE symbol = 'lk' ORDER BY timestamp DESC LIMIT 1
+                        )
+                        AND id NOT IN (
+                            SELECT id FROM ai_decisions WHERE symbol = 'la' ORDER BY timestamp DESC LIMIT 1
+                        )
+                        LIMIT 500
+                    );
+                """
+                cursor.execute(query)
+                count = cursor.rowcount
+                conn.commit()
+                if count == 0:
+                    break
+                ai_total_deleted += count
+                time.sleep(0.1)
+
+            if ai_total_deleted > 0:
+                deleted_log.append(f"{ai_total_deleted} AI decisions (30d)")
+            total_deleted += ai_total_deleted
 
             cursor.close()
             
