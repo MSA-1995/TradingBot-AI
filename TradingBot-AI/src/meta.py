@@ -367,7 +367,7 @@ class Meta:
 
         # --- 2. صائد القمم (نظام النقاط الذكي - متوازن) ---
         peak_analysis = analysis.get('peak', {})
-        peak_score = peak_analysis.get('confidence', 0)  # نقاط القمة
+        peak_score = peak_analysis.get('confidence', 0)
         candle_condition = peak_analysis.get('candle_signal', False)
 
         # متوازن: نقاط ≥MIN_SELL_CONFIDENCE أو شمعة قمة قوية
@@ -375,6 +375,10 @@ class Meta:
 
         if not trigger_activated:
             return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/110', 'profit': profit_percent}
+
+        # منع البيع بربح أقل من 0.5% أو خسارة إلا عبر Trailing Stop
+        if profit_percent < 0.5:
+            return {'action': 'HOLD', 'reason': f'Waiting for +0.5% min profit | Current:{profit_percent:.2f}%', 'profit': profit_percent}
 
         sell_conf = 20
         sell_reasons = []
@@ -696,7 +700,7 @@ class Meta:
             if total > 0:
                 success = data['buy_success'] + data['sell_success']
                 accuracy = (success / total) * 100
-                print(f"👑 الملك تعلم: {trade_quality} | دقة: {accuracy:.0f}% ({success}/{total})")
+                print(f"👑 King learned: {trade_quality} | Accuracy: {accuracy:.0f}% ({success}/{total})")
             
         except Exception as e:
             print(f"⚠️ خطأ في تعلم الملك: {e}")
