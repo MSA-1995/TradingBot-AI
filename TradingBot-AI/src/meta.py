@@ -365,6 +365,10 @@ class Meta:
         
         mood_details = self._get_market_mood(analysis)
 
+        # --- الحد الأدنى للربح: ما يبيع أي عملة إلا بربح >= 0.5% ---
+        if profit_percent < 0.5:
+            return {'action': 'HOLD', 'reason': f'Waiting for +0.5% min profit | Current:{profit_percent:.2f}%', 'profit': profit_percent}
+
         # --- 2. صائد القمم (نظام النقاط الذكي - متوازن) ---
         peak_analysis = analysis.get('peak', {})
         peak_score = peak_analysis.get('confidence', 0)
@@ -375,10 +379,6 @@ class Meta:
 
         if not trigger_activated:
             return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/110', 'profit': profit_percent}
-
-        # منع البيع بربح أقل من 0.5% أو خسارة إلا عبر Trailing Stop
-        if profit_percent < 0.5:
-            return {'action': 'HOLD', 'reason': f'Waiting for +0.5% min profit | Current:{profit_percent:.2f}%', 'profit': profit_percent}
 
         sell_conf = 20
         sell_reasons = []
