@@ -265,6 +265,35 @@ class DatabaseStorage:
             profit_percent FLOAT,
             timestamp TIMESTAMP DEFAULT NOW()
         );
+        CREATE TABLE IF NOT EXISTS symbol_memory (
+            symbol VARCHAR(20) PRIMARY KEY,
+            total_trades INTEGER DEFAULT 0,
+            win_count INTEGER DEFAULT 0,
+            loss_count INTEGER DEFAULT 0,
+            trap_count INTEGER DEFAULT 0,
+            avg_profit FLOAT DEFAULT 0,
+            max_profit FLOAT DEFAULT 0,
+            min_profit FLOAT DEFAULT 0,
+            avg_hold_hours FLOAT DEFAULT 0,
+            best_rsi FLOAT DEFAULT 50,
+            best_volume_ratio FLOAT DEFAULT 1,
+            last_trade_quality VARCHAR(10),
+            last_updated TIMESTAMP DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS causal_data (
+            id SERIAL PRIMARY KEY,
+            symbol VARCHAR(20),
+            timestamp TIMESTAMP DEFAULT NOW(),
+            fear_greed INTEGER DEFAULT 50,
+            whale_activity FLOAT DEFAULT 0,
+            exchange_inflow FLOAT DEFAULT 0,
+            exchange_outflow FLOAT DEFAULT 0,
+            social_volume INTEGER DEFAULT 0,
+            funding_rate FLOAT DEFAULT 0,
+            btc_dominance FLOAT DEFAULT 50,
+            market_sentiment VARCHAR(20) DEFAULT 'neutral',
+            source VARCHAR(20) DEFAULT 'live'
+        );
         """
         # --- FIX: Add indexes for cleanup performance and query speed ---
         create_indexes_sql = """
@@ -273,6 +302,9 @@ class DatabaseStorage:
         CREATE INDEX IF NOT EXISTS idx_ai_decisions_timestamp ON ai_decisions(timestamp);
         CREATE INDEX IF NOT EXISTS idx_trap_memory_timestamp ON trap_memory(timestamp);
         CREATE INDEX IF NOT EXISTS idx_consultant_votes_timestamp ON consultant_votes(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_symbol_memory_symbol ON symbol_memory(symbol);
+        CREATE INDEX IF NOT EXISTS idx_causal_data_symbol ON causal_data(symbol);
+        CREATE INDEX IF NOT EXISTS idx_causal_data_timestamp ON causal_data(timestamp);
         
         -- Indexes for lightning fast pattern searching
         CREATE INDEX IF NOT EXISTS idx_learned_patterns_type ON learned_patterns(pattern_type);
@@ -850,6 +882,121 @@ class DatabaseStorage:
                 conn.rollback() # End any lingering transaction
                 self._put_conn(conn)
     
+    # ========== Symbol Memory ==========
+    def update_symbol_memory(self, symbol, profit, trade_quality, hours_held, rsi, volume_ratio):
+        """تحديث ذاكرة العملة بعد كل صفقة"""
+        conn = None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO symbol_memory 
+                (symbol, total_trades, win_count, loss_count, trap_count, avg_profit, 
+                 max_profit, min_profit, avg_hold_hours, best_rsi, best_volume_ratio, 
+                 last_trade_quality, last_updated)
+                VALUES (%s, 1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (symbol) DO UPDATE SET
+                    total_trades = symbol_memory.total_trades + 1,
+                    win_count = symbol_memory.win_count + %s,
+                    loss_count = symbol_memory.loss_count + %s,
+                    trap_count = symbol_memory.trap_count + %s,
+                    avg_profit = (symbol_memory.avg_profit * symbol_memory.total_trades + %s) / (symbol_memory.total_trades + 1),
+                    max_profit = GREATEST(symbol_memory.max_profit, %s),
+                    min_profit = LEAST(symbol_memory.min_profit, %s),
+                    avg_hold_hours = (symbol_memory.avg_hold_hours * symbol_memory.total_trades + %s) / (symbol_memory.total_trades + 1),
+                    best_rsi = %s,
+                    best_volume_ratio = %s,
+                    last_trade_quality = %s,
+                    last_updated = NOW();
+            """, (
+                symbol,
+                1 if profit > 0 else 0, 1 if profit <= 0 else 0,
+                1 if trade_quality in ['TRAP', 'RISKY'] else 0,
+                profit, profit, profit, hours_held, rsi, volume_ratio, trade_quality,
+                1 if profit > 0 else 0, 1 if profit <= 0 else 0,
+                1 if trade_quality in ['TRAP', 'RISKY'] else 0,
+                profit, profit, profit, hours_held, rsi, volume_ratio, trade_quality
+            ))
+            conn.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"❌ DB update symbol memory error: {e}")
+            if conn: conn.rollback()
+            return False
+        finally:
+            if conn:
+                self._put_conn(conn)
+
+    def get_symbol_memory(self, symbol):
+        """جلب ذاكرة عملة معينة"""
+        conn = None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
+            cursor.execute("SELECT * FROM symbol_memory WHERE symbol = %s", (symbol,))
+            result = cursor.fetchone()
+            cursor.close()
+            return dict(result) if result else {}
+        except Exception as e:
+            print(f"❌ DB get symbol memory error: {e}")
+            return {}
+        finally:
+            if conn:
+                conn.rollback()
+                self._put_conn(conn)
+
+    # ========== Causal Data ==========
+    def save_causal_data(self, symbol, fear_greed=50, whale_activity=0,
+                         exchange_inflow=0, exchange_outflow=0, social_volume=0,
+                         funding_rate=0, btc_dominance=50, market_sentiment='neutral',
+                         source='live'):
+        """حفظ بيانات السببية"""
+        conn = None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO causal_data 
+                (symbol, fear_greed, whale_activity, exchange_inflow, exchange_outflow,
+                 social_volume, funding_rate, btc_dominance, market_sentiment, source)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (symbol, fear_greed, whale_activity, exchange_inflow, exchange_outflow,
+                  social_volume, funding_rate, btc_dominance, market_sentiment, source))
+            conn.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"❌ DB save causal data error: {e}")
+            if conn: conn.rollback()
+            return False
+        finally:
+            if conn:
+                self._put_conn(conn)
+
+    def get_causal_data(self, symbol, hours=24):
+        """جلب بيانات السببية لعملة معينة"""
+        conn = None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
+            cursor.execute("""
+                SELECT * FROM causal_data 
+                WHERE symbol = %s 
+                AND timestamp > NOW() - INTERVAL '%s hours'
+                ORDER BY timestamp DESC LIMIT 1
+            """, (symbol, hours))
+            result = cursor.fetchone()
+            cursor.close()
+            return dict(result) if result else {}
+        except Exception as e:
+            print(f"❌ DB get causal data error: {e}")
+            return {}
+        finally:
+            if conn:
+                conn.rollback()
+                self._put_conn(conn)
+
     # ========== Traps ==========
     def save_trap(self, trap_data):
         """Saves a trap, ensuring the connection is always returned."""
