@@ -6,73 +6,10 @@ Handles Discord messages and file logging
 import requests
 from datetime import datetime, timezone, timedelta
 import os
-from config import STATUS_STORAGE_METHOD
 from config_encrypted import get_discord_webhook, get_critical_webhook
 
 DISCORD_WEBHOOK = get_discord_webhook()
 CRITICAL_WEBHOOK = get_critical_webhook()
-STATUS_MESSAGE_ID = None # Global variable to hold the message ID
-STATUS_MESSAGE_ID_FILE = os.path.join('data', 'bot_status_message_id.txt')
-
-def load_status_message_id():
-    """Load the status message ID from the configured storage (db or file)."""
-    global STATUS_MESSAGE_ID
-    if STATUS_STORAGE_METHOD == 'database':
-        from database import get_db_connection # Conditional import
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM bot_settings WHERE key = 'status_message_id'")
-            row = cursor.fetchone()
-            conn.close()
-            if row:
-                STATUS_MESSAGE_ID = row[0]
-                print(f"✅ Loaded status message ID from database: {STATUS_MESSAGE_ID}")
-            else:
-                print("🤔 No status message ID found in database. A new one will be created.")
-        except Exception as e:
-            print(f"❌ Error loading status message ID from database: {e}")
-            STATUS_MESSAGE_ID = None
-    else: # file method
-        try:
-            if os.path.exists(STATUS_MESSAGE_ID_FILE):
-                with open(STATUS_MESSAGE_ID_FILE, 'r') as f:
-                    STATUS_MESSAGE_ID = f.read().strip()
-                    print(f"✅ Loaded status message ID from file: {STATUS_MESSAGE_ID}")
-            else:
-                print("🤔 No status message ID file found. A new one will be created.")
-        except Exception as e:
-            print(f"❌ Error loading status message ID from file: {e}")
-            STATUS_MESSAGE_ID = None
-
-def save_status_message_id(message_id):
-    """Save the status message ID to the configured storage (db or file)."""
-    global STATUS_MESSAGE_ID
-    if STATUS_STORAGE_METHOD == 'database':
-        from database import get_db_connection # Conditional import
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO bot_settings (key, value)
-                VALUES (%s, %s)
-                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-            """, ('status_message_id', message_id))
-            conn.commit()
-            conn.close()
-            STATUS_MESSAGE_ID = message_id
-            print(f"💾 Saved status message ID to database: {message_id}")
-        except Exception as e:
-            print(f"❌ Error saving status message ID to database: {e}")
-    else: # file method
-        try:
-            os.makedirs('data', exist_ok=True)
-            with open(STATUS_MESSAGE_ID_FILE, 'w') as f:
-                f.write(str(message_id))
-            STATUS_MESSAGE_ID = str(message_id)
-            #print(f"💾 Saved status message ID to file: {message_id}")
-        except Exception as e:
-            print(f"❌ Error saving status message ID to file: {e}")
 
 def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_id=None, webhook_url=None):
     """Send or edit an embed message on Discord."""
@@ -273,29 +210,12 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
             field_name = f"Open Positions ({field_count})" if field_count > 1 else "Open Positions"
             fields.append({"name": field_name, "value": positions_text.strip(), "inline": False})
     
-    # --- FIX: Send the actual embed message ---
-    global STATUS_MESSAGE_ID
-    # Try to edit the existing message, or create a new one
-    response_data = send_discord_embed(
+    send_discord_embed(
         "PORTFOLIO REPORT",
         fields,
-        color='blue',
-        message_id=None # دائماً أرسل رسالة جديدة
+        color='blue'
     )
 
-    if response_data:
-        new_message_id = response_data.get('id')
-        if new_message_id and new_message_id != STATUS_MESSAGE_ID:
-            save_status_message_id(new_message_id)
-    else:
-        # If sending failed (e.g., message was deleted), clear the ID
-        # so we create a new one next time.
-        if STATUS_MESSAGE_ID:
-            print("ℹ️ Failed to update status message. Will create a new one on next report.")
-            save_status_message_id(None) # Clear the invalid ID
-    # --- END FIX ---
-
-    # Update the last sent time at the end of the function
     last_report_sent_time = datetime.now()
 
 
