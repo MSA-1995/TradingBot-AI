@@ -198,8 +198,7 @@ class DatabaseStorage:
             return None
         finally:
             if conn:
-                # For WRITE functions, we do NOT rollback in finally.
-                # The transaction is handled by commit() or rollback() in the try/except blocks.
+                conn.rollback()
                 self._put_conn(conn)
 
     def _create_tables(self):
