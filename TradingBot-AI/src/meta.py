@@ -367,7 +367,7 @@ class Meta:
 
         # --- الحد الأدنى للربح: ما يبيع أي عملة إلا بربح >= 0.5% ---
         if profit_percent < 0.5:
-            return {'action': 'HOLD', 'reason': f'Waiting for +0.5% min profit | Current:{profit_percent:.2f}%', 'profit': profit_percent}
+            return {'action': 'HOLD', 'reason': f'Waiting for +0.5% min profit', 'profit': profit_percent}
 
         # --- 2. صائد القمم (نظام النقاط الذكي - متوازن) ---
         peak_analysis = analysis.get('peak', {})
