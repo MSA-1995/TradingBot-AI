@@ -14,10 +14,17 @@ LEARNING_FILE = 'data/king_learning.json'
 
 class Meta:
     def __init__(self, advisor_manager=None, storage=None):
-        self.advisor_manager = advisor_manager # <<< The King now keeps his secretary
+        self.advisor_manager = advisor_manager
         self.storage = storage
-        self.meta_learner_data = None # Store the raw model data, not the loaded model
+        self.meta_learner_data = None
         self._load_model_data_from_db()
+        
+        # 🚫 القائمة السوداء - Cache ذكي (يُحدّث عند التشغيل وكل ساعة)
+        self._blacklist_cache = {}
+        self._blacklist_cache_time = None
+        self._blacklist_cache_ttl = 3600  # ساعة واحدة
+        self._load_blacklist()  # تحميل عند بداية التشغيل
+        
         print("👑 Meta (The King) is initialized and ready to rule.")
 
     def _load_model_data_from_db(self):
@@ -713,109 +720,78 @@ class Meta:
             pass
         return {'total': 0, 'success': 0, 'accuracy': 0, 'peak_accuracy': 0, 'bottom_accuracy': 0}
     
-    def _is_blacklisted(self, symbol):
-        """
-        فحص إذا كانت العملة في القائمة السوداء (من الداتابيز + الملف المحلي)
-        
-        القواعد:
-        1. إذا آخر 10 صفقات: 60%+ TRAP = ممنوع مؤقتاً (24 ساعة)
-        2. إذا آخر 10 صفقات: 80%+ TRAP = ممنوع (48 ساعة - يومين)
-        3. بعد انتهاء العقوبة: فرصة جديدة
-        """
+    def _load_blacklist(self):
+        """تحميل القائمة السوداء من الملف المحلي (يُستدعى عند التشغيل وكل ساعة)"""
         try:
-            from datetime import datetime, timedelta
+            if not os.path.exists(LEARNING_FILE):
+                self._blacklist_cache = {}
+                self._blacklist_cache_time = datetime.now()
+                return
             
-            # 1. فحص الداتابيز أولاً (الأهم)
-            if self.storage:
-                try:
-                    # جلب آخر 10 صفقات للعملة من الداتابيز
-                    recent_trades = self.storage.get_recent_trades_by_symbol(symbol, limit=10)
-                    if recent_trades and len(recent_trades) >= 3:  # على الأقل 3 صفقات
-                        trap_count = sum(1 for trade in recent_trades if trade.get('trade_quality') == 'TRAP')
-                        total = len(recent_trades)
-                        trap_rate = trap_count / total
-                        
-                        # حساب وقت آخر صفقة
-                        last_trade_time = None
-                        if recent_trades[-1].get('timestamp'):
-                            try:
-                                last_trade_time = datetime.fromisoformat(recent_trades[-1]['timestamp'])
-                            except:
-                                pass
-                        
-                        # قاعدة 1: 80%+ TRAP = ممنوع 48 ساعة (يومين)
-                        if trap_rate >= 0.8:
-                            if last_trade_time:
-                                hours_since = (datetime.now() - last_trade_time).total_seconds() / 3600
-                                if hours_since < 48:  # يومين
-                                    print(f"🚫 {symbol} HEAVY BAN: {trap_count}/{total} TRAPs ({trap_rate*100:.0f}%) - Wait {48-hours_since:.1f}h")
-                                    return True
-                                else:
-                                    print(f"✅ {symbol} Heavy Ban Expired - Fresh Start! ({trap_rate*100:.0f}% TRAPs)")
-                                    return False
-                            else:
-                                print(f"🚫 {symbol} Heavy Ban: {trap_count}/{total} TRAPs ({trap_rate*100:.0f}%) - 48h")
-                                return True
-                        
-                        # قاعدة 2: 60%+ TRAP = ممنوع 24 ساعة (يوم واحد)
-                        if trap_rate >= 0.6:
-                            if last_trade_time:
-                                hours_since = (datetime.now() - last_trade_time).total_seconds() / 3600
-                                if hours_since < 24:
-                                    print(f"⚠️ {symbol} Temp Ban: {trap_count}/{total} TRAPs ({trap_rate*100:.0f}%) - Wait {24-hours_since:.1f}h")
-                                    return True
-                                else:
-                                    print(f"✅ {symbol} Ban Expired - Second Chance! ({trap_rate*100:.0f}% TRAPs)")
-                                    return False
-                            else:
-                                print(f"⚠️ {symbol} Temp Ban: {trap_count}/{total} TRAPs ({trap_rate*100:.0f}%) - 24h")
-                                return True
-                        
-                        # قاعدة 3: 50-59% TRAP = تحذير فقط (مسموح)
-                        if trap_rate >= 0.5:
-                            print(f"⚠️ {symbol} Warning: {trap_count}/{total} TRAPs ({trap_rate*100:.0f}%) - Allowed but risky")
-                            return False
-                        
-                except Exception as e:
-                    print(f"⚠️ DB blacklist check error: {e}")
+            with open(LEARNING_FILE, 'r') as f:
+                data = json.load(f)
             
-            # 2. فحص الملف المحلي (احتياطي)
-            if os.path.exists(LEARNING_FILE):
-                with open(LEARNING_FILE, 'r') as f:
-                    data = json.load(f)
-                blacklist = data.get('blacklist', {})
-                if symbol in blacklist:
-                    trap_count = blacklist[symbol].get('trap_count', 0)
-                    last_trap_str = blacklist[symbol].get('last_trap')
-                    
-                    # إذا 5+ فخاخ = ممنوع 48 ساعة (يومين)
-                    if trap_count >= 5 and last_trap_str:
-                        try:
-                            last_trap = datetime.fromisoformat(last_trap_str)
-                            hours_since = (datetime.now() - last_trap).total_seconds() / 3600
-                            if hours_since < 48:
-                                print(f"🚫 {symbol} Heavy Ban from file: {trap_count} TRAPs - Wait {48-hours_since:.1f}h")
-                                return True
-                            else:
-                                print(f"✅ {symbol} Heavy Ban Expired from file - Fresh Start!")
-                                return False
-                        except:
-                            pass
-                    
-                    # إذا 3-4 فخاخ = ممنوع 24 ساعة (يوم واحد)
-                    if trap_count >= 3 and last_trap_str:
-                        try:
-                            last_trap = datetime.fromisoformat(last_trap_str)
-                            hours_since = (datetime.now() - last_trap).total_seconds() / 3600
-                            if hours_since < 24:
-                                print(f"⚠️ {symbol} Temp Ban from file: {trap_count} TRAPs - Wait {24-hours_since:.1f}h")
-                                return True
-                            else:
-                                print(f"✅ {symbol} Temp Ban Expired from file - Second Chance!")
-                                return False
-                        except:
-                            pass
-                    
+            blacklist_data = data.get('blacklist', {})
+            self._blacklist_cache = {}
+            
+            for symbol, info in blacklist_data.items():
+                trap_count = info.get('trap_count', 0)
+                last_trap_str = info.get('last_trap')
+                
+                is_banned = False
+                
+                # 5+ فخاخ = ممنوع 48 ساعة
+                if trap_count >= 5 and last_trap_str:
+                    try:
+                        last_trap = datetime.fromisoformat(last_trap_str)
+                        hours_since = (datetime.now() - last_trap).total_seconds() / 3600
+                        if hours_since < 48:
+                            is_banned = True
+                    except:
+                        pass
+                
+                # 3-4 فخاخ = ممنوع 24 ساعة
+                elif trap_count >= 3 and last_trap_str:
+                    try:
+                        last_trap = datetime.fromisoformat(last_trap_str)
+                        hours_since = (datetime.now() - last_trap).total_seconds() / 3600
+                        if hours_since < 24:
+                            is_banned = True
+                    except:
+                        pass
+                
+                self._blacklist_cache[symbol] = is_banned
+            
+            self._blacklist_cache_time = datetime.now()
+            
+            # طباعة القائمة السوداء
+            banned_symbols = [s for s, banned in self._blacklist_cache.items() if banned]
+            if banned_symbols:
+                print(f"🚫 Blacklist loaded: {', '.join(banned_symbols)}")
+            
+        except Exception as e:
+            print(f"⚠️ Error loading blacklist: {e}")
+            self._blacklist_cache = {}
+            self._blacklist_cache_time = datetime.now()
+    
+    def _is_blacklisted(self, symbol):
+        """فحص إذا كانت العملة في القائمة السوداء (من Cache - يُحدّث كل ساعة)"""
+        try:
+            # تحديث Cache إذا مر ساعة
+            if self._blacklist_cache_time:
+                elapsed = (datetime.now() - self._blacklist_cache_time).total_seconds()
+                if elapsed >= self._blacklist_cache_ttl:
+                    print("🔄 Refreshing blacklist cache...")
+                    self._load_blacklist()
+            
+            # فحص من Cache
+            is_banned = self._blacklist_cache.get(symbol, False)
+            
+            if is_banned:
+                print(f"🚫 {symbol} is blacklisted (from cache)")
+            
+            return is_banned
+            
         except Exception as e:
             print(f"⚠️ Blacklist check error: {e}")
-        return False
+            return False
