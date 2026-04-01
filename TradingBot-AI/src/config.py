@@ -40,14 +40,8 @@ MEMORY_CLEANUP_INTERVAL = 120  # Interval in seconds to run the memory cleaner (
 MEMORY_USAGE_THRESHOLD = 80    # Percentage of RAM usage that triggers an aggressive cleanup
 
 # Timing
-LOOP_SLEEP = 2  # تحسين السرعة: من 5 إلى 2 ثانية (هدف: 20 ثانية)
-REPORT_INTERVAL = 1800  # بالثواني، كل 30 دقيقة
-
-# Notifications
-# Choose where to store the Discord status message ID: 'database' or 'file'
-# 'database' is recommended for production (uses bot_settings table)
-# 'file' is for local/testing (uses data/bot_status_message_id.txt)
-STATUS_STORAGE_METHOD = 'file' # or 'database'
+LOOP_SLEEP = 2
+REPORT_INTERVAL = 1800
 
 # قائمة العملات المضمونة من Binance (أقوى 50 عملة بالحجم)
 SYMBOLS = [
