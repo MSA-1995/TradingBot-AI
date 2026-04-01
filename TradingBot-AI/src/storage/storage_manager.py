@@ -13,22 +13,22 @@ class StorageManager:
         # كاش للصفقات - يُستخدم بكثرة من RiskManager في كل دورة
         self.trades_cache = None
         self.trades_cache_time = None
-        self.cache_duration = 120  # دقيقتان (كان 60 ثانية)
+        self.cache_duration = 1800  # 30 دقيقة (كان 10 دقائق) - توفير قوي!
 
         # كاش للفخاخ - تتغير نادراً
         self._traps_cache = None
         self._traps_cache_time = None
-        self._traps_cache_ttl = 300  # 5 دقائق
+        self._traps_cache_ttl = 3600  # ساعة (كان 30 دقيقة)
 
         # كاش للأنماط - تتغير نادراً جداً
         self._patterns_cache = None
         self._patterns_cache_time = None
-        self._patterns_cache_ttl = 600  # 10 دقائق
+        self._patterns_cache_ttl = 7200  # ساعتين (كان ساعة)
 
         # كاش لقرارات AI
         self._ai_decisions_cache = None
         self._ai_decisions_cache_time = None
-        self._ai_decisions_cache_ttl = 60  # دقيقة
+        self._ai_decisions_cache_ttl = 600  # 10 دقائق (كان 5 دقائق)
         # ====================================================
         
         if self.mode == 'cloud':
