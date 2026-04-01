@@ -509,20 +509,20 @@ class Meta:
         
         if urgent_sell:
             # حالة طوارئ: نحتاج 3/7 فقط
-            if sell_vote_count >= 3:
+            if sell_vote_count >= 3 and peak_score >= MIN_SELL_CONFIDENCE:
                 action = 'SELL'
                 reason = f"URGENT SELL | Score:{sell_conf}/110 | RSI:{rsi:.0f} | {', '.join(sell_reasons[:3])}"
             else:
                 action = 'HOLD'
-                reason = f"Hold | Score:{sell_conf}/110 | Need 3 votes (got {sell_vote_count})"
+                reason = f"Hold | Score:{peak_score}/110 | Need Score>={MIN_SELL_CONFIDENCE}"
         else:
             # حالة عادية: نحتاج التصويت الكامل
-            if sell_vote_count >= min_votes_needed:
+            if sell_vote_count >= min_votes_needed and peak_score >= MIN_SELL_CONFIDENCE:
                 action = 'SELL'
                 reason = f"SELL | Score:{sell_conf}/110 | {', '.join(sell_reasons[:3])}"
             else:
                 action = 'HOLD'
-                reason = f"Hold | Score:{sell_conf}/110"
+                reason = f"Hold | Score:{peak_score}/110"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
