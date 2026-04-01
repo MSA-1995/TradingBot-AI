@@ -249,6 +249,7 @@ symbols_data_lock = threading.Lock()
 
 # Cooldown tracking: {symbol: sell_timestamp}
 sell_cooldown = {}
+sell_cooldown_lock = threading.Lock()
 COOLDOWN_MINUTES = 15
 
 # ========== PARALLEL ANALYSIS FUNCTION ==========
@@ -327,8 +328,9 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     'news_summary': decision.get('news_summary') if decision and 'news_summary' in decision else None
                 }
 
-            if symbol in sell_cooldown and (datetime.now() - sell_cooldown[symbol]).total_seconds() / 60 < COOLDOWN_MINUTES:
-                return {'symbol': symbol, 'action': 'COOLDOWN', 'minutes_left': COOLDOWN_MINUTES - ((datetime.now() - sell_cooldown[symbol]).total_seconds() / 60)}
+            with sell_cooldown_lock:
+                if symbol in sell_cooldown and (datetime.now() - sell_cooldown[symbol]).total_seconds() / 60 < COOLDOWN_MINUTES:
+                    return {'symbol': symbol, 'action': 'COOLDOWN', 'minutes_left': COOLDOWN_MINUTES - ((datetime.now() - sell_cooldown[symbol]).total_seconds() / 60)}
 
             can_trade, reason = capital_manager.can_trade(BASE_AMOUNT, available, invested)
             if not can_trade:
@@ -389,6 +391,7 @@ ctx = {
     'symbols_data_lock':    symbols_data_lock,
     'balance_lock':         balance_lock,
     'sell_cooldown':        sell_cooldown,
+    'sell_cooldown_lock':   sell_cooldown_lock,
     'storage':              storage,
     'capital_manager':      capital_manager,
     'advisor_manager':      advisor_manager, # <<< إضافة مدير المستشارين إلى السياق
