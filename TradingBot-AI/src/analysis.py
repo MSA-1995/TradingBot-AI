@@ -589,7 +589,7 @@ def analyze_peak(df, rsi):
     - MTF Confirmation: 10 نقاط
     - Volume + Divergence: 15 نقطة (مهم)
     """
-    from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES, MIN_SELL_CONFIDENCE
+    from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES, MIN_SELL_CONFIDENCE, MIN_CONFIDENCE
 
     base_result = {
         'confidence': 0,
@@ -797,12 +797,8 @@ def analyze_peak(df, rsi):
         if sr['at_resistance']:
             sr_score = 15
             reasons.append(f"📐 {sr['reason']} (+15)")
-        elif sr['at_support']:
-            sr_score = 0
-        elif sr['score'] < 0:
-            sr_score = max(0, -sr['score'])
-            reasons.append(f"📐 {sr['reason']} (+{sr_score})")
         score_breakdown['support_resistance'] = sr_score
+        total_score += sr_score
         
         # --- 5. MTF Confirmation - 10 نقطة ---
         mtf = analyze_mtf_confirmation(df)
@@ -943,6 +939,7 @@ def get_market_analysis(exchange, symbol, limit=120):
         df['macd'] = macd.macd().fillna(0)
         df['macd_signal'] = macd.macd_signal().fillna(0)
         df['macd_diff'] = macd.macd_diff().fillna(0)
+        df['macd_histogram'] = df['macd_diff']  # alias لـ analyze_peak و analyze_reversal
         
         df['volume_sma'] = df['volume'].rolling(window=20).mean()
         df['volume_ratio'] = (df['volume'] / df['volume_sma'].replace(0, 1)).fillna(1.0)
