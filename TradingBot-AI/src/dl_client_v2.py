@@ -38,6 +38,7 @@ class DeepLearningClientV2:
         self._models = {}        # {model_name: model_object}
         self._model_accuracy = {} # {model_name: accuracy}
         self._model_trained_at = {} # {model_name: trained_at}
+        self._last_models_check = None  # آخر فحص للنماذج
         self._connect_db()
         self._load_learning_data()
         self._load_all_models_from_db()
@@ -125,6 +126,7 @@ class DeepLearningClientV2:
 
     def _load_all_models_from_db(self):
         """تحميل جميع الموديلات المدربة من قاعدة البيانات"""
+        from datetime import datetime
         model_names = [
             'smart_money', 'risk', 'anomaly', 'exit', 'pattern',
             'liquidity', 'chart_cnn', 'volume_pred', 'meta_learner',
@@ -165,6 +167,7 @@ class DeepLearningClientV2:
             except Exception as e:
                 print(f"⚠️ Failed to load model '{name}': {e}")
         
+        self._last_models_check = datetime.now()
         print(f"🧠 Loaded {loaded}/{len(model_names)} trained models from database")
 
     def _print_models_status(self):
@@ -189,6 +192,52 @@ class DeepLearningClientV2:
         
         print("")
 
+    def check_for_updates(self):
+        """فحص لو فيه نماذج جديدة كل 7 ساعات"""
+        from datetime import datetime, timedelta
+        try:
+            # فحص كل 7 ساعات فقط
+            if self._last_models_check:
+                elapsed = datetime.now() - self._last_models_check
+                if elapsed < timedelta(hours=7):
+                    return False
+            
+            conn = self._get_conn()
+            if not conn:
+                return False
+            
+            cursor = conn.cursor()
+            cursor.execute("SELECT MAX(trained_at) FROM dl_models_v2")
+            latest_db = cursor.fetchone()[0]
+            cursor.close()
+            
+            if not latest_db:
+                return False
+            
+            # مقارنة مع أقدم نموذج محمل
+            oldest_loaded = None
+            for trained_at in self._model_trained_at.values():
+                if trained_at != 'N/A':
+                    try:
+                        dt = datetime.fromisoformat(trained_at.replace('Z', '+00:00'))
+                        if oldest_loaded is None or dt < oldest_loaded:
+                            oldest_loaded = dt
+                    except:
+                        pass
+            
+            if oldest_loaded and latest_db > oldest_loaded:
+                print("🔄 نماذج جديدة متوفرة - جاري التحديث...")
+                self._load_all_models_from_db()
+                return True
+            
+            # تحديث وقت الفحص حتى لو ما فيه تحديث
+            self._last_models_check = datetime.now()
+            return False
+            
+        except Exception as e:
+            print(f"⚠️ خطأ في فحص تحديثات النماذج: {e}")
+            return False
+    
     def get_model_accuracy(self, model_name):
         """جلب دقة الموديل المدرب"""
         return self._model_accuracy.get(model_name, 0)
