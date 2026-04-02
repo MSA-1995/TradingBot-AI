@@ -397,6 +397,7 @@ ctx = {
     'capital_manager':      capital_manager,
     'advisor_manager':      advisor_manager, # <<< إضافة مدير المستشارين إلى السياق
     'meta':                 meta,
+    'dl_client':            dl_client,  # <<< إضافة dl_client لفحص التحديثات
     'memory_optimizer':     memory_optimizer,
     'analyze_fn':           analyze_single_symbol,
     'get_dynamic_symbols_fn': get_dynamic_symbols,
