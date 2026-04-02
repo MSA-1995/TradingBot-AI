@@ -1,22 +1,47 @@
 """
 🧠 Deep Learning Client V3 - للبوت الرئيسي
-يقرأ توقعات 8 موديلات (7 LSTM + 1 CNN) من قاعدة البيانات
+يحمل موديلات LightGBM المدربة من قاعدة البيانات ويستخدمها للتصويت
 """
 import os
 import json
+import pickle
+import gzip
+import numpy as np
+import pandas as pd
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from urllib.parse import urlparse, unquote
 
 ADVISORS_LEARNING_FILE = 'data/advisors_learning.json'
 
+# أسماء الـ BASE features (38 feature من features.py)
+BASE_FEATURE_NAMES = [
+    'rsi', 'macd', 'volume_ratio', 'price_momentum',
+    'bb_position', 'atr_estimate', 'stochastic', 'ema_signal',
+    'volume_strength', 'momentum_strength',
+    'atr', 'ema_crossover', 'bid_ask_spread', 'volume_trend', 'price_change_1h',
+    'trade_quality_score', 'advisor_vote_consensus', 'is_trap_trade',
+    'profit_magnitude', 'hours_held_normalized', 'is_profitable',
+    'btc_trend_normalized', 'is_bullish_market', 'hour_normalized',
+    'is_asian_session', 'is_european_session', 'is_us_session',
+    'optimal_hold_score', 'fib_score', 'fib_level_encoded',
+    'regime_score', 'regime_adx', 'volatility_ratio', 'position_multiplier',
+    'flash_risk_score', 'flash_crash_detected', 'whale_dump_detected', 'cascade_risk_score'
+]
+
+
 class DeepLearningClientV2:
     def __init__(self, database_url):
         self.database_url = database_url
         self.conn = None
         self._db_params = None
+        self._models = {}        # {model_name: model_object}
+        self._model_accuracy = {} # {model_name: accuracy}
+        self._model_trained_at = {} # {model_name: trained_at}
         self._connect_db()
         self._load_learning_data()
+        self._load_all_models_from_db()
+        self._print_models_status()
         print("🧠 Deep Learning Client V3 initialized (LightGBM)")
     
     def _load_learning_data(self):
@@ -96,6 +121,185 @@ class DeepLearningClientV2:
         
         except Exception as e:
             print(f"❌ DL Client: Error getting model data for {model_name}: {e}")
+            return None
+
+    def _load_all_models_from_db(self):
+        """تحميل جميع الموديلات المدربة من قاعدة البيانات"""
+        model_names = [
+            'smart_money', 'risk', 'anomaly', 'exit', 'pattern',
+            'liquidity', 'chart_cnn', 'volume_pred', 'meta_learner',
+            'sentiment', 'crypto_news'
+        ]
+        loaded = 0
+        for name in model_names:
+            try:
+                conn = self._get_conn()
+                if not conn:
+                    continue
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+                cursor.execute("""
+                    SELECT model_data, accuracy, trained_at
+                    FROM dl_models_v2
+                    WHERE model_name = %s
+                    ORDER BY trained_at DESC
+                    LIMIT 1
+                """, (name,))
+                result = cursor.fetchone()
+                cursor.close()
+                
+                if result and result.get('model_data'):
+                    raw_data = result['model_data']
+                    if isinstance(raw_data, memoryview):
+                        raw_data = bytes(raw_data)
+                    # Decompress gzip data
+                    try:
+                        decompressed = gzip.decompress(raw_data)
+                        model = pickle.loads(decompressed)
+                    except:
+                        # Fallback: try without decompression (old models)
+                        model = pickle.loads(raw_data)
+                    self._models[name] = model
+                    self._model_accuracy[name] = float(result.get('accuracy', 0) or 0)
+                    self._model_trained_at[name] = str(result.get('trained_at', 'N/A'))
+                    loaded += 1
+            except Exception as e:
+                print(f"⚠️ Failed to load model '{name}': {e}")
+        
+        print(f"🧠 Loaded {loaded}/{len(model_names)} trained models from database")
+
+    def _print_models_status(self):
+        """طباعة حالة جميع الموديلات المدربة عند بداية التشغيل"""
+        print("\n" + "=" * 60)
+        print("🧠 TRAINED MODELS STATUS")
+        print("=" * 60)
+        
+        all_models = [
+            'smart_money', 'risk', 'anomaly', 'exit', 'pattern',
+            'liquidity', 'chart_cnn', 'volume_pred', 'meta_learner',
+            'sentiment', 'crypto_news'
+        ]
+        
+        for name in all_models:
+            if name in self._models:
+                acc = self._model_accuracy.get(name, 0)
+                trained = self._model_trained_at.get(name, 'N/A')
+                if acc > 0:
+                    status = "✅ ACTIVE" if acc >= 0.55 else "⚠️ WEAK"
+                    bar = "█" * int(acc * 20) + "░" * (20 - int(acc * 20))
+                    print(f"  {name:15s} | {status} | Accuracy: {acc*100:5.1f}% | {bar} | Trained: {trained}")
+                else:
+                    print(f"  {name:15s} | ❌ NO DATA | Accuracy:   0.0% | ░░░░░░░░░░░░░░░░░░░░ | Trained: {trained}")
+            else:
+                print(f"  {name:15s} | ❌ NOT LOADED")
+        
+        print("=" * 60 + "\n")
+
+    def get_model_accuracy(self, model_name):
+        """جلب دقة الموديل المدرب"""
+        return self._model_accuracy.get(model_name, 0)
+
+    def _prepare_base_features(self, rsi, macd, volume_ratio, price_momentum, 
+                                profit=0, hours_held=24, liquidity_metrics=None,
+                                market_sentiment=None, candle_analysis=None,
+                                extra_features=None):
+        """تحضير الـ 38 BASE feature للتنبؤ"""
+        # حساب القيم الأساسية
+        bb_position = (rsi - 30) / 40
+        atr_estimate = abs(price_momentum) * volume_ratio
+        stochastic = rsi
+        ema_signal = 1 if macd > 0 else -1
+        volume_strength = min(volume_ratio / 2.0, 2.0)
+        momentum_strength = abs(price_momentum) / 10.0
+        atr = atr_estimate
+        ema_crossover = 1 if macd > 0 else -1
+        bid_ask_spread = 0
+        volume_trend = 1 if volume_ratio > 1.2 else (-1 if volume_ratio < 0.8 else 0)
+        price_change_1h = price_momentum
+        
+        # ميزات التعلم المباشر
+        trade_quality_score = 3  # OK (default)
+        advisor_vote_consensus = 0.5
+        is_trap_trade = 0
+        profit_magnitude = abs(profit) / 10.0
+        hours_held_normalized = min(hours_held / 48.0, 2.0)
+        is_profitable = 1 if profit > 0 else 0
+        
+        # السوق والوقت
+        btc_change = 0
+        if market_sentiment:
+            btc_change = market_sentiment.get('btc_change_1h', 0)
+        btc_trend_normalized = max(-1.0, min(1.0, btc_change / 5.0))
+        is_bullish_market = 1 if btc_change > 1.0 else 0
+        
+        from datetime import datetime
+        hour_of_day = datetime.now().hour
+        hour_normalized = hour_of_day / 24.0
+        is_asian_session = 1 if 0 <= hour_of_day <= 8 else 0
+        is_european_session = 1 if 8 < hour_of_day <= 16 else 0
+        is_us_session = 1 if 16 < hour_of_day <= 24 else 0
+        optimal_hold_score = 0.5
+        
+        # فيبوناتشي (defaults)
+        fib_score = 0
+        fib_level_encoded = 0
+        
+        # Market Regime (defaults)
+        regime_score = 0.5
+        regime_adx = 0.4
+        volatility_ratio = 1.0
+        position_multiplier = 1.0
+        
+        # Flash Crash (defaults)
+        flash_risk_score = 0
+        flash_crash_detected = 0
+        whale_dump_detected = 0
+        cascade_risk_score = 0
+        
+        base_features = [
+            rsi, macd, volume_ratio, price_momentum,
+            bb_position, atr_estimate, stochastic, ema_signal,
+            volume_strength, momentum_strength,
+            atr, ema_crossover, bid_ask_spread, volume_trend, price_change_1h,
+            trade_quality_score, advisor_vote_consensus, is_trap_trade,
+            profit_magnitude, hours_held_normalized, is_profitable,
+            btc_trend_normalized, is_bullish_market, hour_normalized,
+            is_asian_session, is_european_session, is_us_session,
+            optimal_hold_score, fib_score, fib_level_encoded,
+            regime_score, regime_adx, volatility_ratio, position_multiplier,
+            flash_risk_score, flash_crash_detected, whale_dump_detected, cascade_risk_score
+        ]
+        
+        if extra_features:
+            base_features.extend(extra_features)
+        
+        return base_features
+
+    def _predict_buy(self, model_name, features, feature_names):
+        """التنبؤ باستخدام الموديل المدرب - يرجّع 1 (BUY) أو 0 (SKIP)"""
+        model = self._models.get(model_name)
+        if model is None:
+            return None  # الموديل غير محمّل
+        
+        try:
+            X = pd.DataFrame([features], columns=feature_names)
+            prediction = model.predict(X)[0]
+            return int(prediction)
+        except Exception as e:
+            print(f"⚠️ Prediction error for {model_name}: {e}")
+            return None
+
+    def _predict_proba(self, model_name, features, feature_names):
+        """التنبؤ بالاحتمالية - يرجّع probability للـ class 1"""
+        model = self._models.get(model_name)
+        if model is None:
+            return None
+        
+        try:
+            X = pd.DataFrame([features], columns=feature_names)
+            proba = model.predict_proba(X)[0]
+            return float(proba[1]) if len(proba) > 1 else float(proba[0])
+        except Exception as e:
+            print(f"⚠️ Proba error for {model_name}: {e}")
             return None
 
     
@@ -604,7 +808,7 @@ class DeepLearningClientV2:
 
     def vote_sell_now(self, rsi, macd, volume_ratio, price_momentum, liquidity_metrics=None, candle_analysis=None):
         """
-        البيع: يصوتون بالقمة مع صبر لحلب العملة - نظام متوازن محسّن
+        البيع: يصوتون بالقمة - يستخدم الموديلات المدربة أولاً، مع fallback للمنطق اليدوي
         """
         votes = {}
 
@@ -613,160 +817,116 @@ class DeepLearningClientV2:
         if candle_analysis:
             is_peak_candle = candle_analysis.get('is_peak', False)
 
-        # 1. Exit Strategy (القناص) - يصوت بالقمة مع صبر:
-        # RSI > 72 أو (RSI > 68 و شمعة قمة)
-        votes['exit'] = 1 if (rsi > 72 or (rsi > 68 and is_peak_candle)) else 0
-
-        # 2. MTF vote (صائد الانفجار) - يصوت عند ضعف واضح:
-        # MACD ضعيف جداً (< -0.3) أو Volume نزل كثير (< 0.6)
-        votes['mtf'] = 1 if (macd < -0.3 or volume_ratio < 0.6) else 0
-
-        # 3. Risk vote (محافظ) - يصوت عند RSI عالي جداً:
-        # RSI > 70 (تشبع شرائي واضح)
-        votes['risk'] = 1 if rsi > 70 else 0
-
-        # 4. Pattern vote (الأنماط) - يصوت عند ضعف واضح:
-        # momentum سالب قوي (< -0.5) أو شمعة قمة
-        votes['pattern'] = 1 if (price_momentum < -0.5 or is_peak_candle) else 0
-
-        # 5. CNN vote (الزخم) - يصوت عند ضعف واضح:
-        # MACD ضعيف جداً (< -0.5) أو Volume نزل كثير
-        votes['cnn'] = 1 if (macd < -0.5 or volume_ratio < 0.7) else 0
-
-        # 6. Anomaly vote (كاشف الفخاخ) - يصوت إذا مافي فخ:
-        # Volume طبيعي (< 4.0) و RSI مو متطرف
-        votes['anomaly'] = 1 if (volume_ratio < 4.0 and 25 < rsi < 85) else 0
-
-        # 7. Liquidity vote (الشيخ - محلل السيولة) - يصوت عند ضعف واضح:
-        # score نزل كثير (< 45) أو Volume نزل كثير
+        # ===== استخدام الموديلات المدربة للتصويت =====
+        _tp_acc = self._model_accuracy.get('exit', 0.5)
+        _sl_acc = self._model_accuracy.get('risk', 0.5)
+        
+        # Liquidity features (13 features - custom)
         liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
-        votes['liquidity'] = 1 if (liquidity_score < 45 or volume_ratio < 0.7) else 0
+        liquidity_features = [
+            0, volume_ratio, 0, 0,
+            (liquidity_metrics or {}).get('depth_ratio', 1.0),
+            liquidity_score,
+            (liquidity_metrics or {}).get('price_impact', 0.5),
+            (liquidity_metrics or {}).get('volume_consistency', 50),
+            1 if liquidity_score > 70 else 0,
+            1 if (liquidity_metrics or {}).get('price_impact', 0.5) < 0.3 else 0,
+            1 if (liquidity_metrics or {}).get('volume_consistency', 50) > 60 else 0,
+            _tp_acc, _sl_acc
+        ]
+        liquidity_names = [
+            'profit', 'volume_ratio', 'bid_ask_spread', 'volume_trend',
+            'depth_ratio', 'liquidity_score', 'price_impact', 'volume_consistency',
+            'good_liquidity', 'low_impact', 'consistent_vol', 'tp_accuracy', 'sell_accuracy'
+        ]
 
-        return votes
-    
-    def vote_buy_now(self, rsi, macd, volume_ratio, trend, mtf_score):
-        """يصوت المستشار على الشراء الفوري بناءً على معايير محددة"""
-        score = 0
-        reasons = []
-
-        # 1. RSI في منطقة التشبع بالبيع (< 30)
-        if rsi < 30:
-            score += 25
-            reasons.append("RSI Oversold")
-
-        # 2. مؤشر MACD الإيجابي
-        if macd > 0.1:
-            score += 20
-            reasons.append("Positive MACD")
-
-        # 3. نسبة حجم الشراء المرتفعة
-        if volume_ratio > 1.2:
-            score += 15
-            reasons.append("High Buy Volume")
-
-        # 4. اتجاه صاعد
-        if trend == 1:  # 1 يمثل الاتجاه الصاعد
-            score += 25
-            reasons.append("Uptrend")
-
-        # 5. تحليل الإطار الزمني المتعدد (MTF)
-        if mtf_score > 70:
-            score += 15
-            reasons.append("Strong MTF Signal")
-
-        # إذا لم تتحقق أي من الشروط، لا يوجد تصويت للشراء
-        if score == 0:
-            return None
-
-        return {
-            "score": min(score, 100),  # تأكد من أن النتيجة لا تتجاوز 100
-            "reasons": ", ".join(reasons)
-        }
-
-    def get_market_sentiment(self, btc_change_1h, eth_change_1h, bnb_change_1h):
-        """
-        تحليل السوق العام (BTC + ETH + BNB)
-        Returns: market_status, min_votes_required
-        """
-        # حساب متوسط التغير
-        changes = [btc_change_1h, eth_change_1h, bnb_change_1h]
-        avg_change = sum(changes) / len(changes)
-        
-        # عد العملات النازلة/الطالعة
-        falling_count = sum(1 for c in changes if c < -1.0)
-        rising_count = sum(1 for c in changes if c > 1.0)
-        
-        # Strong Bearish: توقف تام
-        # أغلبية نازلة (2/3 أو أكثر) أو متوسط < -2%
-        if falling_count >= 2 or avg_change < -2.0:
-            return 'strong_bearish', 8  # مستحيل (8/7) = توقف
-        
-        # Bearish: حذر (نحتاج 5/7)
-        # واحدة نازلة قوي أو متوسط < -1%
-        if falling_count >= 1 or avg_change < -1.0:
-            return 'bearish', 5
-        
-        # Neutral/Bullish: عادي (3/7)
-        return 'neutral', 3
-    
-    def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence, liquidity_metrics=None, market_sentiment=None, candle_analysis=None, peak_hunter_signal='neutral'):
-        """
-        المستشارين يصوتون: هل نشتري؟ (BUY/SKIP) - نظام وسطي محسّن
-        market_sentiment: {'btc_change_1h': float, 'eth_change_1h': float, 'bnb_change_1h': float}
-        candle_analysis: {'is_rejection': bool, 'is_accumulation': bool}
-        Returns: buy_votes (dict with each consultant's vote: 1=BUY, 0=SKIP), market_status (str)
-        """
-        # فحص السوق العام أولاً
-        
-        market_status = 'neutral'
-        
-        # استخراج تحليل الشموع (القناص)
-        is_rejection = False
-        is_accumulation = False
-        if candle_analysis:
-            is_rejection = candle_analysis.get('is_rejection', False)
-            is_accumulation = candle_analysis.get('is_accumulation', False)
-        
-        if market_sentiment:
-            btc_change = market_sentiment.get('btc_change_1h', 0)
-            eth_change = market_sentiment.get('eth_change_1h', 0)
-            bnb_change = market_sentiment.get('bnb_change_1h', 0)
-            market_status, _ = self.get_market_sentiment(btc_change, eth_change, bnb_change)
-        
-        votes = {}
-        
-        # 1. Exit Strategy (القناص) - وسطي محسّن:
-        # RSI < 50 + تأكيد شمعة أو RSI < 60 بدون تأكيد
-        has_confirmed_candle = is_rejection or is_accumulation
-        votes['exit'] = 1 if (rsi < 50 or (rsi < 60 and has_confirmed_candle)) else 0
-        
-        # 2. MTF vote (صائد الانفجار) - وسطي محسّن:
-        # MACD > 0 + Volume > 1.0
-        votes['mtf'] = 1 if (macd > 0 and volume_ratio > 1.0) else 0
-        
-        # 3. Risk vote (محافظ) - وسطي:
-        # RSI < 72 (ما يكون في تشبع شرائي)
-        votes['risk'] = 1 if rsi < 72 else 0
-        
-        # 4. Pattern vote (الأنماط) - وسطي محسّن:
-        # momentum إيجابي (> -0.5) أو تأكيد شمعة
-        votes['pattern'] = 1 if (price_momentum > -0.5 or is_rejection) else 0
-        
-        # 5. CNN vote (الزخم) - وسطي محسّن:
-        # MACD > 0.2 + Volume > 0.9
-        votes['cnn'] = 1 if (macd > 0.2 and volume_ratio > 0.9) else 0
-        
-        # 6. Anomaly vote (كاشف الفخاخ) - وسطي محسّن:
-        # Volume < 6.0 + RSI بين 10-90
-        votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 90) else 0
-        
-        # 7. Liquidity vote (الشيخ - محلل السيولة) - وسطي محسّن:
-        # liquidity_score ≥ 50 + Volume > 0.8
-        if liquidity_metrics:
-            liquidity_score = liquidity_metrics.get('liquidity_score', 50)
-            votes['liquidity'] = 1 if (liquidity_score >= 50 and volume_ratio > 0.8) else 0
+        # Exit model: BASE(38) + hours_held + tp_accuracy + sell_accuracy = 41
+        exit_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                     extra_features=[24, _tp_acc, _sl_acc])
+        exit_names = BASE_FEATURE_NAMES + ['hours_held', 'tp_accuracy', 'sell_accuracy']
+        exit_pred = self._predict_buy('exit', exit_features, exit_names)
+        if exit_pred is not None:
+            votes['exit'] = exit_pred
         else:
-            votes['liquidity'] = 1 if volume_ratio > 0.8 else 0
+            votes['exit'] = 1 if (rsi > 72 or (rsi > 68 and is_peak_candle)) else 0
+
+        # Risk model: BASE(38) + risk_rsi + risk_atr + tp_accuracy + sell_accuracy = 42
+        risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                     extra_features=[rsi, abs(price_momentum), _tp_acc, _sl_acc])
+        risk_names = BASE_FEATURE_NAMES + ['risk_rsi', 'risk_atr', 'tp_accuracy', 'sell_accuracy']
+        risk_pred = self._predict_buy('risk', risk_features, risk_names)
+        if risk_pred is not None:
+            votes['risk'] = risk_pred
+        else:
+            votes['risk'] = 1 if rsi < 72 else 0
+        
+        # Pattern model: BASE(38) + price_momentum + tp_accuracy + sell_accuracy = 41
+        pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                        market_sentiment=market_sentiment,
+                                                        candle_analysis=candle_analysis,
+                                                        extra_features=[price_momentum, _tp_acc, _sl_acc])
+        pattern_names = BASE_FEATURE_NAMES + ['pattern_momentum', 'tp_accuracy', 'sell_accuracy']
+        pattern_pred = self._predict_buy('pattern', pattern_features, pattern_names)
+        if pattern_pred is not None:
+            votes['pattern'] = pattern_pred
+        else:
+            votes['pattern'] = 1 if (price_momentum > -0.5 or is_rejection) else 0
+        
+        # Chart CNN model: BASE(38) + bullish_chart + bearish_chart + neutral_chart + tp_accuracy + sell_accuracy = 43
+        bullish_chart = 1 if (rsi < 40 and macd > 0 and volume_ratio > 1.2) else 0
+        bearish_chart = 1 if (rsi > 65 and macd < 0) else 0
+        neutral_chart = 1 if (40 <= rsi <= 60) else 0
+        cnn_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                     market_sentiment=market_sentiment,
+                                                     extra_features=[bullish_chart, bearish_chart, neutral_chart, _tp_acc, _sl_acc])
+        cnn_names = BASE_FEATURE_NAMES + ['bullish_chart', 'bearish_chart', 'neutral_chart', 'tp_accuracy', 'sell_accuracy']
+        cnn_pred = self._predict_buy('chart_cnn', cnn_features, cnn_names)
+        if cnn_pred is not None:
+            votes['cnn'] = cnn_pred
+        else:
+            votes['cnn'] = 1 if (macd > 0.2 and volume_ratio > 0.9) else 0
+        
+        # Anomaly model: BASE(38) + anomaly_score + tp_accuracy + sell_accuracy = 41
+        anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                        market_sentiment=market_sentiment,
+                                                        extra_features=[abs(price_momentum), _tp_acc, _sl_acc])
+        anomaly_names = BASE_FEATURE_NAMES + ['anomaly_score', 'tp_accuracy', 'sell_accuracy']
+        anomaly_pred = self._predict_buy('anomaly', anomaly_features, anomaly_names)
+        if anomaly_pred is not None:
+            votes['anomaly'] = anomaly_pred
+        else:
+            votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 90) else 0
+        
+        # Liquidity model - يتعلم profit > 0 = 1
+        liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
+        liquidity_features = [
+            0, volume_ratio, 0, 0,
+            (liquidity_metrics or {}).get('depth_ratio', 1.0),
+            liquidity_score,
+            (liquidity_metrics or {}).get('price_impact', 0.5),
+            (liquidity_metrics or {}).get('volume_consistency', 50),
+            1 if liquidity_score > 70 else 0,
+            1 if (liquidity_metrics or {}).get('price_impact', 0.5) < 0.3 else 0,
+            1 if (liquidity_metrics or {}).get('volume_consistency', 50) > 60 else 0,
+            self._model_accuracy.get('exit', 0.5),
+            self._model_accuracy.get('risk', 0.5)
+        ]
+        liquidity_names = [
+            'profit', 'volume_ratio', 'bid_ask_spread', 'volume_trend',
+            'depth_ratio', 'liquidity_score', 'price_impact', 'volume_consistency',
+            'good_liquidity', 'low_impact', 'consistent_vol', 'tp_accuracy', 'sell_accuracy'
+        ]
+        liq_pred = self._predict_buy('liquidity', liquidity_features, liquidity_names)
+        if liq_pred is not None:
+            votes['liquidity'] = liq_pred
+        else:
+            if liquidity_metrics:
+                votes['liquidity'] = 1 if (liquidity_score >= 50 and volume_ratio > 0.8) else 0
+            else:
+                votes['liquidity'] = 1 if volume_ratio > 0.8 else 0
+        
+        # MTF vote - لا يوجد موديل مخصص، نستخدم المنطق اليدوي
+        votes['mtf'] = 1 if (macd > 0 and volume_ratio > 1.0) else 0
         
         return votes, market_status
 
