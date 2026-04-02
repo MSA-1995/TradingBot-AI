@@ -97,6 +97,20 @@ def process_buy(result, exchange, ctx):
             'smart_money_score': models_scores.get('smart_money', 0)
         }
 
+        # إضافة بيانات السيولة الحقيقية من Order Book
+        try:
+            from analysis import get_liquidity_metrics
+            liquidity = get_liquidity_metrics(exchange, symbol)
+            advisor_scores['liquidity_score'] = liquidity.get('liquidity_score', 50)
+            advisor_scores['depth_ratio'] = liquidity.get('depth_ratio', 1.0)
+            advisor_scores['price_impact'] = liquidity.get('price_impact', 0.5)
+            advisor_scores['volume_consistency'] = liquidity.get('volume_consistency', 50)
+        except:
+            advisor_scores['liquidity_score'] = 50
+            advisor_scores['depth_ratio'] = 1.0
+            advisor_scores['price_impact'] = 0.5
+            advisor_scores['volume_consistency'] = 50
+
         position_data.update({
             'tp_target':      0,
             'sl_target':      0,
