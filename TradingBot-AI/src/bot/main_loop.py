@@ -226,6 +226,14 @@ def run_main_loop(exchange, ctx):
 
             # Report
             if should_send_report(last_report_time, REPORT_INTERVAL):
+                # 🔄 فحص تحديثات النماذج كل 7 ساعات
+                try:
+                    dl_client = ctx.get('dl_client')
+                    if dl_client and hasattr(dl_client, 'check_for_updates'):
+                        dl_client.check_for_updates()
+                except Exception as e:
+                    print(f"⚠️ Model update check error: {e}")
+                
                 # --- Network Convoy for Reporting ---
                 # Fetch all tickers at once to reduce network requests.
                 open_positions_data = {}
