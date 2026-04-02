@@ -11,8 +11,14 @@ import time
 # ================================================================
 
 def execute_buy(exchange, symbol, amount_usd, price, confidence):
-    """Execute buy order"""
+    """Execute buy order with minimum value protection"""
     try:
+        # 🛡️ حماية: فحص لو القيمة بعد -2% stop loss أقل من $10
+        expected_value_after_sl = amount_usd * 0.98  # -2% stop loss
+        if expected_value_after_sl < 10.0:
+            print(f"⚠️ Buy blocked: ${amount_usd:.2f} would be ${expected_value_after_sl:.2f} after -2% SL (< $10 minimum)")
+            return {'success': False, 'error': 'Value after stop loss below minimum'}
+        
         amount = amount_usd / price
         order = exchange.create_market_buy_order(symbol, amount)
         
