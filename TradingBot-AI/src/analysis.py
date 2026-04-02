@@ -265,7 +265,7 @@ def analyze_reversal(df, rsi):
     if df is None or len(df) < 8:
         return base_result
 
-    if rsi > 75:
+    if rsi > 80:
         base_result['reasons'].append(f'RSI Overbought ({rsi:.0f})')
         return base_result
 
