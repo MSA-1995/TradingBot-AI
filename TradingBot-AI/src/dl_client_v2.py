@@ -169,9 +169,7 @@ class DeepLearningClientV2:
 
     def _print_models_status(self):
         """طباعة حالة جميع الموديلات المدربة عند بداية التشغيل"""
-        print("\n" + "=" * 60)
-        print("🧠 TRAINED MODELS STATUS")
-        print("=" * 60)
+        print("\nTrained Models:")
         
         all_models = [
             'smart_money', 'risk', 'anomaly', 'exit', 'pattern',
@@ -182,17 +180,14 @@ class DeepLearningClientV2:
         for name in all_models:
             if name in self._models:
                 acc = self._model_accuracy.get(name, 0)
-                trained = self._model_trained_at.get(name, 'N/A')
                 if acc > 0:
-                    status = "✅ ACTIVE" if acc >= 0.55 else "⚠️ WEAK"
-                    bar = "█" * int(acc * 20) + "░" * (20 - int(acc * 20))
-                    print(f"  {name:15s} | {status} | Accuracy: {acc*100:5.1f}% | {bar} | Trained: {trained}")
+                    print(f"  {name}: {acc*100:.1f}%")
                 else:
-                    print(f"  {name:15s} | ❌ NO DATA | Accuracy:   0.0% | ░░░░░░░░░░░░░░░░░░░░ | Trained: {trained}")
+                    print(f"  {name}: No data")
             else:
-                print(f"  {name:15s} | ❌ NOT LOADED")
+                print(f"  {name}: Not loaded")
         
-        print("=" * 60 + "\n")
+        print("")
 
     def get_model_accuracy(self, model_name):
         """جلب دقة الموديل المدرب"""
