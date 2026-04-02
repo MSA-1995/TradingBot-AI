@@ -88,7 +88,13 @@ def process_sell(result, exchange, ctx):
         try:
             news_analyzer = advisor_manager.get('NewsAnalyzer') if advisor_manager else None
             if news_analyzer:
-                news_sentiment = news_analyzer.get_news_sentiment(symbol)
+                # محاولة بـ 24 ساعة أولاً، بعدين 48 ساعة، بعدين 72 ساعة
+                news_sentiment = None
+                for hours in [24, 48, 72]:
+                    news_sentiment = news_analyzer.get_news_sentiment(symbol, hours=hours)
+                    if news_sentiment:
+                        break
+                
                 if news_sentiment:
                     news_data = {
                         'positive': news_sentiment.get('positive', 0),
