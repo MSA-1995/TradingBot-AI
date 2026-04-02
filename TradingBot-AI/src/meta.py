@@ -488,9 +488,11 @@ class Meta:
                         pass
                 
                 # جلب التصويت من كل مستشار
-                sell_votes = dl_client.vote_sell_now(
+                sell_votes, market_status = dl_client.vote_sell_now(
                     rsi=rsi, macd=macd_diff, volume_ratio=volume_ratio,
-                    price_momentum=price_momentum, liquidity_metrics=liquidity_metrics
+                    price_momentum=price_momentum, liquidity_metrics=liquidity_metrics,
+                    market_sentiment=analysis.get('market_sentiment'),
+                    candle_analysis=analysis.get('candle_analysis')
                 )
                 
                 if sell_votes:
