@@ -155,11 +155,11 @@ class Meta:
         volume_ratio = analysis_data.get('volume_ratio', 1.0)
         ema_crossover = analysis_data.get('ema_crossover', 0)
 
-        # 🚨 فحص RSI أولاً - إذا تشبع شرائي (>75) لا تشتري!
-        if rsi > 75:
+        # 🚨 فحص RSI أولاً - إذا تشبع شرائي جداً (>80) لا تشتري!
+        if rsi > 80:
             return {
                 'action': 'DISPLAY',
-                'reason': f'🚫 RSI Overbought ({rsi:.0f}) - No Buy',
+                'reason': f'🚫 RSI Extremely Overbought ({rsi:.0f}) - No Buy',
                 'confidence': 0,
                 'rsi': rsi
             }
