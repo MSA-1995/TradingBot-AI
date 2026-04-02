@@ -850,16 +850,29 @@ class DeepLearningClientV2:
         except Exception as e:
             return {}
 
-    def vote_sell_now(self, rsi, macd, volume_ratio, price_momentum, liquidity_metrics=None, candle_analysis=None):
+    def vote_sell_now(self, rsi, macd, volume_ratio, price_momentum, liquidity_metrics=None, candle_analysis=None, market_sentiment=None):
         """
         البيع: يصوتون بالقمة - يستخدم الموديلات المدربة أولاً، مع fallback للمنطق اليدوي
         """
         votes = {}
 
-        # استخراج تحليل الشموع (شمعة قمة)
+        # استخراج تحليل الشموع
         is_peak_candle = False
+        is_rejection = False
         if candle_analysis:
             is_peak_candle = candle_analysis.get('is_peak', False)
+            is_rejection = candle_analysis.get('is_rejection', False)
+
+        # تحديد حالة السوق من المعنويات الفعلية
+        btc_change = 0
+        if market_sentiment:
+            btc_change = market_sentiment.get('btc_change_1h', 0)
+        if btc_change > 1.0:
+            market_status = 'bullish'
+        elif btc_change < -1.0:
+            market_status = 'bearish'
+        else:
+            market_status = 'neutral'
 
         # ===== استخدام الموديلات المدربة للتصويت =====
         _tp_acc = self._model_accuracy.get('exit', 0.5)
