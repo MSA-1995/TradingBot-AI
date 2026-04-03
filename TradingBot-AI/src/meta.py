@@ -203,7 +203,17 @@ class Meta:
             direction = f"+{news_boost}" if news_boost > 0 else str(news_boost)
             reasons.append(f"News({direction})")
 
-        # --- 📊 5. فيبوناتشي (مستويات الدعم/المقاومة) ---
+        # --- 📊 5. كشف الذعر/الجشع النفسي (أقل صرامة) ---
+        panic_greed = analysis.get('panic_greed', {})
+        panic_score = panic_greed.get('panic_score', 0)
+        greed_score = panic_greed.get('greed_score', 0)
+
+        if panic_score > 10:  # أقل صرامة (تأثير خفيف)
+            temp_conf -= panic_score * 0.5  # تقليل الثقة قليلاً عند الذعر
+        if greed_score > 10:
+            temp_conf += greed_score * 0.3  # زيادة الثقة قليلاً عند الجشع
+
+        # --- 📊 6. فيبوناتشي (مستويات الدعم/المقاومة) ---
         fib_score = 0
         fib_level = None
         try:
@@ -526,6 +536,10 @@ class Meta:
             else:
                 action = 'HOLD'
                 reason = f"Hold | Score:{peak_score}/110"
+
+        # تجنب التفاؤل في should_sell (أقل صرامة)
+        if profit_percent > 15:
+            reason += " | Optimism Warning"
 
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
