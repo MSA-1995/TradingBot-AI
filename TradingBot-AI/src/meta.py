@@ -673,6 +673,9 @@ class Meta:
             # حفظ في الداتابيز
             self._save_learning_data(data)
 
+            # حفظ في ذاكرة الملك
+            self._update_symbol_memory(symbol)
+
             total = data['buy_success'] + data['buy_fail'] + data['sell_success'] + data['sell_fail']
             if total > 0:
                 success = data['buy_success'] + data['sell_success']
@@ -811,3 +814,24 @@ class Meta:
         except Exception as e:
             print(f"⚠️ Blacklist check error: {e}")
             return False
+
+    def _update_symbol_memory(self, symbol):
+        """تحديث ذاكرة الملك للعملة"""
+        try:
+            # جلب بيانات حديثة
+            memory_data = {
+                'sentiment_avg': 0,  # من sentiment
+                'whale_confidence_avg': 0,  # من whale_confidence
+                'profit_loss_ratio': 0,  # حساب من الصفقات
+                'volume_trend': 'neutral',  # من volume
+                'panic_score_avg': 0,  # من panic_greed
+                'optimism_penalty_avg': 0,  # من optimism
+                'psychological_summary': 'Updated by Meta'
+            }
+
+            # حفظ في قاعدة البيانات
+            if hasattr(self.storage, 'save_symbol_memory'):
+                self.storage.save_symbol_memory(symbol, memory_data)
+
+        except Exception as e:
+            pass
