@@ -281,7 +281,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
         # ========== SELL LOGIC (Delegated to Meta) ==========
         if position:
             sell_logic_start = time.time()
-            decision = meta.should_sell(symbol, position, current_price, analysis, preloaded_advisors)
+            decision = meta.should_sell(symbol, position, current_price, analysis, analysis.get('mtf', {}), preloaded_advisors)
             timing_data['meta_should_sell'] = (time.time() - sell_logic_start) * 1000
 
             if decision and decision.get('action') == 'SELL':
