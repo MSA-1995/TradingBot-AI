@@ -294,6 +294,12 @@ def run_main_loop(exchange, ctx):
             except Exception as e:
                 print(f"⚠️ Memory optimizer error: {e}")
 
+            # Risk / Anomaly / Pattern Reports (عند كل report interval)
+            if should_send_report(last_report_time, REPORT_INTERVAL):
+                risk_manager       = preloaded_advisors.get('RiskManager')
+                anomaly_detector   = preloaded_advisors.get('AnomalyDetector')
+                pattern_recognizer = preloaded_advisors.get('EnhancedPatternRecognition')
+
                 # Risk Report
                 if risk_manager:
                     try:
@@ -338,7 +344,6 @@ def run_main_loop(exchange, ctx):
                             print(f"  Success Rate: {pattern_stats['success_rate']:.1f}%")
                     except Exception as e:
                         print(f"⚠️ Pattern stats error: {e}")
-                    print(f"⚠️ Pattern stats error: {e}")
 
             # Cleanup
             gc.collect()
