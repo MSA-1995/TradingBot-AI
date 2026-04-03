@@ -873,16 +873,16 @@ class DeepLearningClientV2:
         _tp_acc = self._model_accuracy.get('exit', 0.5)
         _sl_acc = self._model_accuracy.get('risk', 0.5)
 
-        # شروط التصويت حسب حالة السوق
-        # Bullish: أسهل (rsi < 50) | Neutral: متوسط (rsi < 40) | Bearish: أصعب (rsi < 30)
+        # شروط التصويت حسب حالة السوق (متوسط - متوافق مع King)
+        # Bullish: أسهل (rsi < 65) | Neutral: متوسط (rsi < 58) | Bearish: أصعب (rsi < 45)
         if market_status == 'bullish':
-            rsi_buy_threshold = 50
-            macd_required = False  # ما يشترط MACD إيجابي
+            rsi_buy_threshold = 65
+            macd_required = False
         elif market_status == 'bearish':
-            rsi_buy_threshold = 30
-            macd_required = True   # يشترط MACD إيجابي
+            rsi_buy_threshold = 45
+            macd_required = True
         else:  # neutral
-            rsi_buy_threshold = 40
+            rsi_buy_threshold = 58
             macd_required = False
 
         # Exit model
@@ -893,7 +893,7 @@ class DeepLearningClientV2:
         if exit_pred is not None:
             votes['exit'] = exit_pred
         else:
-            votes['exit'] = 1 if rsi < rsi_buy_threshold else 0
+            votes['exit'] = 1 if (rsi < rsi_buy_threshold or volume_ratio > 2.0) else 0
 
         # Risk model
         risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -915,13 +915,13 @@ class DeepLearningClientV2:
         if pattern_pred is not None:
             votes['pattern'] = pattern_pred
         else:
-            condition = rsi < rsi_buy_threshold and (macd > 0 if macd_required else True)
+            condition = rsi < rsi_buy_threshold and (macd > -0.5 if macd_required else True)
             votes['pattern'] = 1 if condition else 0
 
         # Chart CNN model
-        bullish_chart = 1 if (rsi < rsi_buy_threshold and macd > 0 and volume_ratio > 1.0) else 0
-        bearish_chart = 1 if (rsi > 65 and macd < 0) else 0
-        neutral_chart = 1 if (40 <= rsi <= 60) else 0
+        bullish_chart = 1 if (rsi < rsi_buy_threshold and macd > -0.3 and volume_ratio > 0.8) else 0
+        bearish_chart = 1 if (rsi > 72 and macd < -0.5) else 0
+        neutral_chart = 1 if (45 <= rsi <= 65) else 0
         cnn_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
                                                      market_sentiment=market_sentiment,
                                                      extra_features=[bullish_chart, bearish_chart, neutral_chart, _tp_acc, _sl_acc])
@@ -930,7 +930,7 @@ class DeepLearningClientV2:
         if cnn_pred is not None:
             votes['cnn'] = cnn_pred
         else:
-            votes['cnn'] = 1 if (rsi < rsi_buy_threshold + 10 and macd > -0.5) else 0
+            votes['cnn'] = 1 if (rsi < rsi_buy_threshold + 10 and macd > -1.0) else 0
 
         # Anomaly model
         anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -941,7 +941,7 @@ class DeepLearningClientV2:
         if anomaly_pred is not None:
             votes['anomaly'] = anomaly_pred
         else:
-            votes['anomaly'] = 1 if (volume_ratio < 5.0 and rsi > 10) else 0
+            votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 80) else 0
 
         # Liquidity model
         liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
@@ -965,10 +965,10 @@ class DeepLearningClientV2:
         if liq_pred is not None:
             votes['liquidity'] = liq_pred
         else:
-            votes['liquidity'] = 1 if (liquidity_score >= 40 and volume_ratio > 0.3) else 0
+            votes['liquidity'] = 1 if (liquidity_score >= 35 and volume_ratio > 0.2) else 0
 
-        # MTF vote
-        votes['mtf'] = 1 if (macd > 0 and rsi < rsi_buy_threshold + 15) else 0
+        # MTF vote - يصوت إذا RSI مقبول والزخم غير سلبي جداً
+        votes['mtf'] = 1 if (rsi < rsi_buy_threshold + 10 and macd > -1.0) else 0
 
         return votes, market_status
 
