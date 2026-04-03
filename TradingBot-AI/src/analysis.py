@@ -515,15 +515,15 @@ def analyze_reversal(df, rsi):
         total_score += vol_score + div_score
         score_breakdown['volume_divergence'] = vol_score + div_score
         
-        # --- 7. Bottom Confirmation - 10 نقطة (ذكي) ---
+        # --- 7. Bottom Confirmation - 10 نقطة (متوسط) ---
         high_20 = df['high'].tail(20).max()
         current_price_now = df.iloc[-1]['close']
         drop_from_high = ((high_20 - current_price_now) / high_20) * 100 if high_20 > 0 else 0
-        if drop_from_high >= 3.0:
+        if drop_from_high >= 2.0:   # متوسط: 2% بدل 3%
             total_score += 10
             score_breakdown['bottom_confirm'] = 10
             reasons.append(f"Bottom Confirmed (-{drop_from_high:.1f}% from high) (+10)")
-        elif drop_from_high < 1.0:
+        elif drop_from_high < 0.5:  # خصم فقط إذا قريب جداً من القمة
             total_score -= 10
             score_breakdown['bottom_confirm'] = -10
             reasons.append(f"Near High (-{drop_from_high:.1f}%) (-10)")
@@ -903,8 +903,11 @@ def analyze_peak(df, rsi):
         # =========================================================
         confidence_percent = min(total_score, 110)
         
-        # إشارة القمة: نقاط كافية أو RSI عالي مع هبوط من القمة
-        is_candle_signal = confidence_percent >= MIN_SELL_CONFIDENCE or (rsi >= 75 and drop_percent >= PEAK_DROP_THRESHOLD)
+        # إشارة القمة (متوسطة): نقاط كافية أو RSI >= 70 مع هبوط بسيط من القمة
+        is_candle_signal = (
+            confidence_percent >= MIN_SELL_CONFIDENCE or
+            (rsi >= 70 and drop_percent >= PEAK_DROP_THRESHOLD * 0.5)  # متوسط: رفع الحساسية
+        )
         
         if trap_is_filter and is_candle_signal:
             is_candle_signal = False
