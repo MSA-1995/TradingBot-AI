@@ -875,6 +875,7 @@ class DeepLearningClientV2:
         Bullish: 3/5 | Neutral: 4/5 | Bearish: 5/5
         Returns: (votes dict, market_status)
         """
+        is_bottom_candle = candle_analysis.get('is_bottom', False) if candle_analysis else False
         votes = {}
 
         # تحديد حالة السوق
@@ -900,7 +901,7 @@ class DeepLearningClientV2:
             rsi_buy_threshold = 48
             macd_required = True
         else:  # neutral
-            rsi_buy_threshold = 60
+            rsi_buy_threshold = 65
             macd_required = False
 
         # 1. Exit model
@@ -911,7 +912,7 @@ class DeepLearningClientV2:
         if exit_pred is not None:
             votes['exit'] = exit_pred
         else:
-            votes['exit'] = 1 if (rsi < rsi_buy_threshold or volume_ratio > 1.8) else 0
+            votes['exit'] = 1 if (rsi < rsi_buy_threshold or (rsi < rsi_buy_threshold + 2 and is_bottom_candle) or volume_ratio > 1.8) else 0
 
         # 2. Risk model
         risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1010,7 +1011,7 @@ class DeepLearningClientV2:
         if exit_pred is not None:
             votes['exit'] = exit_pred
         else:
-            votes['exit'] = 1 if (rsi > 63 or (rsi > 58 and is_peak_candle)) else 0
+            votes['exit'] = 1 if (rsi > 58 or (rsi > 53 and is_peak_candle)) else 0
 
         # 2. Risk model
         risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1020,7 +1021,7 @@ class DeepLearningClientV2:
         if risk_pred is not None:
             votes['risk'] = risk_pred
         else:
-            votes['risk'] = 1 if rsi > 60 else 0
+            votes['risk'] = 1 if rsi > 55 else 0
 
         # 3. Pattern model
         pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1032,7 +1033,7 @@ class DeepLearningClientV2:
         if pattern_pred is not None:
             votes['pattern'] = pattern_pred
         else:
-            votes['pattern'] = 1 if (is_rejection or rsi > 62 or (price_momentum < -0.5 and rsi > 55)) else 0
+            votes['pattern'] = 1 if (is_rejection or rsi > 57 or (price_momentum < -0.4 and rsi > 50)) else 0
 
         # 4. Anomaly model
         anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1043,7 +1044,7 @@ class DeepLearningClientV2:
         if anomaly_pred is not None:
             votes['anomaly'] = anomaly_pred
         else:
-            votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 90) else 0
+            votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 85) else 0
 
         # 5. Liquidity model
         liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
