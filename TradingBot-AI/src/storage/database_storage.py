@@ -228,6 +228,9 @@ class DatabaseStorage:
             whale_confidence FLOAT DEFAULT 0,
             atr_value FLOAT DEFAULT 0,
             sentiment_score FLOAT DEFAULT 0,
+            panic_score FLOAT DEFAULT 0,
+            optimism_penalty FLOAT DEFAULT 0,
+            psychological_analysis TEXT,
             data JSONB,
             timestamp TIMESTAMP DEFAULT NOW()
         );
@@ -406,7 +409,7 @@ class DatabaseStorage:
             conn = self._get_conn()
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO trades_history (symbol, action, profit_percent, sell_reason, tp_target, sl_target, hours_held, whale_confidence, atr_value, sentiment_score, data)
+                INSERT INTO trades_history (symbol, action, profit_percent, sell_reason, tp_target, sl_target, hours_held, whale_confidence, atr_value, sentiment_score, panic_score, optimism_penalty, psychological_analysis, data)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 trade_data.get('symbol'),
@@ -419,6 +422,9 @@ class DatabaseStorage:
                 trade_data.get('whale_confidence', 0),
                 trade_data.get('atr_value', 0),
                 trade_data.get('sentiment_score', 0),
+                trade_data.get('panic_score', 0),
+                trade_data.get('optimism_penalty', 0),
+                trade_data.get('psychological_analysis', ''),
                 self.json.dumps(trade_data, default=str)
             ))
             conn.commit()
