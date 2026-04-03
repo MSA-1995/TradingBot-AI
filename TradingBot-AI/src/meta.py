@@ -517,25 +517,25 @@ class Meta:
         min_votes_needed = mood_details.get('min_votes_needed', 4)
         total_advisors = mood_details.get('total_advisors', 7)
         
-        # تحسين: إذا النقاط عالية جداً (≥MIN_SELL_CONFIDENCE+10) أو RSI عالي جداً (≥75)، نبيع بتصويت أقل
-        urgent_sell = sell_conf >= MIN_SELL_CONFIDENCE + 10 or rsi >= 75
+        # متوسط: إذا النقاط عالية (≥MIN_SELL_CONFIDENCE+10) أو RSI عالي (≥73)، نبيع بتصويت أقل
+        urgent_sell = sell_conf >= MIN_SELL_CONFIDENCE + 10 or rsi >= 73
         
         if urgent_sell:
             # حالة طوارئ: نحتاج 3/7 فقط
-            if sell_vote_count >= 3 and peak_score >= MIN_SELL_CONFIDENCE:
+            if sell_vote_count >= 3 and sell_conf >= MIN_SELL_CONFIDENCE:
                 action = 'SELL'
                 reason = f"URGENT SELL | Score:{sell_conf}/110 | RSI:{rsi:.0f} | {', '.join(sell_reasons[:3])}"
             else:
                 action = 'HOLD'
-                reason = f"Hold | Score:{peak_score}/110 | Need Score>={MIN_SELL_CONFIDENCE}"
+                reason = f"Hold | Score:{sell_conf}/110 | Need Score>={MIN_SELL_CONFIDENCE}"
         else:
             # حالة عادية: نحتاج التصويت الكامل
-            if sell_vote_count >= min_votes_needed and peak_score >= MIN_SELL_CONFIDENCE:
+            if sell_vote_count >= min_votes_needed and sell_conf >= MIN_SELL_CONFIDENCE:
                 action = 'SELL'
                 reason = f"SELL | Score:{sell_conf}/110 | {', '.join(sell_reasons[:3])}"
             else:
                 action = 'HOLD'
-                reason = f"Hold | Score:{peak_score}/110"
+                reason = f"Hold | Score:{sell_conf}/110"
 
         # تجنب التفاؤل في should_sell (أقل صرامة)
         if profit_percent > 15:
