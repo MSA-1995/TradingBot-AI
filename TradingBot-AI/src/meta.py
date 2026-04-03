@@ -283,14 +283,29 @@ class Meta:
                     market_sentiment=market_sentiment,
                     candle_analysis=candle_analysis
                 )
-                
+
                 if buy_votes:
                     total_advisors = len(buy_votes)
                     buy_vote_count = sum(1 for v in buy_votes.values() if v == 1)
                     vote_breakdown = buy_votes
+                    print(f"🗳️ BUY votes [{symbol}]: {buy_vote_count}/{total_advisors} | {buy_votes}")
+                else:
+                    print(f"⚠️ BUY vote_buy_now returned empty for {symbol} - using King fallback")
+            else:
+                print(f"⚠️ BUY dl_client not available or missing vote_buy_now for {symbol} - using King fallback")
         except Exception as e:
-            print(f"⚠️ Buy voting error: {e}")
-            pass
+            print(f"⚠️ Buy voting error [{symbol}]: {e}")
+
+        # 🔄 Fallback: إذا فشل التصويت، الملك يقرر بناءً على الثقة وحده
+        if total_advisors == 0:
+            fallback_votes = 0
+            if temp_conf >= MIN_CONFIDENCE + 20: fallback_votes = 5
+            elif temp_conf >= MIN_CONFIDENCE + 10: fallback_votes = 4
+            elif temp_conf >= MIN_CONFIDENCE: fallback_votes = 3
+            buy_vote_count = fallback_votes
+            total_advisors = 5
+            vote_breakdown = {'king_fallback': fallback_votes}
+            print(f"🔄 BUY fallback votes [{symbol}]: {buy_vote_count}/5 (conf={temp_conf})")
 
         # =========================================================
         # 👑 6. الملك يقرر أولاً (Independent Decision)
@@ -553,9 +568,24 @@ class Meta:
                     total_advisors = len(sell_votes)
                     sell_vote_count = sum(1 for v in sell_votes.values() if v == 1)
                     vote_breakdown = sell_votes
+                    print(f"🗳️ SELL votes [{symbol}]: {sell_vote_count}/{total_advisors} | {sell_votes}")
+                else:
+                    print(f"⚠️ SELL vote_sell_now returned empty for {symbol} - using King fallback")
+            else:
+                print(f"⚠️ SELL dl_client not available or missing vote_sell_now for {symbol} - using King fallback")
         except Exception as e:
-            print(f"⚠️ Meta sell voting error: {e}")
-            pass
+            print(f"⚠️ Meta sell voting error [{symbol}]: {e}")
+
+        # 🔄 Fallback: إذا فشل التصويت في البيع، الملك يقرر بناءً على النقاط وحده
+        if total_advisors == 0:
+            fallback_votes = 0
+            if sell_conf >= MIN_SELL_CONFIDENCE + 20: fallback_votes = 5
+            elif sell_conf >= MIN_SELL_CONFIDENCE + 10: fallback_votes = 4
+            elif sell_conf >= MIN_SELL_CONFIDENCE: fallback_votes = 3
+            sell_vote_count = fallback_votes
+            total_advisors = 5
+            vote_breakdown = {'king_fallback': fallback_votes}
+            print(f"🔄 SELL fallback votes [{symbol}]: {sell_vote_count}/5 (score={sell_conf})")
 
         # --- 4. القرار الملكي النهائي: نقاط + التصويت (مع صبر لحلب العملة) ---
         min_votes_needed = mood_details.get('min_votes_needed', 4)
