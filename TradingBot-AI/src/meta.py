@@ -423,7 +423,6 @@ class Meta:
         sell_conf = 20
         sell_reasons = []
 
-        rsi = analysis.get('rsi', 50)
         macd_diff = analysis.get('macd_diff', 0)
         volume_ratio = analysis.get('volume_ratio', 1.0)
         ema_crossover = analysis.get('ema_crossover', 0)
