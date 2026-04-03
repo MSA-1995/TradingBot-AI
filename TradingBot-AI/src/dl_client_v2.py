@@ -343,10 +343,8 @@ class DeepLearningClientV2:
             return None  # النموذج غير محمل -> rule-based fallback
 
         try:
-            print(f"Features for {model_name}: {features}")
             X = pd.DataFrame([features], columns=feature_names)
             prediction = model.predict(X)[0]
-            print(f"Prediction for {model_name}: {prediction}")
             return int(prediction)
         except Exception as e:
             print(f"⚠️ Predict error for '{model_name}': {e}")
@@ -877,7 +875,6 @@ class DeepLearningClientV2:
         Bullish: 3/5 | Neutral: 4/5 | Bearish: 5/5
         Returns: (votes dict, market_status)
         """
-        print(f"Debug vote_buy_now: rsi={rsi}, macd={macd}, volume_ratio={volume_ratio}, price_momentum={price_momentum}, confidence={confidence}")
         votes = {}
 
         # تحديد حالة السوق
@@ -890,8 +887,6 @@ class DeepLearningClientV2:
             market_status = 'bearish'
         else:
             market_status = 'neutral'
-
-        print(f"Market status: {market_status}")
 
         _tp_acc = self._model_accuracy.get('exit', 0.5)
         _sl_acc = self._model_accuracy.get('risk', 0.5)
@@ -908,8 +903,6 @@ class DeepLearningClientV2:
             rsi_buy_threshold = 60
             macd_required = False
 
-        print(f"RSI buy threshold: {rsi_buy_threshold}, MACD required: {macd_required}")
-
         # 1. Exit model
         exit_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
                                                      extra_features=[24, _tp_acc, _sl_acc])
@@ -919,7 +912,6 @@ class DeepLearningClientV2:
             votes['exit'] = exit_pred
         else:
             votes['exit'] = 1 if (rsi < rsi_buy_threshold or volume_ratio > 1.8) else 0
-        print(f"Exit vote: {votes['exit']} (pred: {exit_pred})")
 
         # 2. Risk model
         risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -930,7 +922,6 @@ class DeepLearningClientV2:
             votes['risk'] = risk_pred
         else:
             votes['risk'] = 1 if rsi < rsi_buy_threshold + 8 else 0
-        print(f"Risk vote: {votes['risk']} (pred: {risk_pred})")
 
         # 3. Pattern model
         pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -944,7 +935,6 @@ class DeepLearningClientV2:
         else:
             condition = rsi < rsi_buy_threshold and (macd > -1.0 if macd_required else True)
             votes['pattern'] = 1 if condition else 0
-        print(f"Pattern vote: {votes['pattern']} (pred: {pattern_pred})")
 
         # 4. Anomaly model
         anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -956,7 +946,6 @@ class DeepLearningClientV2:
             votes['anomaly'] = anomaly_pred
         else:
             votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 80) else 0
-        print(f"Anomaly vote: {votes['anomaly']} (pred: {anomaly_pred})")
 
         # 5. Liquidity model
         liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
@@ -981,8 +970,6 @@ class DeepLearningClientV2:
             votes['liquidity'] = liq_pred
         else:
             votes['liquidity'] = 1 if (liquidity_score >= 30 and volume_ratio > 0.2) else 0
-        print(f"Liquidity vote: {votes['liquidity']} (pred: {liq_pred})")
-        print(f"Final votes: {votes}")
 
         return votes, market_status
 
