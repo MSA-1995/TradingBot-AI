@@ -245,6 +245,19 @@ class DatabaseStorage:
             success_rate FLOAT,
             last_updated TIMESTAMP DEFAULT NOW()
         );
+        CREATE TABLE IF NOT EXISTS symbol_memory (
+            id SERIAL PRIMARY KEY,
+            symbol VARCHAR(20) UNIQUE,
+            sentiment_avg FLOAT DEFAULT 0,
+            whale_confidence_avg FLOAT DEFAULT 0,
+            profit_loss_ratio FLOAT DEFAULT 0,
+            volume_trend VARCHAR(10) DEFAULT 'neutral',
+            last_interaction TIMESTAMP DEFAULT NOW(),
+            panic_score_avg FLOAT DEFAULT 0,
+            optimism_penalty_avg FLOAT DEFAULT 0,
+            psychological_summary TEXT,
+            updated_at TIMESTAMP DEFAULT NOW()
+        );
         CREATE TABLE IF NOT EXISTS ai_decisions (
             id SERIAL PRIMARY KEY,
             symbol VARCHAR(20),
@@ -1112,3 +1125,60 @@ class DatabaseStorage:
             if conn:
                 conn.rollback() # Always rollback to ensure clean state
                 self._put_conn(conn)
+
+    def save_symbol_memory(self, symbol, data):
+        """حفظ بيانات ذاكرة الملك للعملة"""
+        conn = None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO symbol_memory (
+                    symbol, sentiment_avg, whale_confidence_avg, profit_loss_ratio,
+                    volume_trend, panic_score_avg, optimism_penalty_avg, psychological_summary
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (symbol) DO UPDATE SET
+                    sentiment_avg = EXCLUDED.sentiment_avg,
+                    whale_confidence_avg = EXCLUDED.whale_confidence_avg,
+                    profit_loss_ratio = EXCLUDED.profit_loss_ratio,
+                    volume_trend = EXCLUDED.volume_trend,
+                    panic_score_avg = EXCLUDED.panic_score_avg,
+                    optimism_penalty_avg = EXCLUDED.optimism_penalty_avg,
+                    psychological_summary = EXCLUDED.psychological_summary,
+                    updated_at = NOW()
+            """, (
+                symbol,
+                data.get('sentiment_avg', 0),
+                data.get('whale_confidence_avg', 0),
+                data.get('profit_loss_ratio', 0),
+                data.get('volume_trend', 'neutral'),
+                data.get('panic_score_avg', 0),
+                data.get('optimism_penalty_avg', 0),
+                data.get('psychological_summary', '')
+            ))
+            conn.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"Error saving symbol memory: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+
+    def get_symbol_memory(self, symbol):
+        """جلب ذاكرة الملك للعملة"""
+        conn = None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SELECT * FROM symbol_memory WHERE symbol = %s", (symbol,))
+            result = cursor.fetchone()
+            cursor.close()
+            return result
+        except Exception as e:
+            print(f"Error getting symbol memory: {e}")
+            return None
+        finally:
+            if conn:
+                conn.close()
