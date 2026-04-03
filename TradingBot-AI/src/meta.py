@@ -296,7 +296,7 @@ class Meta:
         # 👑 6. الملك يقرر أولاً (Independent Decision)
         # =========================================================
         min_votes_needed = mood_details.get('min_votes_needed', 4)
-        total_advisors = mood_details.get('total_advisors', 7)
+        total_advisors = mood_details.get('total_advisors', 5)  # 5 مستشارين فقط
         
         # نقاط الشموع من تحليل القاع
         candle_score = reversal.get('confidence', 0)
@@ -305,12 +305,12 @@ class Meta:
         king_wants_to_buy = False
         king_reason = ""
         
-        # الشرط 1: نقاط كافية (Reversal ≥ MIN_CONFIDENCE)
+        # الشرط 1: إشارة انعكاس شمعي واضحة
         if reversal.get('candle_signal', False):
             king_wants_to_buy = True
             king_reason = f"King: Reversal Signal ({candle_score}/110)"
         
-        # الشرط 2: أو ثقة الملك عالية (temp_conf ≥ MIN_CONFIDENCE)
+        # الشرط 2: ثقة الملك عالية
         elif temp_conf >= MIN_CONFIDENCE:
             king_wants_to_buy = True
             king_reason = f"King: High Confidence ({temp_conf}/110)"
@@ -319,8 +319,7 @@ class Meta:
         # 🗳️ 7. التصويت الفوري بعد قرار الملك
         # =========================================================
         if king_wants_to_buy and market_mood != "Bearish":
-            # الملك قال: أريد الشراء
-            # المستشارين: موافقين؟
+            # Bullish: 3/6 | Neutral: 4/6
             if buy_vote_count >= min_votes_needed:
                 action = "BUY"
                 reason = f"BUY ✅ | King:{temp_conf} | Votes:{buy_vote_count}/{min_votes_needed} | {', '.join(reasons[:3])}"
@@ -328,11 +327,16 @@ class Meta:
                 action = "DISPLAY"
                 reason = f"King:{temp_conf}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed} (Need {min_votes_needed})"
         elif king_wants_to_buy and market_mood == "Bearish":
-            action = "DISPLAY"
-            reason = f"Blocked (Bearish Market) | King:{temp_conf}"
+            # Bearish: يسمح بالشراء بشروط صارمة جداً (5/5 + إشارة شمعية قوية)
+            if buy_vote_count >= 5 and reversal.get('candle_signal', False) and candle_score >= 50:
+                action = "BUY"
+                reason = f"BUY (Bearish Override) ✅ | King:{temp_conf} | Votes:5/5 | Signal:{candle_score}/110"
+            else:
+                action = "DISPLAY"
+                reason = f"Bearish | King:{temp_conf} | Votes:{buy_vote_count}/5 | Need strong candle signal"
         else:
             # الملك مو راضي
-            reason = f"King Confidence:{temp_conf}/{MIN_CONFIDENCE} | Need {min_votes_needed} votes"
+            reason = f"King Confidence:{temp_conf}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed}"
 
         decision = {
             'action': action,
@@ -403,8 +407,12 @@ class Meta:
         peak_score = peak_analysis.get('confidence', 0)
         candle_condition = peak_analysis.get('candle_signal', False)
 
-        # متوازن: نقاط ≥MIN_SELL_CONFIDENCE أو شمعة قمة قوية
-        trigger_activated = candle_condition or peak_score >= MIN_SELL_CONFIDENCE
+        # متوسط: نقاط ≥ MIN_SELL_CONFIDENCE أو شمعة قمة أو RSI مرتفع مع ربح كافٍ
+        trigger_activated = (
+            candle_condition or
+            peak_score >= MIN_SELL_CONFIDENCE or
+            (rsi >= 72 and profit_percent >= 1.0)  # متوسط: RSI عالي + ربح = يُفعّل
+        )
 
         if not trigger_activated:
             return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/110', 'profit': profit_percent}
@@ -549,13 +557,13 @@ class Meta:
 
         # --- 4. القرار الملكي النهائي: نقاط + التصويت (مع صبر لحلب العملة) ---
         min_votes_needed = mood_details.get('min_votes_needed', 4)
-        total_advisors = mood_details.get('total_advisors', 7)
+        total_advisors = mood_details.get('total_advisors', 5)  # 5 مستشارين فقط
         
         # متوسط: إذا النقاط عالية (≥MIN_SELL_CONFIDENCE+10) أو RSI عالي (≥73)، نبيع بتصويت أقل
         urgent_sell = sell_conf >= MIN_SELL_CONFIDENCE + 10 or rsi >= 73
         
         if urgent_sell:
-            # حالة طوارئ: نحتاج 3/7 فقط
+            # حالة طوارئ: نحتاج 3/5 فقط
             if sell_vote_count >= 3 and sell_conf >= MIN_SELL_CONFIDENCE:
                 action = 'SELL'
                 reason = f"URGENT SELL | Score:{sell_conf}/110 | RSI:{rsi:.0f} | {', '.join(sell_reasons[:3])}"
@@ -563,13 +571,13 @@ class Meta:
                 action = 'HOLD'
                 reason = f"Hold | Score:{sell_conf}/110 | Need Score>={MIN_SELL_CONFIDENCE}"
         else:
-            # حالة عادية: نحتاج التصويت الكامل
+            # حالة عادية: نحتاج التصويت المطلوب حسب المود
             if sell_vote_count >= min_votes_needed and sell_conf >= MIN_SELL_CONFIDENCE:
                 action = 'SELL'
-                reason = f"SELL | Score:{sell_conf}/110 | {', '.join(sell_reasons[:3])}"
+                reason = f"SELL | Score:{sell_conf}/110 | Votes:{sell_vote_count}/{min_votes_needed} | {', '.join(sell_reasons[:3])}"
             else:
                 action = 'HOLD'
-                reason = f"Hold | Score:{sell_conf}/110"
+                reason = f"Hold | Score:{sell_conf}/110 | Votes:{sell_vote_count}/{min_votes_needed}"
 
         # تجنب التفاؤل في should_sell (أقل صرامة)
         if profit_percent > 15:
@@ -599,16 +607,16 @@ class Meta:
         mood_details = {}
         if up_count >= 2:
             mood_details['mood'] = "Bullish"
-            mood_details['min_votes_needed'] = 3  # 3/6 موافقين
-            mood_details['total_advisors'] = 6
+            mood_details['min_votes_needed'] = 3   # 3/5 موافقين - سوق صاعد
+            mood_details['total_advisors'] = 5
         elif down_count >= 2:
             mood_details['mood'] = "Bearish"
-            mood_details['min_votes_needed'] = 5  # 5/6 موافقين
-            mood_details['total_advisors'] = 6
+            mood_details['min_votes_needed'] = 5   # 5/5 موافقين - سوق هابط
+            mood_details['total_advisors'] = 5
         else:
             mood_details['mood'] = "Neutral"
-            mood_details['min_votes_needed'] = 4  # 4/6 موافقين
-            mood_details['total_advisors'] = 6
+            mood_details['min_votes_needed'] = 4   # 4/5 موافقين - سوق محايد
+            mood_details['total_advisors'] = 5
         
         return mood_details
 
