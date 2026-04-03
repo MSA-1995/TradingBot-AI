@@ -536,6 +536,24 @@ def analyze_reversal(df, rsi):
         current_price = df.iloc[-1]['close']
         bounce_percent = ((current_price - low_n) / low_n) * 100 if low_n > 0 else 0
         
+        # --- Trap Detection (فحص آخر 3 شموع للفخاخ)
+        trap_is_filter = False
+        if len(df) >= 20:
+            avg_volume = df['volume'].tail(20).mean()
+            for check_idx in range(1, min(4, len(df) + 1)):
+                check_candle = df.iloc[-check_idx]
+                check_volume = check_candle['volume']
+                if avg_volume > 0 and check_volume > avg_volume * 3.5:  # متوسط: 3.5x بدل 3x
+                    candle_body = abs(check_candle['close'] - check_candle['open'])
+                    candle_range = check_candle['high'] - check_candle['low']
+                    if candle_range > 0 and candle_body > 0:
+                        upper_shadow = check_candle['high'] - max(check_candle['close'], check_candle['open'])
+                        # فخ صعود وهمي: ظل علوي كبير مع حجم عالي
+                        if upper_shadow > candle_body * 3.5:  # متوسط: 3.5x
+                            trap_is_filter = True
+                            reasons.append(f"⚠️ Fake Pump Trap (Candle-{check_idx})")
+                            break
+
         # =========================================================
         # 🎯 القرار النهائي (المجموع = 110 نقطة)
         # =========================================================
