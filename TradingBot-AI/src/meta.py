@@ -268,6 +268,7 @@ class Meta:
                 peak = analysis_data.get('peak', {})
                 candle_analysis = {
                     'is_reversal': reversal.get('candle_signal', False),
+                    'is_bottom':   reversal.get('candle_signal', False),
                     'is_peak':     peak.get('candle_signal', False),
                     'is_rejection': peak.get('candle_signal', False),
                     'reversal_confidence': reversal.get('confidence', 0),
@@ -548,6 +549,7 @@ class Meta:
                 peak = analysis.get('peak', {})
                 candle_analysis = {
                     'is_reversal': reversal.get('candle_signal', False),
+                    'is_bottom':   reversal.get('candle_signal', False),
                     'is_peak':     peak.get('candle_signal', False),
                     'is_rejection': peak.get('candle_signal', False),
                     'reversal_confidence': reversal.get('confidence', 0),
