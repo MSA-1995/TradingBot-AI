@@ -1037,7 +1037,7 @@ class DeepLearningClientV2:
         if risk_pred is not None:
             votes['risk'] = risk_pred
         else:
-            votes['risk'] = 1 if rsi < 72 else 0
+            votes['risk'] = 1 if rsi > 68 else 0  # متوسط: يصوت للبيع عند RSI > 68
         
         # Pattern model: BASE(38) + price_momentum + tp_accuracy + sell_accuracy = 41
         pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1104,8 +1104,8 @@ class DeepLearningClientV2:
             else:
                 votes['liquidity'] = 1 if volume_ratio > 0.8 else 0
         
-        # MTF vote - لا يوجد موديل مخصص، نستخدم المنطق اليدوي
-        votes['mtf'] = 1 if (macd > 0 and volume_ratio > 1.0) else 0
+        # MTF vote - يصوت للبيع عند ضعف الزخم أو ارتفاع RSI (متوسط)
+        votes['mtf'] = 1 if (rsi > 63 or (macd < 0 and volume_ratio < 1.5)) else 0
         
         return votes, market_status
 
