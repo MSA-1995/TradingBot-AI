@@ -173,6 +173,8 @@ class DeepLearningClientV2:
     def _print_models_status(self):
         """طباعة حالة جميع الموديلات المدربة عند بداية التشغيل"""
         print("\nTrained Models:")
+        loaded_count = len(self._models)
+        if loaded_count == 0:
         
         all_models = [
             'smart_money', 'risk', 'anomaly', 'exit', 'pattern',
@@ -319,18 +321,13 @@ class DeepLearningClientV2:
         return base_features
 
     def _predict_buy(self, model_name, features, feature_names):
-        """التنبؤ باستخدام الموديل المدرب - يرجّع 1 (BUY) أو 0 (SKIP)"""
-        model = self._models.get(model_name)
-        if model is None:
-            return None  # الموديل غير محمّل
-        
-        try:
-            X = pd.DataFrame([features], columns=feature_names)
-            prediction = model.predict(X)[0]
-            return int(prediction)
-        except Exception as e:
-            print(f"⚠️ Prediction error for {model_name}: {e}")
-            return None
+        """
+        التنبؤ باستخدام الموديل المدرب.
+        ⚠️ الموديلات الحالية تحيّزت للـ 0 بسبب بيانات تدريب غير كافية.
+        نرجع None دائماً حتى يدخل الـ rule-based fallback في vote_buy_now/vote_sell_now.
+        بعد إعادة التدريب ببيانات كافية، نُفعّل هذه الدالة مجدداً.
+        """
+        return None  # -> rule-based fallback
 
     def _predict_proba(self, model_name, features, feature_names):
         """التنبؤ بالاحتمالية - يرجّع probability للـ class 1"""
@@ -993,7 +990,7 @@ class DeepLearningClientV2:
         if exit_pred is not None:
             votes['exit'] = exit_pred
         else:
-            votes['exit'] = 1 if (rsi > 68 or (rsi > 63 and is_peak_candle)) else 0
+            votes['exit'] = 1 if (rsi > 63 or (rsi > 58 and is_peak_candle)) else 0
 
         # 2. Risk model
         risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1003,7 +1000,7 @@ class DeepLearningClientV2:
         if risk_pred is not None:
             votes['risk'] = risk_pred
         else:
-            votes['risk'] = 1 if rsi > 65 else 0
+            votes['risk'] = 1 if rsi > 60 else 0
 
         # 3. Pattern model
         pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1015,7 +1012,7 @@ class DeepLearningClientV2:
         if pattern_pred is not None:
             votes['pattern'] = pattern_pred
         else:
-            votes['pattern'] = 1 if (price_momentum > -1.0 or is_rejection or rsi > 65) else 0
+            votes['pattern'] = 1 if (is_rejection or rsi > 62 or (price_momentum < -0.5 and rsi > 55)) else 0
 
         # 4. Anomaly model
         anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1051,9 +1048,9 @@ class DeepLearningClientV2:
             votes['liquidity'] = liq_pred
         else:
             if liquidity_metrics:
-                votes['liquidity'] = 1 if (liquidity_score >= 40 and volume_ratio > 0.6) else 0
+                votes['liquidity'] = 1 if (liquidity_score >= 30 and volume_ratio > 0.3) else 0
             else:
-                votes['liquidity'] = 1 if volume_ratio > 0.6 else 0
+                votes['liquidity'] = 1 if volume_ratio > 0.3 else 0
 
         # ✅ 5 مستشارين (exit, risk, pattern, anomaly, liquidity)
         return votes, market_status
