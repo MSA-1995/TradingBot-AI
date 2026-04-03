@@ -901,7 +901,7 @@ class DeepLearningClientV2:
             rsi_buy_threshold = 48
             macd_required = True
         else:  # neutral
-            rsi_buy_threshold = 65
+            rsi_buy_threshold = 70
             macd_required = False
 
         # 1. Exit model
@@ -1011,7 +1011,7 @@ class DeepLearningClientV2:
         if exit_pred is not None:
             votes['exit'] = exit_pred
         else:
-            votes['exit'] = 1 if (rsi > 58 or (rsi > 53 and is_peak_candle)) else 0
+            votes['exit'] = 1 if (rsi > 50 or (rsi > 45 and is_peak_candle)) else 0
 
         # 2. Risk model
         risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1021,7 +1021,7 @@ class DeepLearningClientV2:
         if risk_pred is not None:
             votes['risk'] = risk_pred
         else:
-            votes['risk'] = 1 if rsi > 55 else 0
+            votes['risk'] = 1 if rsi > 45 else 0
 
         # 3. Pattern model
         pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1033,7 +1033,7 @@ class DeepLearningClientV2:
         if pattern_pred is not None:
             votes['pattern'] = pattern_pred
         else:
-            votes['pattern'] = 1 if (is_rejection or rsi > 57 or (price_momentum < -0.4 and rsi > 50)) else 0
+            votes['pattern'] = 1 if (is_rejection or rsi > 50 or (price_momentum < -0.3 and rsi > 40)) else 0
 
         # 4. Anomaly model
         anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
