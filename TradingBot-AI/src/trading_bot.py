@@ -317,7 +317,10 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                         'sell_votes': decision.get('sell_votes', {}),  # أصوات البيع للأرشفة والتعلم
                         'whale_confidence': whale_confidence,
                         'atr_value': atr_value,
-                        'sentiment_score': sentiment_score
+                        'sentiment_score': sentiment_score,
+                        'panic_score': analysis.get('panic_greed', {}).get('panic_score', 0),
+                        'optimism_penalty': 15 if calculate_profit_percent(current_price, position['buy_price']) > 15 else 0,
+                        'psychological_analysis': f"Panic:{analysis.get('panic_greed', {}).get('panic_score', 0)}, Greed:{analysis.get('panic_greed', {}).get('greed_score', 0)}"
                     }
             else: # HOLD
                 with symbols_data_lock:
