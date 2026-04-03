@@ -565,16 +565,16 @@ class Meta:
         mood_details = {}
         if up_count >= 2:
             mood_details['mood'] = "Bullish"
-            mood_details['min_votes_needed'] = 3  # 3/7 موافقين
-            mood_details['total_advisors'] = 7
+            mood_details['min_votes_needed'] = 3  # 3/6 موافقين
+            mood_details['total_advisors'] = 6
         elif down_count >= 2:
             mood_details['mood'] = "Bearish"
-            mood_details['min_votes_needed'] = 5  # 5/7 موافقين
-            mood_details['total_advisors'] = 7
+            mood_details['min_votes_needed'] = 5  # 5/6 موافقين
+            mood_details['total_advisors'] = 6
         else:
             mood_details['mood'] = "Neutral"
-            mood_details['min_votes_needed'] = 4  # 4/7 موافقين
-            mood_details['total_advisors'] = 7
+            mood_details['min_votes_needed'] = 4  # 4/6 موافقين
+            mood_details['total_advisors'] = 6
         
         return mood_details
 
