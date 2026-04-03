@@ -876,7 +876,7 @@ class DeepLearningClientV2:
         Returns: (votes dict, market_status)
         """
         is_bottom_candle = candle_analysis.get('is_bottom', False) if candle_analysis else False
-        votes = {}
+        votes = {'exit': 0, 'risk': 0, 'pattern': 0, 'anomaly': 0, 'liquidity': 0}
 
         # تحديد حالة السوق
         btc_change = 0
@@ -911,8 +911,6 @@ class DeepLearningClientV2:
         exit_pred = self._predict_buy('exit', exit_features, exit_names)
         if exit_pred is not None:
             votes['exit'] = exit_pred
-        else:
-            votes['exit'] = 1 if (rsi < rsi_buy_threshold or (rsi < rsi_buy_threshold + 2 and is_bottom_candle) or volume_ratio > 1.8) else 0
 
         # 2. Risk model
         risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -921,8 +919,6 @@ class DeepLearningClientV2:
         risk_pred = self._predict_buy('risk', risk_features, risk_names)
         if risk_pred is not None:
             votes['risk'] = risk_pred
-        else:
-            votes['risk'] = 1 if rsi < rsi_buy_threshold + 8 else 0
 
         # 3. Pattern model
         pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -933,9 +929,6 @@ class DeepLearningClientV2:
         pattern_pred = self._predict_buy('pattern', pattern_features, pattern_names)
         if pattern_pred is not None:
             votes['pattern'] = pattern_pred
-        else:
-            condition = rsi < rsi_buy_threshold and (macd > -1.0 if macd_required else True)
-            votes['pattern'] = 1 if condition else 0
 
         # 4. Anomaly model
         anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -945,8 +938,6 @@ class DeepLearningClientV2:
         anomaly_pred = self._predict_buy('anomaly', anomaly_features, anomaly_names)
         if anomaly_pred is not None:
             votes['anomaly'] = anomaly_pred
-        else:
-            votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 80) else 0
 
         # 5. Liquidity model
         liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
@@ -969,8 +960,6 @@ class DeepLearningClientV2:
         liq_pred = self._predict_buy('liquidity', liq_features, liq_names)
         if liq_pred is not None:
             votes['liquidity'] = liq_pred
-        else:
-            votes['liquidity'] = 1 if (liquidity_score >= 30 and volume_ratio > 0.2) else 0
 
         return votes, market_status
 
@@ -979,7 +968,7 @@ class DeepLearningClientV2:
         البيع: 5 مستشارين يصوتون بالقمة
         Bullish: 3/5 | Neutral: 4/5 | Bearish: 5/5
         """
-        votes = {}
+        votes = {'exit': 0, 'risk': 0, 'pattern': 0, 'anomaly': 0, 'liquidity': 0}
 
         # استخراج تحليل الشموع
         is_peak_candle = False
@@ -1010,8 +999,6 @@ class DeepLearningClientV2:
         exit_pred = self._predict_buy('exit', exit_features, exit_names)
         if exit_pred is not None:
             votes['exit'] = exit_pred
-        else:
-            votes['exit'] = 1 if (rsi > 50 or (rsi > 45 and is_peak_candle)) else 0
 
         # 2. Risk model
         risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1020,8 +1007,6 @@ class DeepLearningClientV2:
         risk_pred = self._predict_buy('risk', risk_features, risk_names)
         if risk_pred is not None:
             votes['risk'] = risk_pred
-        else:
-            votes['risk'] = 1 if rsi > 45 else 0
 
         # 3. Pattern model
         pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1032,8 +1017,6 @@ class DeepLearningClientV2:
         pattern_pred = self._predict_buy('pattern', pattern_features, pattern_names)
         if pattern_pred is not None:
             votes['pattern'] = pattern_pred
-        else:
-            votes['pattern'] = 1 if (is_rejection or rsi > 50 or (price_momentum < -0.3 and rsi > 40)) else 0
 
         # 4. Anomaly model
         anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1043,8 +1026,6 @@ class DeepLearningClientV2:
         anomaly_pred = self._predict_buy('anomaly', anomaly_features, anomaly_names)
         if anomaly_pred is not None:
             votes['anomaly'] = anomaly_pred
-        else:
-            votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 85) else 0
 
         # 5. Liquidity model
         liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
@@ -1067,11 +1048,6 @@ class DeepLearningClientV2:
         liq_pred = self._predict_buy('liquidity', liquidity_features, liquidity_names)
         if liq_pred is not None:
             votes['liquidity'] = liq_pred
-        else:
-            if liquidity_metrics:
-                votes['liquidity'] = 1 if (liquidity_score >= 30 and volume_ratio > 0.3) else 0
-            else:
-                votes['liquidity'] = 1 if volume_ratio > 0.3 else 0
 
         # ✅ 5 مستشارين (exit, risk, pattern, anomaly, liquidity)
         return votes, market_status
