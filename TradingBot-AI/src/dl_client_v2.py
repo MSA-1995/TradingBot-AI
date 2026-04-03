@@ -853,8 +853,8 @@ class DeepLearningClientV2:
     def vote_buy_now(self, rsi, macd, volume_ratio, price_momentum, confidence=50,
                      liquidity_metrics=None, market_sentiment=None, candle_analysis=None):
         """
-        الشراء: المستشارون يصوتون على القاع
-        Bullish: 3/7 | Neutral: 4/7 | Bearish: 5/7
+        الشراء: 5 مستشارين يصوتون على القاع
+        Bullish: 3/5 | Neutral: 4/5 | Bearish: 5/5
         Returns: (votes dict, market_status)
         """
         votes = {}
@@ -873,19 +873,19 @@ class DeepLearningClientV2:
         _tp_acc = self._model_accuracy.get('exit', 0.5)
         _sl_acc = self._model_accuracy.get('risk', 0.5)
 
-        # شروط التصويت حسب حالة السوق (متوسط - متوافق مع King)
-        # Bullish: أسهل (rsi < 65) | Neutral: متوسط (rsi < 58) | Bearish: أصعب (rsi < 45)
+        # شروط التصويت حسب حالة السوق (متوسط)
+        # Bullish: أسهل (rsi < 65) | Neutral: متوسط (rsi < 60) | Bearish: أصعب (rsi < 48)
         if market_status == 'bullish':
             rsi_buy_threshold = 65
             macd_required = False
         elif market_status == 'bearish':
-            rsi_buy_threshold = 45
+            rsi_buy_threshold = 48
             macd_required = True
         else:  # neutral
-            rsi_buy_threshold = 58
+            rsi_buy_threshold = 60
             macd_required = False
 
-        # Exit model
+        # 1. Exit model
         exit_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
                                                      extra_features=[24, _tp_acc, _sl_acc])
         exit_names = BASE_FEATURE_NAMES + ['hours_held', 'tp_accuracy', 'sell_accuracy']
@@ -893,9 +893,9 @@ class DeepLearningClientV2:
         if exit_pred is not None:
             votes['exit'] = exit_pred
         else:
-            votes['exit'] = 1 if (rsi < rsi_buy_threshold or volume_ratio > 2.0) else 0
+            votes['exit'] = 1 if (rsi < rsi_buy_threshold or volume_ratio > 1.8) else 0
 
-        # Risk model
+        # 2. Risk model
         risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
                                                      extra_features=[rsi, abs(price_momentum), _tp_acc, _sl_acc])
         risk_names = BASE_FEATURE_NAMES + ['risk_rsi', 'risk_atr', 'tp_accuracy', 'sell_accuracy']
@@ -903,9 +903,9 @@ class DeepLearningClientV2:
         if risk_pred is not None:
             votes['risk'] = risk_pred
         else:
-            votes['risk'] = 1 if rsi < rsi_buy_threshold + 5 else 0
+            votes['risk'] = 1 if rsi < rsi_buy_threshold + 8 else 0
 
-        # Pattern model
+        # 3. Pattern model
         pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
                                                         market_sentiment=market_sentiment,
                                                         candle_analysis=candle_analysis,
@@ -915,24 +915,10 @@ class DeepLearningClientV2:
         if pattern_pred is not None:
             votes['pattern'] = pattern_pred
         else:
-            condition = rsi < rsi_buy_threshold and (macd > -0.5 if macd_required else True)
+            condition = rsi < rsi_buy_threshold and (macd > -1.0 if macd_required else True)
             votes['pattern'] = 1 if condition else 0
 
-        # Chart CNN model
-        bullish_chart = 1 if (rsi < rsi_buy_threshold and macd > -0.3 and volume_ratio > 0.8) else 0
-        bearish_chart = 1 if (rsi > 72 and macd < -0.5) else 0
-        neutral_chart = 1 if (45 <= rsi <= 65) else 0
-        cnn_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
-                                                     market_sentiment=market_sentiment,
-                                                     extra_features=[bullish_chart, bearish_chart, neutral_chart, _tp_acc, _sl_acc])
-        cnn_names = BASE_FEATURE_NAMES + ['bullish_chart', 'bearish_chart', 'neutral_chart', 'tp_accuracy', 'sell_accuracy']
-        cnn_pred = self._predict_buy('chart_cnn', cnn_features, cnn_names)
-        if cnn_pred is not None:
-            votes['cnn'] = cnn_pred
-        else:
-            votes['cnn'] = 1 if (rsi < rsi_buy_threshold + 10 and macd > -1.0) else 0
-
-        # Anomaly model
+        # 4. Anomaly model
         anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
                                                         market_sentiment=market_sentiment,
                                                         extra_features=[abs(price_momentum), _tp_acc, _sl_acc])
@@ -943,7 +929,7 @@ class DeepLearningClientV2:
         else:
             votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 80) else 0
 
-        # Liquidity model
+        # 5. Liquidity model
         liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
         liq_features = [
             0, volume_ratio, 0, 0,
@@ -965,16 +951,15 @@ class DeepLearningClientV2:
         if liq_pred is not None:
             votes['liquidity'] = liq_pred
         else:
-            votes['liquidity'] = 1 if (liquidity_score >= 35 and volume_ratio > 0.2) else 0
+            votes['liquidity'] = 1 if (liquidity_score >= 30 and volume_ratio > 0.2) else 0
 
-        # MTF vote - يصوت إذا RSI مقبول والزخم غير سلبي جداً
-        votes['mtf'] = 1 if (rsi < rsi_buy_threshold + 10 and macd > -1.0) else 0
-
+        # ✅ 5 مستشارين (exit, risk, pattern, anomaly, liquidity)
         return votes, market_status
 
     def vote_sell_now(self, rsi, macd, volume_ratio, price_momentum, liquidity_metrics=None, candle_analysis=None, market_sentiment=None):
         """
-        البيع: يصوتون بالقمة - يستخدم الموديلات المدربة أولاً، مع fallback للمنطق اليدوي
+        البيع: 5 مستشارين يصوتون بالقمة
+        Bullish: 3/5 | Neutral: 4/5 | Bearish: 5/5
         """
         votes = {}
 
@@ -999,8 +984,51 @@ class DeepLearningClientV2:
         # ===== استخدام الموديلات المدربة للتصويت =====
         _tp_acc = self._model_accuracy.get('exit', 0.5)
         _sl_acc = self._model_accuracy.get('risk', 0.5)
-        
-        # Liquidity features (13 features - custom)
+
+        # 1. Exit model
+        exit_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                     extra_features=[24, _tp_acc, _sl_acc])
+        exit_names = BASE_FEATURE_NAMES + ['hours_held', 'tp_accuracy', 'sell_accuracy']
+        exit_pred = self._predict_buy('exit', exit_features, exit_names)
+        if exit_pred is not None:
+            votes['exit'] = exit_pred
+        else:
+            votes['exit'] = 1 if (rsi > 68 or (rsi > 63 and is_peak_candle)) else 0
+
+        # 2. Risk model
+        risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                     extra_features=[rsi, abs(price_momentum), _tp_acc, _sl_acc])
+        risk_names = BASE_FEATURE_NAMES + ['risk_rsi', 'risk_atr', 'tp_accuracy', 'sell_accuracy']
+        risk_pred = self._predict_buy('risk', risk_features, risk_names)
+        if risk_pred is not None:
+            votes['risk'] = risk_pred
+        else:
+            votes['risk'] = 1 if rsi > 65 else 0
+
+        # 3. Pattern model
+        pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                        market_sentiment=market_sentiment,
+                                                        candle_analysis=candle_analysis,
+                                                        extra_features=[price_momentum, _tp_acc, _sl_acc])
+        pattern_names = BASE_FEATURE_NAMES + ['pattern_momentum', 'tp_accuracy', 'sell_accuracy']
+        pattern_pred = self._predict_buy('pattern', pattern_features, pattern_names)
+        if pattern_pred is not None:
+            votes['pattern'] = pattern_pred
+        else:
+            votes['pattern'] = 1 if (price_momentum > -1.0 or is_rejection or rsi > 65) else 0
+
+        # 4. Anomaly model
+        anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                        market_sentiment=market_sentiment,
+                                                        extra_features=[abs(price_momentum), _tp_acc, _sl_acc])
+        anomaly_names = BASE_FEATURE_NAMES + ['anomaly_score', 'tp_accuracy', 'sell_accuracy']
+        anomaly_pred = self._predict_buy('anomaly', anomaly_features, anomaly_names)
+        if anomaly_pred is not None:
+            votes['anomaly'] = anomaly_pred
+        else:
+            votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 90) else 0
+
+        # 5. Liquidity model
         liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
         liquidity_features = [
             0, volume_ratio, 0, 0,
@@ -1018,99 +1046,20 @@ class DeepLearningClientV2:
             'depth_ratio', 'liquidity_score', 'price_impact', 'volume_consistency',
             'good_liquidity', 'low_impact', 'consistent_vol', 'tp_accuracy', 'sell_accuracy'
         ]
-
-        # Exit model: BASE(38) + hours_held + tp_accuracy + sell_accuracy = 41
-        exit_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
-                                                     extra_features=[24, _tp_acc, _sl_acc])
-        exit_names = BASE_FEATURE_NAMES + ['hours_held', 'tp_accuracy', 'sell_accuracy']
-        exit_pred = self._predict_buy('exit', exit_features, exit_names)
-        if exit_pred is not None:
-            votes['exit'] = exit_pred
-        else:
-            votes['exit'] = 1 if (rsi > 72 or (rsi > 68 and is_peak_candle)) else 0
-
-        # Risk model: BASE(38) + risk_rsi + risk_atr + tp_accuracy + sell_accuracy = 42
-        risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
-                                                     extra_features=[rsi, abs(price_momentum), _tp_acc, _sl_acc])
-        risk_names = BASE_FEATURE_NAMES + ['risk_rsi', 'risk_atr', 'tp_accuracy', 'sell_accuracy']
-        risk_pred = self._predict_buy('risk', risk_features, risk_names)
-        if risk_pred is not None:
-            votes['risk'] = risk_pred
-        else:
-            votes['risk'] = 1 if rsi > 68 else 0  # متوسط: يصوت للبيع عند RSI > 68
-        
-        # Pattern model: BASE(38) + price_momentum + tp_accuracy + sell_accuracy = 41
-        pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
-                                                        market_sentiment=market_sentiment,
-                                                        candle_analysis=candle_analysis,
-                                                        extra_features=[price_momentum, _tp_acc, _sl_acc])
-        pattern_names = BASE_FEATURE_NAMES + ['pattern_momentum', 'tp_accuracy', 'sell_accuracy']
-        pattern_pred = self._predict_buy('pattern', pattern_features, pattern_names)
-        if pattern_pred is not None:
-            votes['pattern'] = pattern_pred
-        else:
-            votes['pattern'] = 1 if (price_momentum > -0.5 or is_rejection) else 0
-        
-        # Chart CNN model: BASE(38) + bullish_chart + bearish_chart + neutral_chart + tp_accuracy + sell_accuracy = 43
-        bullish_chart = 1 if (rsi < 40 and macd > 0 and volume_ratio > 1.2) else 0
-        bearish_chart = 1 if (rsi > 65 and macd < 0) else 0
-        neutral_chart = 1 if (40 <= rsi <= 60) else 0
-        cnn_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
-                                                     market_sentiment=market_sentiment,
-                                                     extra_features=[bullish_chart, bearish_chart, neutral_chart, _tp_acc, _sl_acc])
-        cnn_names = BASE_FEATURE_NAMES + ['bullish_chart', 'bearish_chart', 'neutral_chart', 'tp_accuracy', 'sell_accuracy']
-        cnn_pred = self._predict_buy('chart_cnn', cnn_features, cnn_names)
-        if cnn_pred is not None:
-            votes['cnn'] = cnn_pred
-        else:
-            votes['cnn'] = 1 if (macd > 0.2 and volume_ratio > 0.9) else 0
-        
-        # Anomaly model: BASE(38) + anomaly_score + tp_accuracy + sell_accuracy = 41
-        anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
-                                                        market_sentiment=market_sentiment,
-                                                        extra_features=[abs(price_momentum), _tp_acc, _sl_acc])
-        anomaly_names = BASE_FEATURE_NAMES + ['anomaly_score', 'tp_accuracy', 'sell_accuracy']
-        anomaly_pred = self._predict_buy('anomaly', anomaly_features, anomaly_names)
-        if anomaly_pred is not None:
-            votes['anomaly'] = anomaly_pred
-        else:
-            votes['anomaly'] = 1 if (volume_ratio < 6.0 and 10 < rsi < 90) else 0
-        
-        # Liquidity model - يتعلم profit > 0 = 1
-        liquidity_score = liquidity_metrics.get('liquidity_score', 50) if liquidity_metrics else 50
-        liquidity_features = [
-            0, volume_ratio, 0, 0,
-            (liquidity_metrics or {}).get('depth_ratio', 1.0),
-            liquidity_score,
-            (liquidity_metrics or {}).get('price_impact', 0.5),
-            (liquidity_metrics or {}).get('volume_consistency', 50),
-            1 if liquidity_score > 70 else 0,
-            1 if (liquidity_metrics or {}).get('price_impact', 0.5) < 0.3 else 0,
-            1 if (liquidity_metrics or {}).get('volume_consistency', 50) > 60 else 0,
-            self._model_accuracy.get('exit', 0.5),
-            self._model_accuracy.get('risk', 0.5)
-        ]
-        liquidity_names = [
-            'profit', 'volume_ratio', 'bid_ask_spread', 'volume_trend',
-            'depth_ratio', 'liquidity_score', 'price_impact', 'volume_consistency',
-            'good_liquidity', 'low_impact', 'consistent_vol', 'tp_accuracy', 'sell_accuracy'
-        ]
         liq_pred = self._predict_buy('liquidity', liquidity_features, liquidity_names)
         if liq_pred is not None:
             votes['liquidity'] = liq_pred
         else:
             if liquidity_metrics:
-                votes['liquidity'] = 1 if (liquidity_score >= 50 and volume_ratio > 0.8) else 0
+                votes['liquidity'] = 1 if (liquidity_score >= 40 and volume_ratio > 0.6) else 0
             else:
-                votes['liquidity'] = 1 if volume_ratio > 0.8 else 0
-        
-        # MTF vote - يصوت للبيع عند ضعف الزخم أو ارتفاع RSI (متوسط)
-        votes['mtf'] = 1 if (rsi > 63 or (macd < 0 and volume_ratio < 1.5)) else 0
-        
+                votes['liquidity'] = 1 if volume_ratio > 0.6 else 0
+
+        # ✅ 5 مستشارين (exit, risk, pattern, anomaly, liquidity)
         return votes, market_status
 
     # =========================================================
-    # 🎓 التعلم المباشر للمستشارين ال7 - يتعلمون من كل صفقة
+    # 🎓 التعلم المباشر للمستشارين الـ5 - يتعلمون من كل صفقة
     # =========================================================
     def learn_from_trade(self, profit, trade_quality, buy_votes, sell_votes, signal_type='sell'):
         """
