@@ -355,8 +355,8 @@ class Meta:
         flash_crash = analysis.get('flash_crash_protection', {})
         flash_risk = flash_crash.get('risk_score', 0)
         
-        # خطر حرج أو عالي - بيع الكل فوراً
-        if flash_risk >= 50:
+        # خطر حرج أو عالي - بيع الكل فوراً (مع شرط ربح لتجنب البيع المبكر)
+        if flash_risk >= 40 and profit_percent > 1.0:
             return {
                 'action': 'SELL',
                 'reason': f'🚨 Flash Risk ({flash_risk}%) - Emergency Sell',
