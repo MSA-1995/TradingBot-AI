@@ -1037,6 +1037,7 @@ def get_market_analysis(exchange, symbol, limit=120):
             'liquidity_metrics': liquidity_metrics,
             **liquidity_metrics,
             'btc_change_1h': btc_change_1h,
+            'panic_greed': detect_panic_greed(latest),
             'eth_change_1h': eth_change_1h,
             'bnb_change_1h': bnb_change_1h,
             'high_24h': high_24h,
@@ -1207,3 +1208,31 @@ def get_liquidity_metrics(exchange, symbol, df_5m=None):
             'price_impact': 0.5,
             'volume_consistency': 50
         }
+
+def detect_panic_greed(analysis):
+    """كشف الذعر/الجشع النفسي (أقل صرامة)"""
+    try:
+        volume = analysis.get('volume', 0)
+        avg_volume = analysis.get('volume_sma', 0)
+        price_change = analysis.get('price_momentum', 0)
+
+        if avg_volume == 0:
+            return {'panic_score': 0, 'greed_score': 0}
+
+        volume_ratio = volume / avg_volume
+
+        panic_score = 0
+        greed_score = 0
+
+        # ذعر: حجم عالي مع انخفاض سعر
+        if volume_ratio > 1.5 and price_change < -2:
+            panic_score = min(volume_ratio * 10, 30)  # أقل صرامة (حد 30 بدل 50)
+
+        # جشع: حجم عالي مع ارتفاع سعر
+        if volume_ratio > 1.5 and price_change > 2:
+            greed_score = min(volume_ratio * 10, 30)
+
+        return {'panic_score': panic_score, 'greed_score': greed_score}
+
+    except Exception as e:
+        return {'panic_score': 0, 'greed_score': 0}
