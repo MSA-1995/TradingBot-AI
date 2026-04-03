@@ -406,6 +406,9 @@ class Meta:
         peak_analysis = analysis.get('peak', {})
         peak_score = peak_analysis.get('confidence', 0)
         candle_condition = peak_analysis.get('candle_signal', False)
+        
+        # استخراج مؤشر RSI مبكرًا لتجنب خطأ المتغير غير المعرفة
+        rsi = analysis.get('rsi', 50)
 
         # متوسط: نقاط ≥ MIN_SELL_CONFIDENCE أو شمعة قمة أو RSI مرتفع مع ربح كافٍ
         trigger_activated = (
