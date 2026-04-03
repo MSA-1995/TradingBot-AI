@@ -255,15 +255,33 @@ class Meta:
                 mtf = analysis_data.get('mtf', {})
                 trend = mtf.get('trend', 'neutral')
                 trend_numeric = 1 if trend == 'bullish' else (-1 if trend == 'bearish' else 0)
-                
+
+                # بناء market_sentiment من البيانات الموجودة
+                market_sentiment = {
+                    'btc_change_1h': analysis_data.get('btc_change_1h', 0),
+                    'eth_change_1h': analysis_data.get('eth_change_1h', 0),
+                    'bnb_change_1h': analysis_data.get('bnb_change_1h', 0),
+                }
+
+                # بناء candle_analysis من تحليل القاع والقمة
+                reversal = analysis_data.get('reversal', {})
+                peak = analysis_data.get('peak', {})
+                candle_analysis = {
+                    'is_reversal': reversal.get('candle_signal', False),
+                    'is_peak':     peak.get('candle_signal', False),
+                    'is_rejection': peak.get('candle_signal', False),
+                    'reversal_confidence': reversal.get('confidence', 0),
+                    'peak_confidence':     peak.get('confidence', 0),
+                }
+
                 # جلب التصويت من كل مستشار
                 buy_votes, market_status = dl_client.vote_buy_now(
                     rsi=rsi, macd=macd_diff, volume_ratio=volume_ratio,
                     price_momentum=analysis_data.get('price_momentum', 0),
                     confidence=temp_conf,
                     liquidity_metrics=analysis_data.get('liquidity_metrics'),
-                    market_sentiment=analysis_data.get('market_sentiment'),
-                    candle_analysis=analysis_data.get('candle_analysis')
+                    market_sentiment=market_sentiment,
+                    candle_analysis=candle_analysis
                 )
                 
                 if buy_votes:
@@ -497,12 +515,28 @@ class Meta:
                     except:
                         pass
                 
+                # بناء market_sentiment و candle_analysis من البيانات الموجودة
+                market_sentiment = {
+                    'btc_change_1h': analysis.get('btc_change_1h', 0),
+                    'eth_change_1h': analysis.get('eth_change_1h', 0),
+                    'bnb_change_1h': analysis.get('bnb_change_1h', 0),
+                }
+                reversal = analysis.get('reversal', {})
+                peak = analysis.get('peak', {})
+                candle_analysis = {
+                    'is_reversal': reversal.get('candle_signal', False),
+                    'is_peak':     peak.get('candle_signal', False),
+                    'is_rejection': peak.get('candle_signal', False),
+                    'reversal_confidence': reversal.get('confidence', 0),
+                    'peak_confidence':     peak.get('confidence', 0),
+                }
+
                 # جلب التصويت من كل مستشار
                 sell_votes, market_status = dl_client.vote_sell_now(
                     rsi=rsi, macd=macd_diff, volume_ratio=volume_ratio,
                     price_momentum=price_momentum, liquidity_metrics=liquidity_metrics,
-                    market_sentiment=analysis.get('market_sentiment'),
-                    candle_analysis=analysis.get('candle_analysis')
+                    market_sentiment=market_sentiment,
+                    candle_analysis=candle_analysis
                 )
                 
                 if sell_votes:
