@@ -164,6 +164,10 @@ def process_sell(result, exchange, ctx):
         
         # حفظ بيانات التعلم
         try:
+            # تعلم المستشارين (dl_client)
+            if dl_client:
+                dl_client.learn_from_trade(profit, trade_quality, buy_votes, sell_votes, signal_type='sell')
+
             # تعلم الملك (مع symbol للقائمة السوداء)
             if meta:
                 meta.learn_from_trade(profit, trade_quality, buy_votes, sell_votes, symbol=symbol)
