@@ -210,10 +210,51 @@ class DeepLearningClientV2:
         print("")
 
     def check_for_updates(self):
-        """✅ تم إيقاف التحديث التلقائي للنماذج بشكل دائم
-        النماذج يتم تحميلها مرة واحدة عند التشغيل فقط ولا يتم تغييرها ابداً
         """
-        return False
+        يفحص إذا في نموذج محدث في الداتابيز مقارنة بوقت التحميل الحالي.
+        يرجع True إذا في تحديث → يستدعي restart.
+        يرجع False إذا لا شيء جديد → يكمل طبيعي.
+        """
+        try:
+            conn = self._get_conn()
+            if not conn:
+                return False
+
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                SELECT model_name, trained_at
+                FROM dl_models_v2
+                WHERE status = 'active'
+                ORDER BY trained_at DESC
+            """)
+            results = cursor.fetchall()
+            cursor.close()
+
+            if not results:
+                print("✅ No active models in DB to compare.")
+                return False
+
+            for row in results:
+                name = row['model_name']
+                db_trained_at = str(row['trained_at'])
+                current_loaded_at = self._model_trained_at.get(name)
+
+                if not current_loaded_at:
+                    # نموذج موجود في الداتابيز لكن ما تم تحميله → في جديد
+                    print(f"🆕 New model found in DB (not loaded): {name}")
+                    return True
+
+                if db_trained_at != current_loaded_at:
+                    print(f"🔄 Model update detected: {name}")
+                    print(f"   DB: {db_trained_at} | Loaded: {current_loaded_at}")
+                    return True
+
+            print("✅ All models up to date, no restart needed.")
+            return False
+
+        except Exception as e:
+            print(f"⚠️ check_for_updates error: {e}")
+            return False
     
     def get_model_accuracy(self, model_name):
         """جلب دقة الموديل المدرب"""
