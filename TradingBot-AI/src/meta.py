@@ -798,11 +798,23 @@ class Meta:
             
             # ✅ حفظ النمط في جدول الانماط المتعلمة
             try:
-                from models.enhanced_pattern_recognition import EnhancedPatternRecognition
-                pattern_recognizer = EnhancedPatternRecognition(self.storage)
-                # يتم حفظ النمط تلقائيا من قبل الكلاس بعد التحليل
-            except:
-                pass
+                # حفظ نمط النجاح أو الفشل
+                pattern_type = 'SUCCESS' if trade_quality in ['GREAT', 'GOOD'] else 'TRAP'
+                pattern_data = {
+                    'type': pattern_type,
+                    'success_rate': 1.0 if trade_quality in ['GREAT', 'GOOD'] else 0.0,
+                    'features': {
+                        'profit': profit,
+                        'trade_quality': trade_quality,
+                        'sell_votes': sell_votes,
+                        'buy_votes': buy_votes if buy_votes else {},
+                        'symbol': symbol
+                    }
+                }
+                self.storage.save_pattern(pattern_data)
+                print(f"✅ Saved {pattern_type} pattern for {symbol}")
+            except Exception as e:
+                print(f"⚠️ Failed to save pattern: {e}")
 
             total = data['buy_success'] + data['buy_fail'] + data['sell_success'] + data['sell_fail']
             if total > 0:
