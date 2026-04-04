@@ -411,6 +411,7 @@ class DatabaseStorage:
             cursor.execute("""
                 INSERT INTO trades_history (
                     symbol, action, profit_percent, sell_reason, tp_target, sl_target, hours_held,
+                    rsi, volume_ratio, trade_quality, profit,
                     whale_confidence, atr_value, sentiment_score, panic_score, optimism_penalty, psychological_analysis, data,
                     -- الأعمدة الجديدة لتطوير النماذج
                     order_book_imbalance, spread_volatility, depth_at_1pct, market_impact_score, liquidity_trends,
@@ -480,7 +481,11 @@ class DatabaseStorage:
                 # Meta-Learner Model
                 trade_data.get('dynamic_consultant_weights', 0),
                 trade_data.get('uncertainty_quantification', 0),
-                trade_data.get('context_aware_score', 0)
+                trade_data.get('context_aware_score', 0),
+                trade_data.get('rsi'),
+                trade_data.get('volume_ratio'),
+                trade_data.get('trade_quality'),
+                trade_data.get('profit_percent')
             ))
             conn.commit()
             cursor.close()
