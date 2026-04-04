@@ -409,8 +409,21 @@ class DatabaseStorage:
             conn = self._get_conn()
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO trades_history (symbol, action, profit_percent, sell_reason, tp_target, sl_target, hours_held, whale_confidence, atr_value, sentiment_score, panic_score, optimism_penalty, psychological_analysis, data)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO trades_history (
+                    symbol, action, profit_percent, sell_reason, tp_target, sl_target, hours_held,
+                    whale_confidence, atr_value, sentiment_score, panic_score, optimism_penalty, psychological_analysis, data,
+                    -- الأعمدة الجديدة لتطوير النماذج
+                    order_book_imbalance, spread_volatility, depth_at_1pct, market_impact_score, liquidity_trends,
+                    volatility_risk_score, correlation_risk, gap_risk_score, black_swan_probability, behavioral_risk, systemic_risk,
+                    profit_optimization_score, time_decay_signals, opportunity_cost_exits, market_condition_exits,
+                    harmonic_patterns_score, elliott_wave_signals, fractal_patterns, cycle_patterns, momentum_patterns,
+                    whale_wallet_changes, institutional_accumulation, smart_money_ratio, exchange_whale_flows,
+                    statistical_outliers, pattern_anomalies, behavioral_anomalies, volume_anomalies,
+                    attention_mechanism_score, multi_scale_features, temporal_features,
+                    volume_trend_strength, volume_volatility, volume_momentum, volume_seasonality, volume_correlation,
+                    dynamic_consultant_weights, uncertainty_quantification, context_aware_score
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 trade_data.get('symbol'),
                 trade_data.get('action'),
@@ -425,7 +438,49 @@ class DatabaseStorage:
                 trade_data.get('panic_score', 0),
                 trade_data.get('optimism_penalty', 0),
                 trade_data.get('psychological_analysis', ''),
-                self.json.dumps(trade_data, default=str)
+                self.json.dumps(trade_data, default=str),
+                # الأعمدة الجديدة
+                trade_data.get('order_book_imbalance', 0),
+                trade_data.get('spread_volatility', 0),
+                trade_data.get('depth_at_1pct', 0),
+                trade_data.get('market_impact_score', 0),
+                trade_data.get('liquidity_trends', 0),
+                trade_data.get('volatility_risk_score', 0),
+                trade_data.get('correlation_risk', 0),
+                trade_data.get('gap_risk_score', 0),
+                trade_data.get('black_swan_probability', 0),
+                trade_data.get('behavioral_risk', 0),
+                trade_data.get('systemic_risk', 0),
+                trade_data.get('profit_optimization_score', 0),
+                trade_data.get('time_decay_signals', 0),
+                trade_data.get('opportunity_cost_exits', 0),
+                trade_data.get('market_condition_exits', 0),
+                trade_data.get('harmonic_patterns_score', 0),
+                trade_data.get('elliott_wave_signals', 0),
+                trade_data.get('fractal_patterns', 0),
+                trade_data.get('cycle_patterns', 0),
+                trade_data.get('momentum_patterns', 0),
+                trade_data.get('whale_wallet_changes', 0),
+                trade_data.get('institutional_accumulation', 0),
+                trade_data.get('smart_money_ratio', 0),
+                trade_data.get('exchange_whale_flows', 0),
+                trade_data.get('statistical_outliers', 0),
+                trade_data.get('pattern_anomalies', 0),
+                trade_data.get('behavioral_anomalies', 0),
+                trade_data.get('volume_anomalies', 0),
+                trade_data.get('attention_mechanism_score', 0),
+                trade_data.get('multi_scale_features', 0),
+                trade_data.get('temporal_features', 0),
+                # Volume Prediction Model
+                trade_data.get('volume_trend_strength', 0),
+                trade_data.get('volume_volatility', 0),
+                trade_data.get('volume_momentum', 0),
+                trade_data.get('volume_seasonality', 0),
+                trade_data.get('volume_correlation', 0),
+                # Meta-Learner Model
+                trade_data.get('dynamic_consultant_weights', 0),
+                trade_data.get('uncertainty_quantification', 0),
+                trade_data.get('context_aware_score', 0)
             ))
             conn.commit()
             cursor.close()
