@@ -634,7 +634,7 @@ class Meta:
         effective_total = mood_details.get('total_advisors', 5)
         
         # متوسط: إذا النقاط عالية أو RSI عالي، نبيع بتصويت أقل
-        urgent_sell = sell_conf >= MIN_SELL_CONFIDENCE + 10 or rsi >= 71  # ✅ خففنا من 73 إلى 71
+        urgent_sell = sell_conf >= MIN_SELL_CONFIDENCE + 10 or rsi >= 85  # ✅ خففنا من 73 إلى 71
         
         if urgent_sell:
             # حالة طوارئ: نحتاج 3/5 فقط
