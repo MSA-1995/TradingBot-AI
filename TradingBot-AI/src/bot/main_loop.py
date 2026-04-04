@@ -5,7 +5,9 @@ Runs the continuous analysis and execution cycle.
 
 import time
 import gc
-from datetime import datetime
+import os
+import sys
+from datetime import datetime, timedelta
 from colorama import Fore, Style
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -62,6 +64,10 @@ def run_main_loop(exchange, ctx):
         loop_count = 0
         available  = 0
         last_report_time = datetime.now()
+
+        # ⏰ مؤقت فحص تحديثات النماذج كل 7 ساعات
+        _last_model_check = datetime.now()
+        _MODEL_CHECK_HOURS = 7
 
         while True:
             loop_count += 1
@@ -243,8 +249,18 @@ def run_main_loop(exchange, ctx):
                 # 🔄 فحص تحديثات النماذج كل 7 ساعات
                 try:
                     dl_client = ctx.get('dl_client')
-                    if dl_client and hasattr(dl_client, 'check_for_updates'):
-                        dl_client.check_for_updates()
+                    hours_since_check = (datetime.now() - _last_model_check).total_seconds() / 3600
+
+                    if dl_client and hours_since_check >= _MODEL_CHECK_HOURS:
+                        print(f"🕐 7 hours passed — checking for model updates...")
+                        _last_model_check = datetime.now()
+                        has_update = dl_client.check_for_updates()
+
+                        if has_update:
+                            print("🔄 New models found! Restarting bot to load them...")
+                            time.sleep(2)
+                            os.execv(sys.executable, [sys.executable] + sys.argv)
+                        # إذا ما في تحديث يكمل طبيعي بدون أي شيء
                 except Exception as e:
                     print(f"⚠️ Model update check error: {e}")
                 
