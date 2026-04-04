@@ -443,10 +443,6 @@ class Meta:
         
         mood_details = self._get_market_mood(analysis)
 
-        # --- الحد الأدنى للربح: ما يبيع أي عملة إلا بربح >= 0.5% ---
-        if profit_percent < 0.5:
-            return {'action': 'HOLD', 'reason': f'Waiting for +0.5% min profit', 'profit': profit_percent}
-
         # --- 2. صائد القمم (نظام النقاط الذكي - متوازن) ---
         peak_analysis = analysis.get('peak', {})
         peak_score = peak_analysis.get('confidence', 0)
@@ -465,6 +461,11 @@ class Meta:
 
         if not trigger_activated:
             return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score}/110', 'profit': profit_percent}
+
+        # --- ✅ الحد الأدنى للربح: تم نقله بعد فحص القمة
+        # فقط عندما تنشط اشارة البيع نتحقق ان نبيع على الاقل بربح 0.5%
+        if profit_percent < 0.5:
+            return {'action': 'HOLD', 'reason': f'Waiting for +0.5% min profit', 'profit': profit_percent}
 
         sell_conf = 20
         sell_reasons = []
