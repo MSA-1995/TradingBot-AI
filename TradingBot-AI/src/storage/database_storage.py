@@ -298,20 +298,8 @@ class DatabaseStorage:
             last_trade_quality VARCHAR(10),
             last_updated TIMESTAMP DEFAULT NOW()
         );
-        CREATE TABLE IF NOT EXISTS causal_data (
-            id SERIAL PRIMARY KEY,
-            symbol VARCHAR(20),
-            timestamp TIMESTAMP DEFAULT NOW(),
-            fear_greed INTEGER DEFAULT 50,
-            whale_activity FLOAT DEFAULT 0,
-            exchange_inflow FLOAT DEFAULT 0,
-            exchange_outflow FLOAT DEFAULT 0,
-            social_volume INTEGER DEFAULT 0,
-            funding_rate FLOAT DEFAULT 0,
-            btc_dominance FLOAT DEFAULT 50,
-            market_sentiment VARCHAR(20) DEFAULT 'neutral',
-            source VARCHAR(20) DEFAULT 'live'
-        );
+        -- ✅ تم تعطيل جدول causal_data تمهيدا للحذف النهائي
+        -- لا يتم انشاءه تلقائياً بعد الان
         """
         # --- FIX: Add indexes for cleanup performance and query speed ---
         create_indexes_sql = """
@@ -321,8 +309,7 @@ class DatabaseStorage:
         CREATE INDEX IF NOT EXISTS idx_trap_memory_timestamp ON trap_memory(timestamp);
         CREATE INDEX IF NOT EXISTS idx_consultant_votes_timestamp ON consultant_votes(timestamp);
         CREATE INDEX IF NOT EXISTS idx_symbol_memory_symbol ON symbol_memory(symbol);
-        CREATE INDEX IF NOT EXISTS idx_causal_data_symbol ON causal_data(symbol);
-        CREATE INDEX IF NOT EXISTS idx_causal_data_timestamp ON causal_data(timestamp);
+        -- ✅ تم حذف ايديكسات جدول causal_data بعد تعطيل الجدول
         
         -- Indexes for lightning fast pattern searching
         CREATE INDEX IF NOT EXISTS idx_learned_patterns_type ON learned_patterns(pattern_type);
@@ -831,10 +818,13 @@ class DatabaseStorage:
             cursor = conn.cursor()
             
             queries = {
-                "trades (30d)": ("trades_history", "timestamp", 30),
-                "patterns (7d)": ("learned_patterns", "last_updated", 7),
-                "traps (30d)": ("trap_memory", "timestamp", 30),
-                "votes (30d)": ("consultant_votes", "timestamp", 30),
+                "trades (30d)":     ("trades_history",     "timestamp",    30),
+                "patterns (7d)":    ("learned_patterns",  "last_updated", 7),
+                "traps (30d)":      ("trap_memory",      "timestamp",    30),
+                "votes (30d)":      ("consultant_votes", "timestamp",    30),
+                "symbol (180d)":    ("symbol_memory",    "last_updated", 180),
+                "news (7d)":        ("news_sentiment",   "timestamp",    7),
+                "ai decisions (7d)":("ai_decisions",     "timestamp",    7),
             }
             
             total_deleted = 0
