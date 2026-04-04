@@ -35,6 +35,7 @@ def process_sell(result, exchange, ctx):
     advisor_manager = ctx.get('advisor_manager')
     meta            = ctx.get('meta')
     sell_cooldown   = ctx.get('sell_cooldown', {})
+    dl_client       = ctx.get('dl_client')
 
     print(f"{Fore.RED}🔴 SELL {symbol} | {result['reason']} | Profit: {result['profit']:+.2f}%{Style.RESET_ALL}")
 
