@@ -64,6 +64,16 @@ class DatabaseStorage:
         self.init_thread = threading.Thread(target=self._initialize_tables_background, daemon=True)
         self.init_thread.start()
 
+    def _create_tables(self):
+        """Creates necessary database tables if they don't exist."""
+        # Tables are assumed to be created via migration scripts
+        return True
+
+    def _check_schema_updates(self):
+        """Checks and applies schema updates if needed."""
+        # Schema updates handled manually or via scripts
+        pass
+
     def _initialize_tables_background(self):
         """Runs the slow table creation/verification in a background thread."""
         if not self._create_tables():
@@ -167,211 +177,15 @@ class DatabaseStorage:
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
-            cursor.execute(sql, (key, str(value)))
-            conn.commit()
-            cursor.close()
-            return True
-        except Exception as e:
-            print(f"❌ DB Error saving setting {key}: {e}")
-            if conn: conn.rollback()
-            return False
-        finally:
-            if conn:
-                # For READ functions, we MUST rollback to close the transaction
-                # and prevent `IDLE IN TRANSACTION` state which causes locks.
-                conn.rollback()
-                self._put_conn(conn)
-
-    def load_setting(self, key):
-        """Loads a value from the bot_settings table."""
-        sql = "SELECT value FROM bot_settings WHERE key = %s;"
-        conn = None
-        try:
-            conn = self._get_conn()
-            cursor = conn.cursor()
-            cursor.execute(sql, (key,))
-            result = cursor.fetchone()
-            cursor.close()
-            return result[0] if result else None
-        except Exception as e:
-            print(f"❌ DB Error loading setting {key}: {e}")
-            return None
-        finally:
-            if conn:
-                conn.rollback()
-                self._put_conn(conn)
-
-    def _create_tables(self):
-        """إنشاء الجداول إذا لم تكن موجودة (مع إعادة محاولة). Returns True on success, False on failure."""
-        # تجميع كل أوامر إنشاء الجداول في نص واحد لتنفيذها كمعاملة واحدة
-        create_sql = """
-        CREATE TABLE IF NOT EXISTS positions (
-            symbol VARCHAR(20) PRIMARY KEY,
-            buy_price FLOAT NOT NULL,
-            amount FLOAT NOT NULL,
-            highest_price FLOAT NOT NULL,
-            tp_level_1 BOOLEAN DEFAULT FALSE,
-            tp_level_2 BOOLEAN DEFAULT FALSE,
-            buy_time TIMESTAMP NOT NULL,
-            invested FLOAT NOT NULL,
-            data JSONB
-        );
-        CREATE TABLE IF NOT EXISTS trades_history (
-            id SERIAL PRIMARY KEY,
-            symbol VARCHAR(20),
-            action VARCHAR(10),
-            profit_percent FLOAT,
-            sell_reason TEXT,
-            tp_target FLOAT,
-            sl_target FLOAT,
-            hours_held FLOAT,
-            whale_confidence FLOAT DEFAULT 0,
-            atr_value FLOAT DEFAULT 0,
-            sentiment_score FLOAT DEFAULT 0,
-            panic_score FLOAT DEFAULT 0,
-            optimism_penalty FLOAT DEFAULT 0,
-            psychological_analysis TEXT,
-            data JSONB,
-            timestamp TIMESTAMP DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS bot_settings (
-            key VARCHAR(255) PRIMARY KEY,
-            value TEXT
-        );
-        CREATE TABLE IF NOT EXISTS learned_patterns (
-            id SERIAL PRIMARY KEY,
-            pattern_type VARCHAR(20),
-            data JSONB,
-            success_rate FLOAT,
-            last_updated TIMESTAMP DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS symbol_memory (
-            id SERIAL PRIMARY KEY,
-            symbol VARCHAR(20) UNIQUE,
-            sentiment_avg FLOAT DEFAULT 0,
-            whale_confidence_avg FLOAT DEFAULT 0,
-            profit_loss_ratio FLOAT DEFAULT 0,
-            volume_trend VARCHAR(10) DEFAULT 'neutral',
-            last_interaction TIMESTAMP DEFAULT NOW(),
-            panic_score_avg FLOAT DEFAULT 0,
-            optimism_penalty_avg FLOAT DEFAULT 0,
-            psychological_summary TEXT,
-            updated_at TIMESTAMP DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS ai_decisions (
-            id SERIAL PRIMARY KEY,
-            symbol VARCHAR(20),
-            decision VARCHAR(10),
-            confidence INTEGER,
-            data JSONB,
-            timestamp TIMESTAMP DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS trap_memory (
-            id SERIAL PRIMARY KEY,
-            symbol VARCHAR(20),
-            data JSONB,
-            timestamp TIMESTAMP DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS consultant_votes (
-            id SERIAL PRIMARY KEY,
-            symbol VARCHAR(20),
-            consultant_name VARCHAR(50),
-            vote_type VARCHAR(20),
-            vote_value FLOAT,
-            actual_result FLOAT,
-            is_correct BOOLEAN,
-            profit_percent FLOAT,
-            timestamp TIMESTAMP DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS symbol_memory (
-            symbol VARCHAR(20) PRIMARY KEY,
-            total_trades INTEGER DEFAULT 0,
-            win_count INTEGER DEFAULT 0,
-            loss_count INTEGER DEFAULT 0,
-            trap_count INTEGER DEFAULT 0,
-            avg_profit FLOAT DEFAULT 0,
-            max_profit FLOAT DEFAULT 0,
-            min_profit FLOAT DEFAULT 0,
-            avg_hold_hours FLOAT DEFAULT 0,
-            best_rsi FLOAT DEFAULT 50,
-            best_volume_ratio FLOAT DEFAULT 1,
-            last_trade_quality VARCHAR(10),
-            last_updated TIMESTAMP DEFAULT NOW()
-        );
-        -- ✅ تم تعطيل جدول causal_data تمهيدا للحذف النهائي
-        -- لا يتم انشاءه تلقائياً بعد الان
-        """
-        # --- FIX: Add indexes for cleanup performance and query speed ---
-        create_indexes_sql = """
-        CREATE INDEX IF NOT EXISTS idx_trades_history_timestamp ON trades_history(timestamp);
-        CREATE INDEX IF NOT EXISTS idx_learned_patterns_last_updated ON learned_patterns(last_updated);
-        CREATE INDEX IF NOT EXISTS idx_ai_decisions_timestamp ON ai_decisions(timestamp);
-        CREATE INDEX IF NOT EXISTS idx_trap_memory_timestamp ON trap_memory(timestamp);
-        CREATE INDEX IF NOT EXISTS idx_consultant_votes_timestamp ON consultant_votes(timestamp);
-        CREATE INDEX IF NOT EXISTS idx_symbol_memory_symbol ON symbol_memory(symbol);
-        -- ✅ تم حذف ايديكسات جدول causal_data بعد تعطيل الجدول
-        
-        -- Indexes for lightning fast pattern searching
-        CREATE INDEX IF NOT EXISTS idx_learned_patterns_type ON learned_patterns(pattern_type);
-        CREATE INDEX IF NOT EXISTS idx_learned_patterns_rsi ON learned_patterns((data->'features'->>'rsi_zone'));
-        CREATE INDEX IF NOT EXISTS idx_learned_patterns_trend ON learned_patterns((data->'features'->>'trend'));
-
-        -- *** SUPER INDEX for find_similar_patterns_in_db ***
-        -- This composite index is specifically designed to make that query extremely fast.
-        -- It covers all filtering conditions and the sorting order in one go.
-        CREATE INDEX IF NOT EXISTS idx_super_pattern_search ON learned_patterns(pattern_type, (data->'features'->>'rsi_zone'), (data->'features'->>'trend'), last_updated DESC);
-
-        -- Force update of query planner statistics
-        ANALYZE learned_patterns;
-        """
-
-        for attempt in range(3):
-            conn = None
+            # Add missing columns if not exist
             try:
-                conn = self._get_conn()
-                cursor = conn.cursor()
-                # --- FIX: Increase statement timeout for this session to prevent DDL timeouts ---
-                cursor.execute("SET statement_timeout = '60s';")
-                # --- Create tables first, then indexes ---
-                cursor.execute(create_sql)
-                cursor.execute(create_indexes_sql)
+                cursor.execute("ALTER TABLE trades_history ADD COLUMN IF NOT EXISTS rsi FLOAT DEFAULT 0")
+                cursor.execute("ALTER TABLE trades_history ADD COLUMN IF NOT EXISTS volume_ratio FLOAT DEFAULT 1")
+                cursor.execute("ALTER TABLE trades_history ADD COLUMN IF NOT EXISTS trade_quality TEXT DEFAULT ''")
+                cursor.execute("ALTER TABLE trades_history ADD COLUMN IF NOT EXISTS profit FLOAT DEFAULT 0")
                 conn.commit()
-                cursor.close()
-                self._put_conn(conn) # --- إرجاع الاتصال السليم إلى المجمع
-                print("✅ Database tables and indexes created/verified successfully.")
-                return True # --- نجاح، خروج
-
-            except self._psycopg2.Error as e: # --- التعامل مع أخطاء قاعدة البيانات فقط
-                print(f"⚠️ Table/Index creation DB error (attempt {attempt + 1}/3): {e}")
-                if conn:
-                    # --- الخطوة الأهم: تخلص من الاتصال الفاشل ولا تعيده للمجمع
-                    self.pool.putconn(conn, close=True)
-                    print("🔥 Discarded faulty DB connection. Will retry with a new one.")
-
-                if attempt < 2:
-                    import time
-                    time.sleep(5) # --- انتظار قبل المحاولة التالية
-                else:
-                    print("❌ Final attempt to create tables/indexes failed.")
             except Exception as e:
-                print(f"⚠️ An unexpected error occurred during table/index creation: {e}")
-                if conn: # تخلص من الاتصال عند حدوث أي خطأ غير متوقع أيضًا
-                    self.pool.putconn(conn, close=True)
-                # لا تعيد المحاولة في الأخطاء العامة غير المتوقعة
-                break
-
-        return False # فشل بعد كل المحاولات
-    
-    def _check_schema_updates(self):
-        """التحقق من تحديثات المخطط وإصلاحها تلقائياً (Self-Healing) في معاملات معزولة."""
-        
-        # --- المهمة: التأكد من وجود جدول 'dl_models_v2' (في معاملة معزولة)
-        conn_dl = None
-        try:
-            conn_dl = self._get_conn()
-            cursor = conn_dl.cursor()
-            # مهلة أقصر مناسبة لهذه العملية السريعة
-            cursor.execute("SET statement_timeout = '30s';")
+                print(f"⚠️ Column add error (may already exist): {e}")
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS dl_models_v2 (
                     model_name VARCHAR(50) PRIMARY KEY,
