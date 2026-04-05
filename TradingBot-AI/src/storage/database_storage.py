@@ -231,7 +231,7 @@ class DatabaseStorage:
                     volatility_risk_score, correlation_risk, gap_risk_score, black_swan_probability, behavioral_risk, systemic_risk,
                     profit_optimization_score, time_decay_signals, opportunity_cost_exits, market_condition_exits,
                     harmonic_patterns_score, elliott_wave_signals, fractal_patterns, cycle_patterns, momentum_patterns,
-                    whale_wallet_changes, institutional_accumulation, smart_money_ratio, exchange_whale_flows,
+                    smart_money_ratio, exchange_whale_flows,
                     statistical_outliers, pattern_anomalies, behavioral_anomalies, volume_anomalies,
                     attention_mechanism_score, multi_scale_features, temporal_features,
                     volume_trend_strength, volume_volatility, volume_momentum, volume_seasonality, volume_correlation,
@@ -280,8 +280,7 @@ class DatabaseStorage:
                 trade_data.get('fractal_patterns', 0),
                 trade_data.get('cycle_patterns', 0),
                 trade_data.get('momentum_patterns', 0),
-                trade_data.get('whale_wallet_changes', 0),
-                trade_data.get('institutional_accumulation', 0),
+
                 trade_data.get('smart_money_ratio', 0),
                 trade_data.get('exchange_whale_flows', 0),
                 trade_data.get('statistical_outliers', 0),
