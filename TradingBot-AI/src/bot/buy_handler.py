@@ -62,8 +62,25 @@ def process_buy(result, exchange, ctx):
         buy_vote_count = decision.get('buy_vote_count')
         total_consultants = decision.get('total_consultants')
 
+    # ✅ الكمية الحقيقية من Binance (filled) وليس الكمية المحسوبة
+    actual_amount = buy_result['amount']
+    try:
+        order = buy_result.get('order', {})
+        filled = order.get('filled', 0)
+        if filled and filled > 0:
+            actual_amount = filled
+            print(f"✅ Actual filled amount from Binance: {actual_amount}")
+        else:
+            # جلب الكمية من الرصيد مباشرة كـ fallback
+            balance = exchange.fetch_balance()
+            base_currency = symbol.split('/')[0]
+            actual_amount = balance.get(base_currency, {}).get('free', actual_amount)
+            print(f"✅ Amount from balance: {actual_amount}")
+    except Exception as e:
+        print(f"⚠️ Could not get actual amount, using calculated: {e}")
+
     send_buy_notification(
-        symbol, buy_result['amount'], buy_result['price'], buy_result['amount'] * buy_result['price'],
+        symbol, actual_amount, buy_result['price'], actual_amount * buy_result['price'],
         result['confidence'], tp_target, sl_target,
         buy_vote_percentage, buy_vote_count, total_consultants
     )
@@ -71,7 +88,7 @@ def process_buy(result, exchange, ctx):
     # Save for learning - with full decision context
     position_data = {
         'buy_price':    buy_result['price'],
-        'amount':       buy_result['amount'],
+        'amount':       actual_amount,
         'highest_price': buy_result['price'],
         'buy_time':     datetime.now().isoformat()
     }
