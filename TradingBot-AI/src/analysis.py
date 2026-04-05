@@ -1017,6 +1017,13 @@ def get_market_analysis(exchange, symbol, limit=120):
         latest = df.iloc[-1]
         candles = df.tail(2).to_dict('records') if len(df) >= 2 else []
         
+        # جلب order_book لاستخدامه في حساب أعمدة النماذج
+        order_book = {}
+        try:
+            order_book = exchange.fetch_order_book(symbol, limit=20)
+        except:
+            pass
+
         bid_ask_spread = 0
         try:
             ticker = exchange.fetch_ticker(symbol)
@@ -1024,8 +1031,8 @@ def get_market_analysis(exchange, symbol, limit=120):
                 bid_ask_spread = ((ticker['ask'] - ticker['bid']) / ticker['bid']) * 100
         except:
             bid_ask_spread = 0
-        
-        liquidity_metrics = get_liquidity_metrics(exchange, symbol, df)
+
+        liquidity_metrics = get_liquidity_metrics(exchange, symbol, df, order_book=order_book)
 
         high_24h = df['high'].tail(288).max() if len(df) >= 288 else (df['high'].max() if not df.empty else 0)
         low_24h = df['low'].tail(288).min() if len(df) >= 288 else (df['low'].min() if not df.empty else 0)
@@ -1049,10 +1056,20 @@ def get_market_analysis(exchange, symbol, limit=120):
                     }
         except Exception:
             pass
-        
+
+        # حساب average_spread من آخر 20 شمعة
+        average_spread = 0.001
+        try:
+            if len(df) >= 20 and df['close'].iloc[-1] > 0:
+                average_spread = float((df['high'] - df['low']).tail(20).mean() / df['close'].iloc[-1] * 100)
+        except:
+            pass
+
         return {
             'candles': candles,
             'rsi': latest['rsi'],
+            'order_book': order_book,
+            'average_spread': average_spread,
             'macd': latest['macd'],
             'macd_signal': latest['macd_signal'],
             'macd_diff': latest['macd_diff'],
@@ -1142,13 +1159,14 @@ def calculate_mtf_from_5m_data(df):
 
 
 
-def get_liquidity_metrics(exchange, symbol, df_5m=None):
+def get_liquidity_metrics(exchange, symbol, df_5m=None, order_book=None):
     """
     قياس السيولة من Order Book
     Returns: dict with liquidity metrics
     """
     try:
-        order_book = exchange.fetch_order_book(symbol, limit=20)
+        if not order_book:
+            order_book = exchange.fetch_order_book(symbol, limit=20)
         
         if not order_book or not order_book.get('bids') or not order_book.get('asks'):
             return {
