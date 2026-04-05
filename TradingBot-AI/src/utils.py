@@ -55,8 +55,16 @@ def execute_sell(exchange, symbol, amount, reason=""):
         sell_value = amount * current_price
         
         if sell_value < 10.0:
-            print(f"⚠️ Sell value ${sell_value:.2f} < $10 minimum - Skipping {symbol}")
-            return {'success': False, 'error': f'NOTIONAL: Value ${sell_value:.2f} below $10 minimum'}
+            # 🚨 الرصيد الفعلي أقل من $10 — نحاول بيع كل الرصيد المتاح قسراً
+            # (يحدث عند عملات رخيصة كـ SHIB بسبب خطأ في الكمية المحفوظة)
+            print(f"⚠️ Sell value ${sell_value:.2f} < $10 — attempting force sell all available balance: {available_amount}")
+            try:
+                order = exchange.create_market_sell_order(symbol, available_amount)
+                print(f"✅ Force sell executed {symbol}: {available_amount} units")
+                return {'success': True, 'order': order, 'reason': f'force_exit: {reason}'}
+            except Exception as force_err:
+                print(f"❌ Force sell failed {symbol}: {force_err}")
+                return {'success': False, 'error': f'Force sell failed: {force_err}'}
         
         order = exchange.create_market_sell_order(symbol, amount)
         
