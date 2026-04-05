@@ -26,7 +26,7 @@ BASE_AMOUNT = 12
 # 1. تصويت المستشارين (-0.8% إلى -1.2%)
 # 2. Trailing Stop -2% من أعلى سعر (جدار نهائي)
 
-VOLUME_SPIKE_FACTOR = 0.8 # Multiplier for detecting significant volume spikes (lowered for more opportunities)
+VOLUME_SPIKE_FACTOR = 1.0 # Multiplier for detecting significant volume spikes (lowered for more opportunities)
 PEAK_DROP_THRESHOLD = 2.0   # % هبوط من القمة يعتبر إشارة بيع (Dynamic Trailing Stop-Loss)
 BOTTOM_BOUNCE_THRESHOLD = 2.0  # % ارتداد من القاع يعتبر إشارة شراء (0.5% = وسط)
 REVERSAL_CANDLES = 10       # عدد الشموع للبحث عن القاع والقمة (أسرع)
