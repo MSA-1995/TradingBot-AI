@@ -143,6 +143,134 @@ def process_sell(result, exchange, ctx):
                 'liquidity': liquidity_data
             }
         }
+
+        # حساب الميزات المتقدمة للتدريب
+        analysis = result.get('analysis', {})
+        price = analysis.get('close', 1)
+        volume_ratio = analysis.get('volume_ratio', 1)
+
+        # Liquidity Features
+        order_book = analysis.get('order_book', {})
+        bids_volume = sum(float(level[1]) for level in order_book.get('bids', [])[:10])
+        asks_volume = sum(float(level[1]) for level in order_book.get('asks', [])[:10])
+        total_volume = bids_volume + asks_volume
+        order_book_imbalance = (bids_volume - asks_volume) / max(total_volume, 1) if total_volume > 0 else 0
+
+        spread = analysis.get('bid_ask_spread', 0.001)
+        avg_spread = analysis.get('average_spread', 0.001)
+        spread_volatility = abs(spread - avg_spread) / max(avg_spread, 0.0001)
+
+        depth_at_1pct = 0
+        for level in order_book.get('bids', []):
+            if abs(float(level[0]) - price) / price <= 0.01:
+                depth_at_1pct += float(level[1])
+        for level in order_book.get('asks', []):
+            if abs(float(level[0]) - price) / price <= 0.01:
+                depth_at_1pct += float(level[1])
+
+        market_impact_score = min(volume_ratio / 10, 1.0)
+        liquidity_trends = 0
+        if volume_ratio > 1.5 and spread_volatility < 0.5:
+            liquidity_trends = 1
+        elif volume_ratio < 0.7 or spread_volatility > 1.0:
+            liquidity_trends = -1
+
+        # Risk Features
+        volatility_risk_score = analysis.get('atr', 0) / price * 100
+        correlation_risk = 0  # placeholder
+        gap_risk_score = 0  # placeholder
+        black_swan_probability = 0  # placeholder
+        behavioral_risk = 0  # placeholder
+        systemic_risk = 0  # placeholder
+
+        # Exit Features
+        profit_optimization_score = profit / 10
+        time_decay_signals = min(hours_held / 24, 1)
+        opportunity_cost_exits = 0  # placeholder
+        market_condition_exits = 0  # placeholder
+
+        # Pattern Features
+        harmonic_patterns_score = 0  # placeholder
+        elliott_wave_signals = 0  # placeholder
+        fractal_patterns = 0  # placeholder
+        cycle_patterns = 0  # placeholder
+        momentum_patterns = 0  # placeholder
+
+        # Smart Money Features
+        whale_wallet_changes = 0  # placeholder
+        institutional_accumulation = 0  # placeholder
+        smart_money_ratio = 0  # placeholder
+        exchange_whale_flows = 0  # placeholder
+
+        # Anomaly Features
+        statistical_outliers = 0  # placeholder
+        pattern_anomalies = 0  # placeholder
+        behavioral_anomalies = 0  # placeholder
+        volume_anomalies = 0  # placeholder
+
+        # Chart CNN Features
+        attention_mechanism_score = 0  # placeholder
+        multi_scale_features = 0  # placeholder
+        temporal_features = 0  # placeholder
+
+        # Volume Features
+        volume_trend_strength = analysis.get('volume_trend', 0)
+        volume_volatility = 0  # placeholder
+        volume_momentum = 0  # placeholder
+        volume_seasonality = 0  # placeholder
+        volume_correlation = 0  # placeholder
+
+        # Meta Features
+        dynamic_consultant_weights = 0  # placeholder
+        uncertainty_quantification = 0  # placeholder
+        context_aware_score = 0  # placeholder
+
+        # Add to trade_data
+        trade_data.update({
+            'order_book_imbalance': round(order_book_imbalance, 4),
+            'spread_volatility': round(spread_volatility, 4),
+            'depth_at_1pct': round(depth_at_1pct, 4),
+            'market_impact_score': round(market_impact_score, 4),
+            'liquidity_trends': liquidity_trends,
+            'volatility_risk_score': round(volatility_risk_score, 4),
+            'correlation_risk': correlation_risk,
+            'gap_risk_score': gap_risk_score,
+            'black_swan_probability': black_swan_probability,
+            'behavioral_risk': behavioral_risk,
+            'systemic_risk': systemic_risk,
+            'profit_optimization_score': round(profit_optimization_score, 4),
+            'time_decay_signals': round(time_decay_signals, 4),
+            'opportunity_cost_exits': opportunity_cost_exits,
+            'market_condition_exits': market_condition_exits,
+            'harmonic_patterns_score': harmonic_patterns_score,
+            'elliott_wave_signals': elliott_wave_signals,
+            'fractal_patterns': fractal_patterns,
+            'cycle_patterns': cycle_patterns,
+            'momentum_patterns': momentum_patterns,
+            'whale_wallet_changes': whale_wallet_changes,
+            'institutional_accumulation': institutional_accumulation,
+            'smart_money_ratio': smart_money_ratio,
+            'exchange_whale_flows': exchange_whale_flows,
+            'statistical_outliers': statistical_outliers,
+            'pattern_anomalies': pattern_anomalies,
+            'behavioral_anomalies': behavioral_anomalies,
+            'volume_anomalies': volume_anomalies,
+            'attention_mechanism_score': attention_mechanism_score,
+            'multi_scale_features': multi_scale_features,
+            'temporal_features': temporal_features,
+            'volume_trend_strength': round(volume_trend_strength, 4),
+            'volume_volatility': volume_volatility,
+            'volume_momentum': volume_momentum,
+            'volume_seasonality': volume_seasonality,
+            'volume_correlation': volume_correlation,
+            'dynamic_consultant_weights': dynamic_consultant_weights,
+            'uncertainty_quantification': uncertainty_quantification,
+            'context_aware_score': context_aware_score,
+            'rsi': analysis.get('rsi', 50),
+            'volume_ratio': volume_ratio,
+            'sentiment_score': analysis.get('sentiment_score', 0),
+            'panic_score': analysis.get('panic_score', 0)
+        })
         # تحديث ذاكرة العملة
         try:
             if hasattr(storage.storage, 'update_symbol_memory'):
