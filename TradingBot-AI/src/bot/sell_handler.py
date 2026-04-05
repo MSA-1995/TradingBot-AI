@@ -161,13 +161,14 @@ def process_sell(result, exchange, ctx):
             }
         }
 
-        # حساب الميزات المتقدمة للتدريب
-        candles = result.get('candles', analysis.get('candles', []))
-        price = analysis.get('close', 1) or 1
-        volume_ratio = analysis.get('volume_ratio', 1)
-        rsi = analysis.get('rsi', 50)
-        macd_diff = analysis.get('macd_diff', 0)
-        atr = analysis.get('atr', 0)
+        # حساب الميزات المتقدمة للتدريب - GET REAL ANALYSIS FROM CTX!!!
+        analysis_data = ctx.get('last_analysis', {}) if 'last_analysis' in ctx else result.get('analysis', {})
+        candles = result.get('candles', analysis_data.get('candles', []))
+        price = analysis_data.get('close', 1) or 1
+        volume_ratio = analysis_data.get('volume_ratio', 1)
+        rsi = analysis_data.get('rsi', 50)
+        macd_diff = analysis_data.get('macd_diff', 0)
+        atr = analysis_data.get('atr', 0)
 
         # Helper to safely convert to float
         def safe_float(value, default=0.0):
@@ -513,51 +514,51 @@ def process_sell(result, exchange, ctx):
         except:
             context_aware_score = 0
 
-        # Add to trade_data - READ ALL VALUES FROM ANALYSIS OBJECT!!!
+        # Add to trade_data - READ ALL VALUES FROM REAL ANALYSIS DATA!!!
         trade_data.update({
-            'order_book_imbalance': safe_float(analysis.get('order_book_imbalance')),
-            'spread_volatility': safe_float(analysis.get('spread_volatility')),
-            'depth_at_1pct': safe_float(analysis.get('depth_at_1pct')),
-            'market_impact_score': safe_float(analysis.get('market_impact_score')),
-            'liquidity_trends': safe_float(analysis.get('liquidity_trends')),
-            'volatility_risk_score': safe_float(analysis.get('volatility_risk_score')),
-            'correlation_risk': safe_float(analysis.get('correlation_risk')),
-            'gap_risk_score': safe_float(analysis.get('gap_risk_score')),
-            'black_swan_probability': safe_float(analysis.get('black_swan_probability')),
-            'behavioral_risk': safe_float(analysis.get('behavioral_risk')),
-            'systemic_risk': safe_float(analysis.get('systemic_risk')),
-            'profit_optimization_score': safe_float(analysis.get('profit_optimization_score')),
-            'time_decay_signals': safe_float(analysis.get('time_decay_signals')),
-            'opportunity_cost_exits': safe_float(analysis.get('opportunity_cost_exits')),
-            'market_condition_exits': safe_float(analysis.get('market_condition_exits')),
-            'harmonic_patterns_score': safe_float(analysis.get('harmonic_patterns_score')),
-            'elliott_wave_signals': safe_float(analysis.get('elliott_wave_signals')),
-            'fractal_patterns': safe_float(analysis.get('fractal_patterns')),
-            'cycle_patterns': safe_float(analysis.get('cycle_patterns')),
-            'momentum_patterns': safe_float(analysis.get('momentum_patterns')),
-            'whale_wallet_changes': safe_float(analysis.get('whale_wallet_changes')),
-            'institutional_accumulation': safe_float(analysis.get('institutional_accumulation')),
-            'smart_money_ratio': safe_float(analysis.get('smart_money_ratio')),
-            'exchange_whale_flows': safe_float(analysis.get('exchange_whale_flows')),
-            'statistical_outliers': safe_float(analysis.get('statistical_outliers')),
-            'pattern_anomalies': safe_float(analysis.get('pattern_anomalies')),
-            'behavioral_anomalies': safe_float(analysis.get('behavioral_anomalies')),
-            'volume_anomalies': safe_float(analysis.get('volume_anomalies')),
-            'attention_mechanism_score': safe_float(analysis.get('attention_mechanism_score')),
-            'multi_scale_features': safe_float(analysis.get('multi_scale_features')),
-            'temporal_features': safe_float(analysis.get('temporal_features')),
-            'volume_trend_strength': safe_float(analysis.get('volume_trend_strength')),
-            'volume_volatility': safe_float(analysis.get('volume_volatility')),
-            'volume_momentum': safe_float(analysis.get('volume_momentum')),
-            'volume_seasonality': safe_float(analysis.get('volume_seasonality')),
-            'volume_correlation': safe_float(analysis.get('volume_correlation')),
-            'dynamic_consultant_weights': safe_float(analysis.get('dynamic_consultant_weights')),
-            'uncertainty_quantification': safe_float(analysis.get('uncertainty_quantification')),
-            'context_aware_score': safe_float(analysis.get('context_aware_score')),
-            'rsi': safe_float(analysis.get('rsi'), 50),
+            'order_book_imbalance': safe_float(analysis_data.get('order_book_imbalance')),
+            'spread_volatility': safe_float(analysis_data.get('spread_volatility')),
+            'depth_at_1pct': safe_float(analysis_data.get('depth_at_1pct')),
+            'market_impact_score': safe_float(analysis_data.get('market_impact_score')),
+            'liquidity_trends': safe_float(analysis_data.get('liquidity_trends')),
+            'volatility_risk_score': safe_float(analysis_data.get('volatility_risk_score')),
+            'correlation_risk': safe_float(analysis_data.get('correlation_risk')),
+            'gap_risk_score': safe_float(analysis_data.get('gap_risk_score')),
+            'black_swan_probability': safe_float(analysis_data.get('black_swan_probability')),
+            'behavioral_risk': safe_float(analysis_data.get('behavioral_risk')),
+            'systemic_risk': safe_float(analysis_data.get('systemic_risk')),
+            'profit_optimization_score': safe_float(analysis_data.get('profit_optimization_score')),
+            'time_decay_signals': safe_float(analysis_data.get('time_decay_signals')),
+            'opportunity_cost_exits': safe_float(analysis_data.get('opportunity_cost_exits')),
+            'market_condition_exits': safe_float(analysis_data.get('market_condition_exits')),
+            'harmonic_patterns_score': safe_float(analysis_data.get('harmonic_patterns_score')),
+            'elliott_wave_signals': safe_float(analysis_data.get('elliott_wave_signals')),
+            'fractal_patterns': safe_float(analysis_data.get('fractal_patterns')),
+            'cycle_patterns': safe_float(analysis_data.get('cycle_patterns')),
+            'momentum_patterns': safe_float(analysis_data.get('momentum_patterns')),
+            'whale_wallet_changes': safe_float(analysis_data.get('whale_wallet_changes')),
+            'institutional_accumulation': safe_float(analysis_data.get('institutional_accumulation')),
+            'smart_money_ratio': safe_float(analysis_data.get('smart_money_ratio')),
+            'exchange_whale_flows': safe_float(analysis_data.get('exchange_whale_flows')),
+            'statistical_outliers': safe_float(analysis_data.get('statistical_outliers')),
+            'pattern_anomalies': safe_float(analysis_data.get('pattern_anomalies')),
+            'behavioral_anomalies': safe_float(analysis_data.get('behavioral_anomalies')),
+            'volume_anomalies': safe_float(analysis_data.get('volume_anomalies')),
+            'attention_mechanism_score': safe_float(analysis_data.get('attention_mechanism_score')),
+            'multi_scale_features': safe_float(analysis_data.get('multi_scale_features')),
+            'temporal_features': safe_float(analysis_data.get('temporal_features')),
+            'volume_trend_strength': safe_float(analysis_data.get('volume_trend_strength')),
+            'volume_volatility': safe_float(analysis_data.get('volume_volatility')),
+            'volume_momentum': safe_float(analysis_data.get('volume_momentum')),
+            'volume_seasonality': safe_float(analysis_data.get('volume_seasonality')),
+            'volume_correlation': safe_float(analysis_data.get('volume_correlation')),
+            'dynamic_consultant_weights': safe_float(analysis_data.get('dynamic_consultant_weights')),
+            'uncertainty_quantification': safe_float(analysis_data.get('uncertainty_quantification')),
+            'context_aware_score': safe_float(analysis_data.get('context_aware_score')),
+            'rsi': safe_float(analysis_data.get('rsi'), 50),
             'volume_ratio': safe_float(volume_ratio, 1),
-            'sentiment_score': safe_float(analysis.get('sentiment_score'), 0),
-            'panic_score': safe_float(analysis.get('panic_score'), 0)
+            'sentiment_score': safe_float(analysis_data.get('sentiment_score'), 0),
+            'panic_score': safe_float(analysis_data.get('panic_score'), 0)
         })
         # تحديث ذاكرة العملة
         try:
