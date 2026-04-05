@@ -9,6 +9,7 @@ from datetime import datetime
 from functools import lru_cache
 import time
 from market_intelligence import get_market_regime, check_flash_crash, get_time_analysis, get_time_multiplier
+from news_analyzer import get_sentiment_data
 
 # [تحسين الذاكرة] تم حذف المتغير العام _market_cache
 
@@ -1068,7 +1069,8 @@ def get_market_analysis(exchange, symbol, limit=120):
             'eth_change_1h': eth_change_1h,
             'bnb_change_1h': bnb_change_1h,
             'high_24h': high_24h,
-            'low_24h': low_24h
+            'low_24h': low_24h,
+            **get_sentiment_data(symbol, {'close': latest['close'], 'rsi': latest['rsi']})
         }
     except Exception as e:
         print(f"❌ Analysis error {symbol}: {e}")
