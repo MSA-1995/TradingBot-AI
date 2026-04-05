@@ -301,16 +301,14 @@ def calculate_smart_money_features(symbol, analysis):
         exchange_whale_flows = exchange_flows * 0.01  # تطبيع
 
         return {
-            'whale_wallet_changes': round(whale_changes, 2),
-            'institutional_accumulation': round(institutional_accumulation, 4),
+
             'smart_money_ratio': round(smart_money_ratio, 4),
             'exchange_whale_flows': round(exchange_whale_flows, 4)
         }
     except Exception as e:
         print(f"⚠️ Smart money features error: {e}")
         return {
-            'whale_wallet_changes': 0,
-            'institutional_accumulation': 0,
+
             'smart_money_ratio': 0,
             'exchange_whale_flows': 0
         }
