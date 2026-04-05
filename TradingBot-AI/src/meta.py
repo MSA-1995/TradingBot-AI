@@ -11,7 +11,6 @@ import os
 import json
 
 DB_LEARNING_KEY = 'king_learning_data'
-DB_BLACKLIST_KEY = 'king_blacklist'
 
 class Meta:
     def __init__(self, advisor_manager=None, storage=None):
@@ -19,13 +18,7 @@ class Meta:
         self.storage = storage
         self.meta_learner_data = None
         self._load_model_data_from_db()
-        
-        # 🚫 القائمة السوداء - Cache ذكي (يُحدّث عند التشغيل وكل ساعة)
-        self._blacklist_cache = {}
-        self._blacklist_cache_time = None
-        self._blacklist_cache_ttl = 3600  # ساعة واحدة
-        self._load_blacklist()  # تحميل عند بداية التشغيل
-        
+
         print("👑 Meta (The King) is initialized and ready to rule.")
 
     def _load_model_data_from_db(self):
@@ -84,14 +77,6 @@ class Meta:
         if not analysis_data or not isinstance(analysis_data, dict):
             return {'action': 'DISPLAY', 'reason': 'Invalid analysis data', 'confidence': 0}
         
-        # 🚫 فحص القائمة السوداء - منع شراء العملات الفخ المتكررة
-        if self._is_blacklisted(symbol):
-            return {
-                'action': 'DISPLAY',
-                'reason': f'🚫 Blacklisted (Repeated Trap)',
-                'confidence': 10
-            }
-
         # --- 1. Market Mood ---
         mood_details = self._get_market_mood(analysis_data)
         market_mood = mood_details['mood']
@@ -762,14 +747,6 @@ class Meta:
             # تحميل البيانات من الداتابيز
             data = self._load_learning_data()
 
-            # تحديث القائمة السوداء
-            if symbol and trade_quality in ['TRAP', 'RISKY']:
-                if symbol not in data['blacklist']:
-                    data['blacklist'][symbol] = {'trap_count': 0, 'last_trap': None}
-                data['blacklist'][symbol]['trap_count'] += 1
-                data['blacklist'][symbol]['last_trap'] = datetime.now().isoformat()
-                print(f"🚫 {symbol} added to blacklist (Trap #{data['blacklist'][symbol]['trap_count']})")
-
             # تعلم من البيع
             if trade_quality in ['GREAT', 'GOOD', 'OK']:
                 data['sell_success'] += 1
@@ -831,8 +808,7 @@ class Meta:
             'buy_success': 0, 'buy_fail': 0,
             'sell_success': 0, 'sell_fail': 0,
             'peak_correct': 0, 'peak_wrong': 0,
-            'bottom_correct': 0, 'bottom_wrong': 0,
-            'blacklist': {}
+            'bottom_correct': 0, 'bottom_wrong': 0
         }
         try:
             if self.storage:
@@ -879,64 +855,6 @@ class Meta:
         except:
             pass
         return {'total': 0, 'success': 0, 'accuracy': 0, 'peak_accuracy': 0, 'bottom_accuracy': 0}
-    
-    def _load_blacklist(self):
-        """تحميل القائمة السوداء من الداتابيز"""
-        try:
-            data = self._load_learning_data()
-            blacklist_data = data.get('blacklist', {})
-            self._blacklist_cache = {}
-
-            for symbol, info in blacklist_data.items():
-                trap_count = info.get('trap_count', 0)
-                last_trap_str = info.get('last_trap')
-                is_banned = False
-
-                if trap_count >= 4 and last_trap_str:
-                    try:
-                        last_trap = datetime.fromisoformat(last_trap_str)
-                        if (datetime.now() - last_trap).total_seconds() / 3600 < 2:
-                            is_banned = True
-                    except:
-                        pass
-                elif trap_count >= 3 and last_trap_str:
-                    try:
-                        last_trap = datetime.fromisoformat(last_trap_str)
-                        if (datetime.now() - last_trap).total_seconds() / 3600 < 1.5:
-                            is_banned = True
-                    except:
-                        pass
-                elif trap_count >= 2 and last_trap_str:
-                    try:
-                        last_trap = datetime.fromisoformat(last_trap_str)
-                        if (datetime.now() - last_trap).total_seconds() / 3600 < 1:
-                            is_banned = True
-                    except:
-                        pass
-                elif trap_count >= 1 and last_trap_str:
-                    try:
-                        last_trap = datetime.fromisoformat(last_trap_str)
-                        if (datetime.now() - last_trap).total_seconds() / 60 < 30:
-                            is_banned = True
-                    except:
-                        pass
-
-                self._blacklist_cache[symbol] = is_banned
-
-            self._blacklist_cache_time = datetime.now()
-            banned_symbols = [s for s, banned in self._blacklist_cache.items() if banned]
-            if banned_symbols:
-                pass
-                # print(f"🚫 Blacklist loaded: {', '.join(banned_symbols)}")
-
-        except Exception as e:
-            print(f"⚠️ Error loading blacklist: {e}")
-            self._blacklist_cache = {}
-            self._blacklist_cache_time = datetime.now()
-    
-    def _is_blacklisted(self, symbol):
-        """✅ تم إيقاف نظام القائمة السوداء بشكل دائم"""
-        return False
 
     def _update_symbol_memory(self, symbol):
         """تحديث ذاكرة الملك للعملة"""
