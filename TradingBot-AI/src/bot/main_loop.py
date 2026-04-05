@@ -207,7 +207,7 @@ def run_main_loop(exchange, ctx):
                         'advisor_manager': advisor_manager,
                         'meta':            meta,
                         'sell_cooldown':   sell_cooldown,
-                        'last_analysis':   analysis
+                        'last_analysis':   result.get('analysis', {})
                     })
                     continue
 
