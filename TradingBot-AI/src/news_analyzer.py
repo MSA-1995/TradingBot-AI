@@ -62,9 +62,20 @@ def get_sentiment_data(symbol=None, analysis=None):
     # ========== 2. Panic Score من التحليل التقني ==========
     if analysis:
         try:
-            panic_greed = analysis.get('panic_greed', {})
-            result['panic_score'] = float(panic_greed.get('panic_score', 0))
-        except:
+            # Calculate panic score directly from real data
+            rsi_val = float(analysis.get('rsi', 50))
+            btc_change = float(analysis.get('btc_change_1h', 0))
+            vol_ratio = float(analysis.get('volume_ratio', 1))
+            
+            panic_score = 0.0
+            if rsi_val < 30: panic_score += 3
+            if rsi_val > 75: panic_score += 2
+            if btc_change < -2: panic_score += abs(btc_change) / 2
+            if vol_ratio > 2.5: panic_score += 2
+            if vol_ratio < 0.4: panic_score += 1
+            
+            result['panic_score'] = min(float(panic_score), 10.0)
+        except Exception as e:
             result['panic_score'] = 0.0
 
     # ========== 3. Optimism Penalty ==========
