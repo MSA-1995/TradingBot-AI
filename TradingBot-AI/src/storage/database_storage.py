@@ -205,6 +205,18 @@ class DatabaseStorage:
                 return d
             trade_data = convert_to_native(trade_data)
 
+            # --- FIX: تنظيف Infinity و NaN قبل الحفظ (JSON لا يدعمهما) ---
+            import math
+            def sanitize_for_json(d):
+                if isinstance(d, dict):
+                    return {k: sanitize_for_json(v) for k, v in d.items()}
+                if isinstance(d, list):
+                    return [sanitize_for_json(i) for i in d]
+                if isinstance(d, float) and (math.isinf(d) or math.isnan(d)):
+                    return 0.0
+                return d
+            trade_data = sanitize_for_json(trade_data)
+
             # --- FIX: Ensure all values are correct types to prevent DB errors ---
             for key, value in trade_data.items():
                 if key in ['symbol', 'action', 'sell_reason', 'trade_quality']:
@@ -226,7 +238,6 @@ class DatabaseStorage:
                     symbol, action, profit_percent, sell_reason, tp_target, sl_target, hours_held,
                     rsi, volume_ratio, trade_quality, profit,
                     whale_confidence, atr_value, sentiment_score, panic_score, optimism_penalty, psychological_analysis, data,
-                    -- الأعمدة الجديدة لتطوير النماذج
                     order_book_imbalance, spread_volatility, depth_at_1pct, market_impact_score, liquidity_trends,
                     volatility_risk_score, correlation_risk, gap_risk_score, black_swan_probability, behavioral_risk, systemic_risk,
                     profit_optimization_score, time_decay_signals, opportunity_cost_exits, market_condition_exits,
@@ -237,7 +248,7 @@ class DatabaseStorage:
                     volume_trend_strength, volume_volatility, volume_momentum, volume_seasonality, volume_correlation,
                     dynamic_consultant_weights, uncertainty_quantification, context_aware_score
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 trade_data.get('symbol'),
                 trade_data.get('action'),
@@ -250,7 +261,7 @@ class DatabaseStorage:
                 trade_data.get('rsi', 0),
                 trade_data.get('volume_ratio', 0),
                 trade_data.get('trade_quality', ''),
-                trade_data.get('profit_percent', 0),
+                trade_data.get('profit', 0),
                 # whale/sentiment/analysis columns
                 trade_data.get('whale_confidence', 0),
                 trade_data.get('atr_value', 0),
