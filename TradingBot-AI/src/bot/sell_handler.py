@@ -350,23 +350,6 @@ def process_sell(result, exchange, ctx):
             momentum_patterns = 0
 
         # Smart Money Features
-        # whale_wallet_changes: تقدير من حجم الصفقة نسبةً للسوق
-        try:
-            whale_wallet_changes = min(safe_float(analysis.get('whale_ratio', volume_ratio / 5)), 1.0)
-        except:
-            whale_wallet_changes = 0
-
-        # institutional_accumulation: تراكم مؤسسي (volume مرتفع مع سعر مستقر)
-        try:
-            price_volatility = atr / price if price else 0
-            if volume_ratio > 1.5 and price_volatility < 0.02:
-                institutional_accumulation = 0.8
-            elif volume_ratio > 1.2:
-                institutional_accumulation = 0.4
-            else:
-                institutional_accumulation = 0.0
-        except:
-            institutional_accumulation = 0
 
         # smart_money_ratio: نسبة الأموال الذكية (order book imbalance + volume)
         try:
@@ -552,8 +535,7 @@ def process_sell(result, exchange, ctx):
             'fractal_patterns': safe_float(fractal_patterns),
             'cycle_patterns': safe_float(cycle_patterns),
             'momentum_patterns': safe_float(momentum_patterns),
-            'whale_wallet_changes': safe_float(whale_wallet_changes),
-            'institutional_accumulation': safe_float(institutional_accumulation),
+
             'smart_money_ratio': safe_float(smart_money_ratio),
             'exchange_whale_flows': safe_float(exchange_whale_flows),
             'statistical_outliers': safe_float(statistical_outliers),
