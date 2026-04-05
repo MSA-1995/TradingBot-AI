@@ -177,15 +177,15 @@ def process_sell(result, exchange, ctx):
             except (ValueError, TypeError):
                 return default
 
-        # Liquidity Features
-        order_book = analysis.get('order_book', {})
+        # Liquidity Features - FROM REAL ANALYSIS DATA NOW!
+        order_book = analysis_data.get('order_book', {})
         bids_volume = sum(float(level[1]) for level in order_book.get('bids', [])[:10])
         asks_volume = sum(float(level[1]) for level in order_book.get('asks', [])[:10])
         total_volume = bids_volume + asks_volume
         order_book_imbalance = (bids_volume - asks_volume) / max(total_volume, 1) if total_volume > 0 else 0
 
-        spread = analysis.get('bid_ask_spread', 0.001)
-        avg_spread = analysis.get('average_spread', 0.001)
+        spread = analysis_data.get('bid_ask_spread', 0.001)
+        avg_spread = analysis_data.get('average_spread', 0.001)
         spread_volatility = abs(spread - avg_spread) / max(avg_spread, 0.0001)
 
         depth_at_1pct = 0
