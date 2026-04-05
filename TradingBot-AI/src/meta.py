@@ -762,7 +762,7 @@ class Meta:
             # ✅ حفظ النمط في جدول الانماط المتعلمة
             try:
                 # حفظ نمط النجاح أو الفشل
-                pattern_type = 'SUCCESS' if trade_quality in ['GREAT', 'GOOD'] else 'TRAP'
+                pattern_type = 'SUCCESS' if trade_quality in ['GREAT', 'GOOD', 'OK'] else 'TRAP'
                 pattern_data = {
                     'type': pattern_type,
                     'success_rate': 1.0 if trade_quality in ['GREAT', 'GOOD'] else 0.0,
