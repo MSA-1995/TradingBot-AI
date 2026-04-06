@@ -6,10 +6,17 @@ Handles Discord messages and file logging
 import requests
 from datetime import datetime, timezone, timedelta
 import os
+import time
 from config_encrypted import get_discord_webhook, get_critical_webhook
 
 DISCORD_WEBHOOK = get_discord_webhook()
 CRITICAL_WEBHOOK = get_critical_webhook()
+
+# Cache for sent messages to prevent duplicates (stores hashes of recent messages)
+sent_messages_cache = set()
+CACHE_MAX_SIZE = 100  # Keep only last 100 messages
+CACHE_EXPIRY = timedelta(hours=1)  # Clear cache every hour
+last_cache_clear = datetime.now()
 
 def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_id=None, webhook_url=None):
     """Send or edit an embed message on Discord."""
@@ -67,6 +74,43 @@ def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_
     except Exception as e:
         print(f"❌ An unexpected error occurred while sending to Discord: {e}")
         return None
+    except Exception as e:
+        print(f"❌ An unexpected error occurred while sending to Discord: {e}")
+        return None
+
+def _clear_expired_cache():
+    """Clear the sent messages cache if expired."""
+    global last_cache_clear
+    if datetime.now() - last_cache_clear > CACHE_EXPIRY:
+        sent_messages_cache.clear()
+        last_cache_clear = datetime.now()
+
+def _is_message_duplicate(message):
+    """Check if message was recently sent to prevent duplicates."""
+    _clear_expired_cache()
+    message_hash = hash(message)
+    if message_hash in sent_messages_cache:
+        return True
+    if len(sent_messages_cache) >= CACHE_MAX_SIZE:
+        # Remove oldest (approximate by popping one)
+        sent_messages_cache.pop()
+    sent_messages_cache.add(message_hash)
+    return False
+
+def send_discord(webhook_url, message, retries=3):
+    """Send a simple Discord message with retries, rate limit handling, and deduplication."""
+    if _is_message_duplicate(message):
+        return  # Skip duplicate message
+    for i in range(retries):
+        try:
+            response = requests.post(webhook_url, json={"content": message})
+            if response.status_code == 429:
+                wait = response.json().get('retry_after', 2)
+                time.sleep(wait)
+                continue
+            return
+        except:
+            time.sleep(2)
 
 def log_trade(action, symbol, amount, price, value, profit_percent=None, reason=""):
     """Log trade to file"""
