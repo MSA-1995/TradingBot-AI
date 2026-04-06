@@ -53,7 +53,8 @@ class Meta:
             
             if model:
                 self.meta_model = model
-                self.meta_model_accuracy = dl_client._model_accuracy.get('meta_learner', 0)
+                # ✅ نفس الاسم للنموذج وللدقة
+                self.meta_model_accuracy = dl_client._model_accuracy.get('meta_trading', 0)
             else:
                 self.meta_model = None
                 self.meta_model_accuracy = 0
@@ -88,33 +89,7 @@ class Meta:
         
         return self._symbol_memory_cache.get(symbol, {})
 
-    def _load_learning_data(self):
-        """Load learning data with cache"""
-        current_time = time()
-        
-        # إرجاع من الـ cache إذا لم ينتهي
-        if (current_time - self._learning_data_cache_timestamp) < 600:  # 10 دقائق
-            return self._learning_data_cache
-        
-        # تحميل من الملف
-        try:
-            if os.path.exists(DB_LEARNING_KEY + '.json'):
-                with open(DB_LEARNING_KEY + '.json', 'r') as f:
-                    self._learning_data_cache = json.load(f)
-                    self._learning_data_cache_timestamp = current_time
-            else:
-                self._learning_data_cache = {
-                    'courage_record': [],
-                    'best_buy_times': {},
-                    'worst_buy_times': {},
-                    'successful_patterns': [],
-                    'symbol_win_rate': {}
-                }
-        except Exception as e:
-            print(f"⚠️ Error loading learning data: {e}")
-            self._learning_data_cache = {}
-        
-        return self._learning_data_cache
+    # _load_learning_data مُعرَّفة أسفل الملف (الإصدار الكامل مع storage)
 
     def _extract_meta_features(self, analysis_data, symbol=None):
         """
@@ -377,10 +352,10 @@ class Meta:
     # =========================================================
     # 💪 الجرأة الديناميكية — يجرؤ أكثر لو نجح قبل بنفس الظروف
     # =========================================================
-    def _get_courage_boost(self, symbol, rsi, volume_ratio):
+    def _get_courage_boost(self, symbol, rsi, volume_ratio, _ld=None):
         """لو البوت نجح قبل بنفس الظروف → يجرؤ أكثر ويرفع الثقة"""
         try:
-            data = self._load_learning_data()
+            data = _ld if _ld is not None else self._load_learning_data()
             courage_record = data.get('courage_record', [])
 
             similar_wins = [
@@ -410,10 +385,10 @@ class Meta:
     # =========================================================
     # ⏰ ذاكرة الوقت — يتجنب أوقات الخسارة ويفضل أوقات النجاح
     # =========================================================
-    def _get_time_memory_modifier(self, symbol):
+    def _get_time_memory_modifier(self, symbol, _ld=None):
         """يتذكر الأوقات الناجحة والخاسرة لكل عملة ويعدّل الثقة"""
         try:
-            data = self._load_learning_data()
+            data = _ld if _ld is not None else self._load_learning_data()
             current_hour = datetime.now().hour
             hour_key = str(current_hour)
 
@@ -460,10 +435,10 @@ class Meta:
     # =========================================================
     # 🔁 ذاكرة الأنماط — يبحث عن نمط مشابه ناجح سابق
     # =========================================================
-    def _get_symbol_pattern_score(self, symbol, rsi, macd_diff, volume_ratio):
+    def _get_symbol_pattern_score(self, symbol, rsi, macd_diff, volume_ratio, _ld=None):
         """يبحث في الصفقات الناجحة السابقة عن نمط مشابه ويرفع الثقة"""
         try:
-            data = self._load_learning_data()
+            data = _ld if _ld is not None else self._load_learning_data()
             patterns = data.get('successful_patterns', [])
 
             symbol_patterns = [p for p in patterns if p.get('symbol') == symbol]
@@ -498,10 +473,10 @@ class Meta:
     # =========================================================
     # 🏆 معدل نجاح العملة — يثق أكثر بالعملات الموثوقة
     # =========================================================
-    def _get_symbol_win_rate_boost(self, symbol):
+    def _get_symbol_win_rate_boost(self, symbol, _ld=None):
         """لو العملة سجلها ناجح تاريخياً → يضيف ثقة إضافية"""
         try:
-            data = self._load_learning_data()
+            data = _ld if _ld is not None else self._load_learning_data()
             win_data = data.get('symbol_win_rate', {}).get(symbol, {})
             wins = win_data.get('wins', 0)
             total = win_data.get('total', 0)
@@ -704,42 +679,57 @@ class Meta:
             print(f"⚠️ Fibonacci error: {e}")
 
         # =========================================================
-        # 🧠 الذاكرة الذكية — تضيف ثقة بدون تعديل نسب التصويت
+        # 🧠 الذاكرة الذكية — تحميل مرة واحدة فقط (بدل 4 استدعاءات)
         # =========================================================
+        _cached_ld = self._load_learning_data()
 
         # 💪 1. الجرأة الديناميكية
-        courage_boost = self._get_courage_boost(symbol, rsi, volume_ratio)
+        courage_boost = self._get_courage_boost(symbol, rsi, volume_ratio, _ld=_cached_ld)
         if courage_boost > 0:
             temp_conf += courage_boost
             reasons.append(f"CourageBoost(+{courage_boost:.0f})")
 
         # ⏰ 2. ذاكرة الوقت
-        time_mod, time_label = self._get_time_memory_modifier(symbol)
+        time_mod, time_label = self._get_time_memory_modifier(symbol, _ld=_cached_ld)
         if time_mod != 0:
             temp_conf += time_mod
             reasons.append(time_label)
 
         # 🔁 3. ذاكرة الأنماط
-        pattern_boost, pattern_label = self._get_symbol_pattern_score(symbol, rsi, macd_diff, volume_ratio)
+        pattern_boost, pattern_label = self._get_symbol_pattern_score(symbol, rsi, macd_diff, volume_ratio, _ld=_cached_ld)
         if pattern_boost > 0:
             temp_conf += pattern_boost
             reasons.append(pattern_label)
 
         # 🏆 4. معدل نجاح العملة
-        win_boost, win_label = self._get_symbol_win_rate_boost(symbol)
+        win_boost, win_label = self._get_symbol_win_rate_boost(symbol, _ld=_cached_ld)
         if win_boost != 0:
             temp_conf += win_boost
             reasons.append(win_label)
 
         # =========================================================
-        # 👑 4.5. النموذج المدرب الذكي (Meta Model) - من قاعدة البيانات
+        # 👑 5. النموذج الذكي المتعلم — هو القرار الكامل (Meta = King)
         # =========================================================
         meta_model_probability = self._get_meta_model_prediction(analysis_data, symbol=symbol)
-        if meta_model_probability is not None:
-            # استخدم النموذج المدرب لتعزيز الثقة (0-30 نقطة)
-            meta_boost = meta_model_probability * 30  # تحويل من 0-1 إلى 0-30
-            temp_conf += meta_boost
-            reasons.append(f"MetaModel({meta_model_probability*100:.0f}%,+{meta_boost:.0f})")
+        if meta_model_probability is None:
+            meta_model_probability = 0.5  # neutral fallback
+
+        # يعزز الثقة أيضاً (0-30 نقطة)
+        meta_boost = meta_model_probability * 30
+        temp_conf += meta_boost
+        reasons.append(f"MetaModel({meta_model_probability*100:.0f}%,+{meta_boost:.0f})")
+
+        # إشارة الشمعة الانعكاسية تضيف ثقة إضافية (لكنها لم تعد البوابة الوحيدة)
+        candle_score = reversal.get('confidence', 0)
+        if reversal.get('candle_signal', False):
+            temp_conf += 12
+            reasons.append(f"CandleReversal(+12)")
+        elif candle_score >= MIN_CONFIDENCE:
+            temp_conf += 7
+            reasons.append(f"BottomScore({candle_score:.0f},+7)")
+        elif volume_ratio >= 2.0 and reversal.get('is_reversing', False):
+            temp_conf += 5
+            reasons.append(f"VolReversal(+5)")
 
         # =========================================================
         temp_conf = min(max(temp_conf, 0), 99)  # نضمن النطاق 0-99
@@ -812,63 +802,45 @@ class Meta:
             vote_breakdown = {'king_fallback': fallback_votes}
 
         # =========================================================
-        # 👑 6. الملك يقرر أولاً (Independent Decision)
+        # 👑 6. الملك يقرر — بناءً على النموذج الذكي المتعلم
         # =========================================================
         min_votes_needed = mood_details.get('min_votes_needed', 4)
-        # ✅ BUG FIX: لا نـ override total_advisors بعد ما حسبناه من الـ fallback
         effective_total = mood_details.get('total_advisors', 5)
         
-        # نقاط الشموع من تحليل القاع
-        candle_score = reversal.get('confidence', 0)
+        # النموذج الذكي هو القرار الكامل (threshold: 50% = محايد، 60% = واثق)
+        king_wants_to_buy = meta_model_probability >= 0.50
+        king_reason = f"MetaModel({meta_model_probability*100:.0f}%)"
         
-        # ✅ قرار الملك: يعتمد على إشارات القاع الحقيقية فقط
-        king_wants_to_buy = False
-        king_reason = ""
-
-        # الشرط 1: إشارة شمعية انعكاسية واضحة من القاع (الأقوى)
-        if reversal.get('candle_signal', False):
-            king_wants_to_buy = True
-            king_reason = f"King: Reversal Signal ({candle_score}/110)"
-
-        # الشرط 2: نقاط القاع كافية (شموع + حجم + تريند + دعم)
-        elif candle_score >= MIN_CONFIDENCE:
-            king_wants_to_buy = True
-            king_reason = f"King: Bottom Score ({candle_score}/110)"
-
-        # الشرط 3: انفجار حجم مع بداية ارتداد (بدون أرقام RSI ثابتة)
-        elif volume_ratio >= 2.0 and reversal.get('is_reversing', False):
-            king_wants_to_buy = True
-            king_reason = f"King: Vol Explosion + Reversal ({volume_ratio:.1f}x)"
+        # في سوق هابط — اشترط ثقة أعلى من النموذج
+        if market_mood == "Bearish" and meta_model_probability < 0.65:
+            king_wants_to_buy = False
+            king_reason = f"MetaModel low in Bearish({meta_model_probability*100:.0f}%<65%)"
         
         # =========================================================
-        # 🗳️ 7. التصويت الفوري بعد قرار الملك
+        # 🗳️ 7. التصويت بعد قرار الملك الذكي
         # =========================================================
         if king_wants_to_buy and market_mood != "Bearish":
-            # Bullish: 3/5 | Neutral: 4/5 (كما هي - لم تتغير النسب)
             if buy_vote_count >= min_votes_needed:
                 action = "BUY"
-                reason = f"BUY ✅ | King:{temp_conf} | Votes:{buy_vote_count}/{min_votes_needed} | {', '.join(reasons[:3])}"
+                reason = f"BUY ✅ | MetaModel:{meta_model_probability*100:.0f}% | King:{temp_conf:.0f} | Votes:{buy_vote_count}/{min_votes_needed} | {', '.join(reasons[:3])}"
             else:
                 action = "DISPLAY"
                 market_emoji = "🟢" if market_mood == "Bullish" else "⚪"
-                reason = f"King:{temp_conf}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed} (Need {min_votes_needed}) | {market_emoji} Market: {market_mood}"
+                reason = f"MetaModel:{meta_model_probability*100:.0f}% | King:{temp_conf:.0f}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed} (Need {min_votes_needed}) | {market_emoji} Market: {market_mood}"
         elif king_wants_to_buy and market_mood == "Bearish":
-            # Bearish: 5/5 (كما هي - لم تتغير النسبة)
-            # لكن أضفنا استثناء متوسط: RSI تشبع بيعي شديد جداً
-            if buy_vote_count >= 5 and reversal.get('candle_signal', False) and candle_score >= 40:
+            # سوق هابط: النموذج واثق (>=65%) + 5/5 أصوات + إشارة شمعية
+            if buy_vote_count >= 5 and reversal.get('candle_signal', False) and meta_model_probability >= 0.65:
                 action = "BUY"
-                reason = f"BUY (Bearish Override) ✅ | King:{temp_conf} | Votes:5/5 | Signal:{candle_score}/110"
-            elif rsi <= 28 and buy_vote_count >= 4 and temp_conf >= MIN_CONFIDENCE + 10:
-                # ✅ متوسط: تشبع بيعي شديد جداً في سوق هابط = فرصة نادرة
+                reason = f"BUY (Bearish Override) ✅ | MetaModel:{meta_model_probability*100:.0f}% | Votes:5/5"
+            elif rsi <= 28 and buy_vote_count >= 4 and meta_model_probability >= 0.70:
                 action = "BUY"
-                reason = f"BUY (Deep Oversold) ✅ | RSI:{rsi:.0f} | King:{temp_conf:.0f} | Votes:{buy_vote_count}/4"
+                reason = f"BUY (Deep Oversold) ✅ | RSI:{rsi:.0f} | MetaModel:{meta_model_probability*100:.0f}% | Votes:{buy_vote_count}/4"
             else:
                 action = "DISPLAY"
-                reason = f"Bearish | King:{temp_conf:.0f} | Votes:{buy_vote_count}/5 | Need strong candle signal"
+                reason = f"Bearish | MetaModel:{meta_model_probability*100:.0f}% | Votes:{buy_vote_count}/5 | Need MetaModel>=65%+5/5"
         else:
-            # الملك مو راضي
             market_emoji = "🟢" if market_mood == "Bullish" else "🔴" if market_mood == "Bearish" else "⚪"
-            reason = f"King Confidence:{temp_conf:.0f}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed} | {market_emoji} Market: {market_mood}"
+            reason = f"MetaModel LOW:{meta_model_probability*100:.0f}%(<50%) | King:{temp_conf:.0f} | {market_emoji} Market: {market_mood}"
 
         decision = {
             'action': action,
@@ -930,36 +902,72 @@ class Meta:
         
         mood_details = self._get_market_mood(analysis)
 
-        # --- 2. صائد القمم (نظام النقاط الذكي - متوازن) ---
-        peak_analysis = analysis.get('peak', {})
-        peak_score = peak_analysis.get('confidence', 0)
-        candle_condition = peak_analysis.get('candle_signal', False)
-        
-        # استخراج مؤشر RSI مبكرًا لتجنب خطأ المتغير غير المعرفة
+        # استخراج المؤشرات مبكراً
         rsi = analysis.get('rsi', 50)
-
-        # تأكيد القمة بإشارات حقيقية فقط - بدون أرقام ثابتة
-        trigger_activated = (
-            candle_condition or               # نمط شمعي انعكاسي عند القمة
-            peak_score >= MIN_SELL_CONFIDENCE # نقاط القمة كافية (شموع + حجم + تريند + مقاومة)
-        )
-
-        if not trigger_activated:
-            return {'action': 'HOLD', 'reason': f'Waiting for Peak | Score:{peak_score:.0f}/110', 'profit': profit_percent}
-
-        # --- ✅ الحد الأدنى للربح: تم نقله بعد فحص القمة
-        # فقط عندما تنشط اشارة البيع نتحقق ان نبيع على الاقل بربح 0.5%
-        if profit_percent < 0.5:
-            return {'action': 'HOLD', 'reason': f'Waiting for +0.5% min profit', 'profit': profit_percent}
-
-        sell_conf = 20
-        sell_reasons = []
-
         macd_diff = analysis.get('macd_diff', 0)
         volume_ratio = analysis.get('volume_ratio', 1.0)
         ema_crossover = analysis.get('ema_crossover', 0)
         price_momentum = analysis.get('price_momentum', 0)
         liquidity_metrics = analysis.get('liquidity_metrics', {})
+        peak_analysis = analysis.get('peak', {})
+        peak_score = peak_analysis.get('confidence', 0)
+        candle_condition = peak_analysis.get('candle_signal', False)
+
+        sell_conf = 20
+        sell_reasons = []
+
+        # =========================================================
+        # 👑 2. النموذج الذكي المتعلم — هو الملك الكامل للبيع
+        # =========================================================
+        # النموذج يتنبأ باحتمالية الشراء (0-1)
+        # احتمالية منخفضة = السوق مو مناسب للشراء = وقت البيع
+        sell_meta_probability = self._get_meta_model_prediction(analysis, symbol=symbol)
+        if sell_meta_probability is None:
+            sell_meta_probability = 0.5  # neutral fallback
+
+        # تحويل احتمالية الشراء إلى إشارة بيع (عكسية)
+        sell_signal_strength = 1.0 - sell_meta_probability  # كلما انخفضت احتمالية الشراء، قوي إشارة البيع
+
+        # النموذج يعزز sell_conf (0-30 نقطة)
+        meta_sell_boost = sell_signal_strength * 30
+        sell_conf += meta_sell_boost
+        sell_reasons.append(f"MetaModel(BuyProb:{sell_meta_probability*100:.0f}%,SellBoost:+{meta_sell_boost:.0f})")
+
+        # الشمعة وإشارة القمة تضيف ثقة إضافية (لكنها لم تعد البوابة)
+        if candle_condition:
+            sell_conf += 15
+            sell_reasons.append(f"CandlePeak(+15)")
+        elif peak_score >= MIN_SELL_CONFIDENCE:
+            sell_conf += 8
+            sell_reasons.append(f"PeakScore({peak_score:.0f},+8)")
+
+        # =========================================================
+        # 👑 قرار الملك: هل نبيع؟ (النموذج هو المتحكم الكامل)
+        # =========================================================
+        # سوق صاعد: يشترط إشارة بيع أقوى (احتمالية شراء < 45%)
+        # سوق محايد: احتمالية شراء < 50%
+        # سوق هابط: احتمالية شراء < 55% (أسهل بيع في الهابط)
+        market_mood = mood_details['mood']
+        if market_mood == 'Bullish':
+            sell_threshold = 0.45
+        elif market_mood == 'Bearish':
+            sell_threshold = 0.55
+        else:
+            sell_threshold = 0.50
+
+        king_wants_to_sell = sell_meta_probability <= sell_threshold
+        king_sell_reason = f"MetaModel({sell_meta_probability*100:.0f}%<={sell_threshold*100:.0f}%)"
+
+        if not king_wants_to_sell:
+            return {
+                'action': 'HOLD',
+                'reason': f'MetaModel HIGH:{sell_meta_probability*100:.0f}%(>{sell_threshold*100:.0f}%) — Hold | Score:{sell_conf:.0f}',
+                'profit': profit_percent
+            }
+
+        # --- ✅ الحد الأدنى للربح (بعد قرار الملك)
+        if profit_percent < 0.5:
+            return {'action': 'HOLD', 'reason': f'Waiting for +0.5% min profit | MetaModel:{sell_meta_probability*100:.0f}%', 'profit': profit_percent}
 
         # --- 🎯 Profit Target (هدف الربح - حلب العملة) ---
         if profit_percent >= 2.5:
@@ -1113,22 +1121,19 @@ class Meta:
             total_advisors = 5
             vote_breakdown = {'king_fallback': fallback_votes}
 
-        # --- 4. القرار الملكي النهائي: نقاط + التصويت ---
+        # --- 4. القرار الملكي النهائي: النموذج + النقاط + التصويت ---
         min_votes_needed = mood_details.get('min_votes_needed', 4)
-        # ✅ BUG FIX: لا نـ override total_advisors بعد ما حسبناه من الـ fallback
         effective_total = mood_details.get('total_advisors', 5)
         
-        # حالة عادية: نحتاج التصويت المطلوب حسب المود (النسب لم تتغير: Bullish 3/5, Neutral 4/5, Bearish 5/5)
         if sell_vote_count >= min_votes_needed and sell_conf >= MIN_SELL_CONFIDENCE:
             action = 'SELL'
-            reason = f"SELL | Score:{sell_conf:.0f}/110 | Votes:{sell_vote_count}/{min_votes_needed} | {', '.join(sell_reasons[:3])}"
-        # ✅ متوسط: Fallback King - إذا النقاط كافية والـ fallback وافق
+            reason = f"SELL ✅ | MetaModel:{sell_meta_probability*100:.0f}% | Score:{sell_conf:.0f} | Votes:{sell_vote_count}/{min_votes_needed} | {', '.join(sell_reasons[:3])}"
         elif vote_breakdown.get('king_fallback', 0) >= min_votes_needed and sell_conf >= MIN_SELL_CONFIDENCE:
             action = 'SELL'
-            reason = f"SELL (King Decision) | Score:{sell_conf:.0f}/110 | {', '.join(sell_reasons[:3])}"
+            reason = f"SELL (King) ✅ | MetaModel:{sell_meta_probability*100:.0f}% | Score:{sell_conf:.0f} | {', '.join(sell_reasons[:3])}"
         else:
             action = 'HOLD'
-            reason = f"Hold | Score:{sell_conf:.0f}/110 | Votes:{sell_vote_count}/{min_votes_needed}"
+            reason = f"Hold | MetaModel:{sell_meta_probability*100:.0f}% | Score:{sell_conf:.0f} | Votes:{sell_vote_count}/{min_votes_needed}"
 
         # تجنب التفاؤل في should_sell (أقل صرامة)
         if profit_percent > 15:
@@ -1382,7 +1387,11 @@ class Meta:
             print(f"⚠️ King learning error: {e}")
 
     def _load_learning_data(self):
-        """تحميل بيانات التعلم من الداتابيز"""
+        """تحميل بيانات التعلم من الداتابيز — مع cache 10 دقائق"""
+        current_time = time()
+        if (current_time - self._learning_data_cache_timestamp) < 600:
+            return self._learning_data_cache
+
         default = {
             'buy_success': 0, 'buy_fail': 0,
             'sell_success': 0, 'sell_fail': 0,
@@ -1402,11 +1411,12 @@ class Meta:
                 raw = self.storage.load_setting(DB_LEARNING_KEY)
                 if raw:
                     loaded = json.loads(raw)
-                    # Backward compatibility: أضف الحقول الجديدة لو مش موجودة
                     for key, val in default.items():
                         if key not in loaded:
                             loaded[key] = val
-                    return loaded
+                    self._learning_data_cache = loaded
+                    self._learning_data_cache_timestamp = current_time
+                    return self._learning_data_cache
         except:
             pass
         # Fallback: قراءة من الملف المحلي لو موجود
@@ -1415,13 +1425,16 @@ class Meta:
             if os.path.exists(local_file):
                 with open(local_file, 'r') as f:
                     file_data = json.load(f)
-                    # نقل البيانات للداتابيز
                     self._save_learning_data(file_data)
                     print("✅ Migrated king_learning.json to database")
-                    return file_data
+                    self._learning_data_cache = file_data
+                    self._learning_data_cache_timestamp = current_time
+                    return self._learning_data_cache
         except:
             pass
-        return default
+        self._learning_data_cache = default
+        self._learning_data_cache_timestamp = current_time
+        return self._learning_data_cache
 
     def _save_learning_data(self, data):
         """حفظ بيانات التعلم في الداتابيز"""
