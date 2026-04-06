@@ -558,7 +558,8 @@ def process_sell(result, exchange, ctx):
             'rsi': safe_float(analysis_data.get('rsi'), 50),
             'volume_ratio': safe_float(volume_ratio, 1),
             'sentiment_score': safe_float(analysis_data.get('sentiment_score'), 0),
-            'panic_score': safe_float(analysis_data.get('panic_score'), 0)
+            'panic_score': safe_float(analysis_data.get('panic_score'), 0),
+            'profit': safe_float(trade_data.get('profit_percent', 0))
         })
         # تحديث ذاكرة العملة
         try:
