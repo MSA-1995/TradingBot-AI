@@ -753,6 +753,46 @@ class Meta:
                 if buy_votes and len([v for v in buy_votes.values() if v == 1]) >= 3:
                     data['bottom_wrong'] += 1
 
+            # ✅ إضافة الذاكرة الجديدة للجرأة والذكاء
+            if trade_quality in ['GREAT', 'GOOD', 'OK']:
+                # أفضل وقت للشراء
+                from datetime import datetime
+                current_hour = datetime.now().hour
+                if symbol not in data['best_buy_times']:
+                    data['best_buy_times'][symbol] = {}
+                if current_hour not in data['best_buy_times'][symbol]:
+                    data['best_buy_times'][symbol][current_hour] = 0
+                data['best_buy_times'][symbol][current_hour] += 1
+
+                # أنماط السعر الناجحة (placeholders for now)
+                rsi = 50  # will be updated when position data is available
+                volume_ratio = 1.0
+                data['successful_patterns'].append({
+                    'symbol': symbol,
+                    'rsi': rsi,
+                    'volume_ratio': volume_ratio,
+                    'profit': profit,
+                    'date': datetime.now().isoformat()
+                })
+
+                # سجل الجرأة (لو اتجرأ ونجح)
+                if rsi < 35 or volume_ratio > 2.5:
+                    data['courage_record'].append({
+                        'symbol': symbol,
+                        'rsi': rsi,
+                        'volume_ratio': volume_ratio,
+                        'profit': profit,
+                        'date': datetime.now().isoformat()
+                    })
+
+            # تاريخ الأخطاء
+            if trade_quality in ['RISKY', 'TRAP'] or profit < -0.5:
+                data['error_history'].append({
+                    'symbol': symbol,
+                    'reason': 'trap' if trade_quality in ['TRAP'] else 'low_profit' if profit < -0.5 else 'other',
+                    'date': datetime.now().isoformat()
+                })
+
             # حفظ في الداتابيز
             self._save_learning_data(data)
 
@@ -794,7 +834,12 @@ class Meta:
             'buy_success': 0, 'buy_fail': 0,
             'sell_success': 0, 'sell_fail': 0,
             'peak_correct': 0, 'peak_wrong': 0,
-            'bottom_correct': 0, 'bottom_wrong': 0
+            'bottom_correct': 0, 'bottom_wrong': 0,
+            'best_buy_times': {},  # {symbol: {hour: success_count}}
+            'best_trade_sizes': {},  # {symbol: {size_range: avg_profit}}
+            'successful_patterns': [],  # list of {'symbol':, 'rsi':, 'volume_ratio':, 'profit':}
+            'error_history': [],  # list of {'symbol':, 'reason':, 'date':}
+            'courage_record': []  # list of {'symbol':, 'rsi':, 'volume_ratio':, 'profit':, 'date':}
         }
         try:
             if self.storage:
