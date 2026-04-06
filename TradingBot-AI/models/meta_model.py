@@ -41,7 +41,7 @@ def train_meta_model(trades, voting_scores=None, since_timestamp=None):
 
             # ========== TECHNICAL INDICATORS ==========
             rsi = float(data.get('rsi', 50))
-            macd = float(data.get('macd', 0))
+            macd_diff = float(data.get('macd_diff', data.get('macd', 0)))  # ✅ unified name
             volume_ratio = float(data.get('volume_ratio', 1.0))
             price_momentum = float(data.get('price_momentum', 0))
             atr = float(data.get('atr', 0))
@@ -76,7 +76,23 @@ def train_meta_model(trades, voting_scores=None, since_timestamp=None):
             social_volume = float(data.get('social_volume', 0))
             market_sentiment = float(data.get('market_sentiment', 0))
 
-            # ========== CONSULTANT VOTES ==========
+            # ========== SYMBOL MEMORY ==========
+            sym_mem = data.get('symbol_memory', {})
+            sym_win_rate = float(sym_mem.get('win_count', 0)) / max(float(sym_mem.get('total_trades', 1)), 1)
+            sym_avg_profit = float(sym_mem.get('avg_profit', 0))
+            sym_trap_count = float(sym_mem.get('trap_count', 0))
+            sym_total = float(sym_mem.get('total_trades', 0))
+            sym_is_reliable = 1 if (sym_win_rate > 0.6 and sym_total > 5) else 0
+            sym_sentiment_avg = float(sym_mem.get('sentiment_avg', 0))
+            sym_whale_avg = float(sym_mem.get('whale_confidence_avg', 0))
+            sym_profit_loss_ratio = float(sym_mem.get('profit_loss_ratio', 1.0))
+            sym_volume_trend = float(sym_mem.get('volume_trend', 1.0))
+            sym_panic_avg = float(sym_mem.get('panic_score_avg', 0))
+            sym_optimism_avg = float(sym_mem.get('optimism_penalty_avg', 0))
+            sym_courage_boost = float(sym_mem.get('courage_boost', 0))
+            sym_time_memory = float(sym_mem.get('time_memory_modifier', 0))
+            sym_pattern_score = float(sym_mem.get('pattern_score', 0))
+            sym_win_rate_boost = float(sym_mem.get('win_rate_boost', 0))
             buy_votes = data.get('buy_votes', {})
             sell_votes = data.get('sell_votes', {})
             buy_count = sum(1 for v in buy_votes.values() if v == 1) if buy_votes else 0
@@ -90,10 +106,10 @@ def train_meta_model(trades, voting_scores=None, since_timestamp=None):
             momentum_strength = np.abs(price_momentum)
             volatility_level = float(data.get('volatility', 0))
 
-            # BUILD FEATURE VECTOR
+            # BUILD FEATURE VECTOR (must match meta.py inference exactly)
             features = [
                 # Technical
-                rsi, macd, volume_ratio, price_momentum, atr,
+                rsi, macd_diff, volume_ratio, price_momentum, atr,
                 # News
                 news_score, news_pos, news_neg, news_total, news_ratio, has_news,
                 # Sentiment
@@ -109,6 +125,13 @@ def train_meta_model(trades, voting_scores=None, since_timestamp=None):
                 # Derived
                 risk_score, opportunity, market_quality,
                 momentum_strength, volatility_level,
+                # Symbol Memory (أساسي)
+                sym_win_rate, sym_avg_profit, sym_trap_count, sym_total, sym_is_reliable,
+                # Symbol Memory (جديد - 7)
+                sym_sentiment_avg, sym_whale_avg, sym_profit_loss_ratio, sym_volume_trend,
+                sym_panic_avg, sym_optimism_avg,
+                # Symbol Memory (جديد - 4)
+                sym_courage_boost, sym_time_memory, sym_pattern_score, sym_win_rate_boost,
                 # Trade Context
                 hours_held
             ]
@@ -129,10 +152,10 @@ def train_meta_model(trades, voting_scores=None, since_timestamp=None):
 
     print(f"  📊 Collected {len(features_list)} samples (skipped {skipped})")
 
-    # Feature names
+    # Feature names (must match meta.py inference exactly — 48 features)
     feature_names = [
         # Technical
-        'rsi', 'macd', 'volume_ratio', 'price_momentum', 'atr',
+        'rsi', 'macd_diff', 'volume_ratio', 'price_momentum', 'atr',
         # News
         'news_score', 'news_pos', 'news_neg', 'news_total', 'news_ratio', 'has_news',
         # Sentiment
@@ -148,6 +171,13 @@ def train_meta_model(trades, voting_scores=None, since_timestamp=None):
         # Derived
         'risk_score', 'opportunity', 'market_quality',
         'momentum_strength', 'volatility_level',
+        # Symbol Memory (أساسي)
+        'sym_win_rate', 'sym_avg_profit', 'sym_trap_count', 'sym_total', 'sym_is_reliable',
+        # Symbol Memory (جديد - 7)
+        'sym_sentiment_avg', 'sym_whale_avg', 'sym_profit_loss_ratio', 'sym_volume_trend',
+        'sym_panic_avg', 'sym_optimism_avg',
+        # Symbol Memory (جديد - 4)
+        'sym_courage_boost', 'sym_time_memory', 'sym_pattern_score', 'sym_win_rate_boost',
         # Context
         'hours_held'
     ]
