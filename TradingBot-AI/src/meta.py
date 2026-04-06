@@ -36,7 +36,12 @@ class Meta:
     
     def is_meta_model_loaded(self):
         """✅ طريقة سريعة للتحقق: هل النموذج المتعلم محمل؟"""
-        return self.meta_model is not None and self.meta_model_accuracy > 0.5
+        if self.meta_model is None:
+            return False
+        # الدقة قد تكون مخزنة كنسبة مئوية (75.0) أو كسر (0.75)
+        acc = self.meta_model_accuracy
+        normalized = acc / 100.0 if acc > 1.0 else acc
+        return normalized > 0.5
 
     def _load_meta_model_from_db(self):
         """Loads the trained Meta Model from the database."""
@@ -62,7 +67,6 @@ class Meta:
             self.meta_model = None
             self.meta_model_accuracy = 0
             print("   >> Falling back to Heuristic predictions...")
-            self.meta_model = None
 
     def _load_symbol_memory_cache(self):
         """تحميل symbol_memory من DB مرة واحدة إلى الـ cache"""
@@ -100,37 +104,63 @@ class Meta:
         try:
             # ========== TECHNICAL INDICATORS ==========
             rsi = float(analysis_data.get('rsi', 50))
-            macd_diff = float(analysis_data.get('macd_diff', 0))
-            volume_ratio = float(analysis_data.get('volume_ratio', 1.0))
+            # 🔧 macd_diff: fallback to 'macd' (training key)
+            macd_diff = float(analysis_data.get('macd_diff', analysis_data.get('macd', 0)))
+            # 🔧 volume_ratio: fallback to 'volume_spike' or 'vol_ratio'
+            volume_ratio = float(analysis_data.get('volume_ratio',
+                           analysis_data.get('volume_spike',
+                           analysis_data.get('vol_ratio', 1.0))))
             price_momentum = float(analysis_data.get('price_momentum', 0))
             atr = float(analysis_data.get('atr', 0))
 
             # ========== NEWS DATA ==========
-            news_data = analysis_data.get('news_analysis', {})
-            news_score = float(news_data.get('overall_score', 0))
-            news_pos = float(news_data.get('positive_count', 0))
-            news_neg = float(news_data.get('negative_count', 0))
-            news_total = float(news_data.get('total_articles', 0))
+            # 🔧 'news_analysis' في inference ↔ 'news' في training
+            news_data = analysis_data.get('news_analysis',
+                        analysis_data.get('news', {}))
+            if not isinstance(news_data, dict):
+                news_data = {}
+            # 🔧 'overall_score' في inference ↔ 'news_score' في training
+            news_score = float(news_data.get('overall_score',
+                         news_data.get('news_score', 0)))
+            # 🔧 'positive_count' في inference ↔ 'positive' في training
+            news_pos = float(news_data.get('positive_count',
+                       news_data.get('positive', 0)))
+            # 🔧 'negative_count' في inference ↔ 'negative' في training
+            news_neg = float(news_data.get('negative_count',
+                       news_data.get('negative', 0)))
+            # 🔧 'total_articles' في inference ↔ 'total' في training
+            news_total = float(news_data.get('total_articles',
+                          news_data.get('total', 0)))
             news_ratio = news_pos / (news_neg + 0.001)
             has_news = 1 if news_total > 0 else 0
 
             # ========== SENTIMENT ==========
             sentiment = analysis_data.get('sentiment', {})
-            sent_score = float(sentiment.get('sentiment_score', 0))
+            if not isinstance(sentiment, dict):
+                sentiment = {}
+            # 🔧 'sentiment_score' في inference ↔ 'news_sentiment' في training
+            sent_score = float(sentiment.get('sentiment_score',
+                         sentiment.get('news_sentiment', 0)))
             fear_greed = float(sentiment.get('fear_greed_index', 50))
             fear_greed_norm = (fear_greed - 50) / 50
             is_fearful = 1 if fear_greed < 30 else 0
             is_greedy = 1 if fear_greed > 70 else 0
 
             # ========== LIQUIDITY ==========
-            liquidity = analysis_data.get('liquidity_metrics', {})
+            # 🔧 'liquidity_metrics' في inference ↔ 'liquidity' في training
+            liquidity = analysis_data.get('liquidity_metrics',
+                        analysis_data.get('liquidity', {}))
+            if not isinstance(liquidity, dict):
+                liquidity = {}
             liq_score = float(liquidity.get('liquidity_score', 50))
             depth_ratio = float(liquidity.get('depth_ratio', 1.0))
             price_impact = float(liquidity.get('price_impact', 0.5))
             good_liq = 1 if liq_score > 70 else 0
 
             # ========== MARKET CONDITIONS ==========
-            whale_activity = float(analysis_data.get('whale_confidence', 0))
+            # 🔧 'whale_confidence' في inference ↔ 'whale_activity' في training
+            whale_activity = float(analysis_data.get('whale_confidence',
+                             analysis_data.get('whale_activity', 0)))
             exchange_inflow = float(analysis_data.get('exchange_inflow', 0))
             social_volume = float(analysis_data.get('social_volume', 0))
             market_sentiment = float(analysis_data.get('market_sentiment', 0))
@@ -158,7 +188,12 @@ class Meta:
             sym_sentiment_avg = float(symbol_memory.get('sentiment_avg', 0))
             sym_whale_avg = float(symbol_memory.get('whale_confidence_avg', 0))
             sym_profit_loss_ratio = float(symbol_memory.get('profit_loss_ratio', 1.0))
-            sym_volume_trend = float(symbol_memory.get('volume_trend', 1.0))
+            # 🔧 volume_trend قد يكون string ('neutral','up','down') أو float
+            _vt = symbol_memory.get('volume_trend', 1.0)
+            if isinstance(_vt, str):
+                sym_volume_trend = 1.2 if _vt == 'up' else (0.8 if _vt == 'down' else 1.0)
+            else:
+                sym_volume_trend = float(_vt)
             sym_panic_avg = float(symbol_memory.get('panic_score_avg', 0))
             sym_optimism_avg = float(symbol_memory.get('optimism_penalty_avg', 0))
             
@@ -218,17 +253,27 @@ class Meta:
         try:
             # التقنية
             rsi = float(analysis_data.get('rsi', 50))
-            macd_diff = float(analysis_data.get('macd_diff', 0))
-            volume_ratio = float(analysis_data.get('volume_ratio', 1.0))
+            # 🔧 fallback keys
+            macd_diff = float(analysis_data.get('macd_diff', analysis_data.get('macd', 0)))
+            volume_ratio = float(analysis_data.get('volume_ratio',
+                           analysis_data.get('volume_spike',
+                           analysis_data.get('vol_ratio', 1.0))))
             price_momentum = float(analysis_data.get('price_momentum', 0))
             
-            # الأخبار
-            news_data = analysis_data.get('news_analysis', {})
-            news_pos = float(news_data.get('positive_count', 0))
-            news_neg = float(news_data.get('negative_count', 0))
+            # الأخبار - 🔧 fallback keys
+            news_data = analysis_data.get('news_analysis',
+                        analysis_data.get('news', {}))
+            if not isinstance(news_data, dict):
+                news_data = {}
+            news_pos = float(news_data.get('positive_count',
+                       news_data.get('positive', 0)))
+            news_neg = float(news_data.get('negative_count',
+                       news_data.get('negative', 0)))
             
-            # السنتيمنت
+            # السنتيمنت - 🔧 fallback keys
             sentiment = analysis_data.get('sentiment', {})
+            if not isinstance(sentiment, dict):
+                sentiment = {}
             fear_greed = float(sentiment.get('fear_greed_index', 50))
             
             # الـ votes من الـ consultants
@@ -573,8 +618,10 @@ class Meta:
 
         # --- 2. Technical Indicators ---
         rsi = analysis_data.get('rsi', 50)
-        macd_diff = analysis_data.get('macd_diff', 0)
-        volume_ratio = analysis_data.get('volume_ratio', 1.0)
+        macd_diff = analysis_data.get('macd_diff', analysis_data.get('macd', 0))  # 🔧 fallback
+        volume_ratio = analysis_data.get('volume_ratio',
+                       analysis_data.get('volume_spike',
+                       analysis_data.get('vol_ratio', 1.0)))  # 🔧 fallback
         ema_crossover = analysis_data.get('ema_crossover', 0)
 
         # 🚨 فحص RSI أولاً - إذا تشبع شرائي جداً (>85) لا تشتري!
@@ -904,11 +951,14 @@ class Meta:
 
         # استخراج المؤشرات مبكراً
         rsi = analysis.get('rsi', 50)
-        macd_diff = analysis.get('macd_diff', 0)
-        volume_ratio = analysis.get('volume_ratio', 1.0)
+        macd_diff = analysis.get('macd_diff', analysis.get('macd', 0))  # 🔧 fallback
+        volume_ratio = analysis.get('volume_ratio',
+                       analysis.get('volume_spike',
+                       analysis.get('vol_ratio', 1.0)))  # 🔧 fallback
         ema_crossover = analysis.get('ema_crossover', 0)
         price_momentum = analysis.get('price_momentum', 0)
-        liquidity_metrics = analysis.get('liquidity_metrics', {})
+        liquidity_metrics = analysis.get('liquidity_metrics',
+                            analysis.get('liquidity', {}))  # 🔧 fallback
         peak_analysis = analysis.get('peak', {})
         peak_score = peak_analysis.get('confidence', 0)
         candle_condition = peak_analysis.get('candle_signal', False)
@@ -1179,8 +1229,10 @@ class Meta:
     def _calculate_smart_amount(self, symbol, confidence, analysis):
         """حساب المبلغ الذكي بالتصويت من المستشارين + Risk Manager"""
         rsi = analysis.get('rsi', 50)
-        macd = analysis.get('macd_diff', 0)
-        volume_ratio = analysis.get('volume_ratio', 1.0)
+        macd = analysis.get('macd_diff', analysis.get('macd', 0))  # 🔧 fallback
+        volume_ratio = analysis.get('volume_ratio',
+                       analysis.get('volume_spike',
+                       analysis.get('vol_ratio', 1.0)))  # 🔧 fallback
         
         dl_client = self.advisor_manager.get('dl_client')
         if dl_client:
@@ -1437,10 +1489,13 @@ class Meta:
         return self._learning_data_cache
 
     def _save_learning_data(self, data):
-        """حفظ بيانات التعلم في الداتابيز"""
+        """حفظ بيانات التعلم في الداتابيز + تحديث الـ cache مباشرة"""
         try:
             if self.storage:
                 self.storage.save_setting(DB_LEARNING_KEY, json.dumps(data))
+            # ✅ تحديث الـ cache مباشرة بعد الحفظ (بدل انتظار 10 دقائق)
+            self._learning_data_cache = data
+            self._learning_data_cache_timestamp = time()
         except Exception as e:
             print(f"⚠️ Error saving learning data: {e}")
     
@@ -1483,22 +1538,71 @@ class Meta:
         return {'total': 0, 'success': 0, 'accuracy': 0, 'peak_accuracy': 0, 'bottom_accuracy': 0}
 
     def _update_symbol_memory(self, symbol):
-        """تحديث ذاكرة الملك للعملة"""
+        """تحديث ذاكرة الملك للعملة — بيانات حقيقية من learning_data"""
         try:
-            # جلب بيانات حديثة
+            data = self._load_learning_data()
+
+            # ===== حساب win_rate الحقيقي =====
+            wr = data.get('symbol_win_rate', {}).get(symbol, {})
+            wins  = wr.get('wins', 0)
+            total = wr.get('total', 0)
+            win_rate = wins / total if total > 0 else 0.0
+
+            # ===== حساب avg_profit من الأنماط الناجحة =====
+            sym_patterns = [p for p in data.get('successful_patterns', []) if p.get('symbol') == symbol]
+            avg_profit = (sum(p.get('profit', 0) for p in sym_patterns) / len(sym_patterns)) if sym_patterns else 0.0
+
+            # ===== حساب trap_count من error_history =====
+            trap_count = sum(
+                1 for e in data.get('error_history', [])
+                if e.get('symbol') == symbol and e.get('reason') == 'trap'
+            )
+
+            # ===== profit_loss_ratio =====
+            losses = [p for p in data.get('error_history', []) if p.get('symbol') == symbol]
+            profit_loss_ratio = (len(sym_patterns) / len(losses)) if losses else float(len(sym_patterns))
+            profit_loss_ratio = round(min(profit_loss_ratio, 10.0), 2)
+
+            # ===== courage_boost من آخر courage_record =====
+            courage_records = [r for r in data.get('courage_record', []) if r.get('symbol') == symbol]
+            courage_boost = 0.0
+            if len(courage_records) >= 2:
+                avg_c = sum(r.get('profit', 0) for r in courage_records[-5:]) / min(len(courage_records), 5)
+                courage_boost = round(min(avg_c * 1.5, 15.0), 2)
+
+            # ===== pattern_score =====
+            pattern_score = round(min(avg_profit * 2.0, 14.0), 2) if len(sym_patterns) >= 3 else 0.0
+
+            # ===== win_rate_boost =====
+            win_rate_boost = 0.0
+            if total >= 5:
+                if win_rate >= 0.80:   win_rate_boost = 10.0
+                elif win_rate >= 0.65: win_rate_boost = 5.0
+                elif win_rate < 0.35:  win_rate_boost = -8.0
+
             memory_data = {
-                'sentiment_avg': 0,  # من sentiment
-                'whale_confidence_avg': 0,  # من whale_confidence
-                'profit_loss_ratio': 0,  # حساب من الصفقات
-                'volume_trend': 'neutral',  # من volume
-                'panic_score_avg': 0,  # من panic_greed
-                'optimism_penalty_avg': 0,  # من optimism
-                'psychological_summary': 'Updated by Meta'
+                'win_count':           wins,
+                'total_trades':        total,
+                'avg_profit':          round(avg_profit, 3),
+                'trap_count':          trap_count,
+                'profit_loss_ratio':   profit_loss_ratio,
+                'volume_trend':        1.0,
+                'sentiment_avg':       0.0,
+                'whale_confidence_avg': 0.0,
+                'panic_score_avg':     0.0,
+                'optimism_penalty_avg': 0.0,
+                'courage_boost':       courage_boost,
+                'time_memory_modifier': 0.0,
+                'pattern_score':       pattern_score,
+                'win_rate_boost':      win_rate_boost,
+                'psychological_summary': f'WR:{win_rate*100:.0f}% T:{total} P:{avg_profit:.1f}%'
             }
 
-            # حفظ في قاعدة البيانات
             if hasattr(self.storage, 'save_symbol_memory'):
                 self.storage.save_symbol_memory(symbol, memory_data)
 
+            # تحديث الـ cache مباشرة بعد الحفظ
+            self._symbol_memory_cache[symbol] = memory_data
+
         except Exception as e:
-            pass
+            print(f"⚠️ _update_symbol_memory error [{symbol}]: {e}")
