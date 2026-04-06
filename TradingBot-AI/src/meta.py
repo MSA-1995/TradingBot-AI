@@ -822,11 +822,11 @@ class Meta:
         if king_wants_to_buy and market_mood != "Bearish":
             if buy_vote_count >= min_votes_needed:
                 action = "BUY"
-                reason = f"BUY ✅ | MetaModel:{meta_model_probability*100:.0f}% | King:{temp_conf:.0f} | Votes:{buy_vote_count}/{min_votes_needed} | {', '.join(reasons[:3])}"
+                reason = f"BUY ✅ | MetaModel:{meta_model_probability*100:.0f}% | Confidence:{temp_conf:.0f} | Votes:{buy_vote_count}/{min_votes_needed} | {', '.join(reasons[:3])}"
             else:
                 action = "DISPLAY"
                 market_emoji = "🟢" if market_mood == "Bullish" else "⚪"
-                reason = f"MetaModel:{meta_model_probability*100:.0f}% | King:{temp_conf:.0f}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed} (Need {min_votes_needed}) | {market_emoji} Market: {market_mood}"
+                reason = f"MetaModel:{meta_model_probability*100:.0f}% | Confidence:{temp_conf:.0f}/{MIN_CONFIDENCE} | Votes:{buy_vote_count}/{min_votes_needed} (Need {min_votes_needed}) | {market_emoji} Market: {market_mood}"
         elif king_wants_to_buy and market_mood == "Bearish":
             # سوق هابط: النموذج واثق (>=65%) + 5/5 أصوات + إشارة شمعية
             if buy_vote_count >= 5 and reversal.get('candle_signal', False) and meta_model_probability >= 0.65:
@@ -840,7 +840,7 @@ class Meta:
                 reason = f"Bearish | MetaModel:{meta_model_probability*100:.0f}% | Votes:{buy_vote_count}/5 | Need MetaModel>=65%+5/5"
         else:
             market_emoji = "🟢" if market_mood == "Bullish" else "🔴" if market_mood == "Bearish" else "⚪"
-            reason = f"MetaModel LOW:{meta_model_probability*100:.0f}%(<50%) | King:{temp_conf:.0f} | {market_emoji} Market: {market_mood}"
+            reason = f"MetaModel LOW:{meta_model_probability*100:.0f}%(<50%) | Confidence:{temp_conf:.0f} | {market_emoji} Market: {market_mood}"
 
         decision = {
             'action': action,
