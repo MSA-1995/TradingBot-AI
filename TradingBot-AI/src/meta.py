@@ -65,6 +65,160 @@ class Meta:
         except Exception:
             return 0, "No news"
 
+    # =========================================================
+    # 💪 الجرأة الديناميكية — يجرؤ أكثر لو نجح قبل بنفس الظروف
+    # =========================================================
+    def _get_courage_boost(self, symbol, rsi, volume_ratio):
+        """لو البوت نجح قبل بنفس الظروف → يجرؤ أكثر ويرفع الثقة"""
+        try:
+            data = self._load_learning_data()
+            courage_record = data.get('courage_record', [])
+
+            similar_wins = [
+                r for r in courage_record
+                if r.get('symbol') == symbol
+                and abs(r.get('rsi', 50) - rsi) < 12
+                and abs(r.get('volume_ratio', 1.0) - volume_ratio) < 0.5
+                and r.get('profit', 0) > 0.5
+            ]
+
+            if len(similar_wins) >= 3:
+                avg_profit = sum(r['profit'] for r in similar_wins) / len(similar_wins)
+                boost = min(avg_profit * 2.5, 18)  # max +18 نقطة
+                print(f"💪 Courage Boost [{symbol}]: +{boost:.1f} (based on {len(similar_wins)} similar wins, avg {avg_profit:.1f}%)")
+                return round(boost, 1)
+
+            # حتى عملتين ناجحتين تعطي boost خفيف
+            if len(similar_wins) == 2:
+                avg_profit = sum(r['profit'] for r in similar_wins) / 2
+                boost = min(avg_profit * 1.2, 8)
+                print(f"💪 Soft Courage [{symbol}]: +{boost:.1f} (2 similar wins)")
+                return round(boost, 1)
+        except Exception as e:
+            print(f"⚠️ Courage boost error: {e}")
+        return 0
+
+    # =========================================================
+    # ⏰ ذاكرة الوقت — يتجنب أوقات الخسارة ويفضل أوقات النجاح
+    # =========================================================
+    def _get_time_memory_modifier(self, symbol):
+        """يتذكر الأوقات الناجحة والخاسرة لكل عملة ويعدّل الثقة"""
+        try:
+            data = self._load_learning_data()
+            current_hour = datetime.now().hour
+            hour_key = str(current_hour)
+
+            best_times = data.get('best_buy_times', {}).get(symbol, {})
+            worst_times = data.get('worst_buy_times', {}).get(symbol, {})
+
+            success_this_hour = best_times.get(hour_key, 0)
+            fails_this_hour = worst_times.get(hour_key, 0)
+
+            total_this_hour = success_this_hour + fails_this_hour
+
+            # ساعة ناجحة بشكل واضح
+            if success_this_hour >= 3 and fails_this_hour == 0:
+                boost = +10
+                label = f"GoodHour({current_hour}h,{success_this_hour}wins)"
+                print(f"⏰ Time Boost [{symbol}]: {label}")
+                return boost, label
+
+            # ساعة ناجحة بنسبة عالية (75%+)
+            if total_this_hour >= 4 and success_this_hour / total_this_hour >= 0.75:
+                boost = +6
+                label = f"GoodHour({current_hour}h,{int(success_this_hour/total_this_hour*100)}%)"
+                print(f"⏰ Time Boost [{symbol}]: {label}")
+                return boost, label
+
+            # ساعة خاسرة
+            if fails_this_hour >= 2:
+                penalty = -12
+                label = f"BadHour({current_hour}h,{fails_this_hour}fails)"
+                print(f"⏰ Time Penalty [{symbol}]: {label}")
+                return penalty, label
+
+            # ساعة خاسرة بنسبة (60%+)
+            if total_this_hour >= 3 and fails_this_hour / total_this_hour >= 0.6:
+                penalty = -7
+                label = f"BadHour({current_hour}h,{int(fails_this_hour/total_this_hour*100)}%)"
+                print(f"⏰ Time Penalty [{symbol}]: {label}")
+                return penalty, label
+
+        except Exception as e:
+            print(f"⚠️ Time memory error: {e}")
+        return 0, ""
+
+    # =========================================================
+    # 🔁 ذاكرة الأنماط — يبحث عن نمط مشابه ناجح سابق
+    # =========================================================
+    def _get_symbol_pattern_score(self, symbol, rsi, macd_diff, volume_ratio):
+        """يبحث في الصفقات الناجحة السابقة عن نمط مشابه ويرفع الثقة"""
+        try:
+            data = self._load_learning_data()
+            patterns = data.get('successful_patterns', [])
+
+            symbol_patterns = [p for p in patterns if p.get('symbol') == symbol]
+            if len(symbol_patterns) < 4:
+                return 0, ""  # ما في بيانات كافية بعد
+
+            matches = [
+                p for p in symbol_patterns
+                if abs(p.get('rsi', 50) - rsi) < 10
+                and abs(p.get('volume_ratio', 1.0) - volume_ratio) < 0.5
+            ]
+
+            if len(matches) >= 3:
+                avg_profit = sum(p.get('profit', 0) for p in matches) / len(matches)
+                if avg_profit > 0.8:
+                    boost = min(avg_profit * 2.0, 14)
+                    label = f"Pattern({len(matches)}hits,avg{avg_profit:.1f}%)"
+                    print(f"🔁 Pattern Boost [{symbol}]: +{boost:.1f} — {label}")
+                    return round(boost, 1), label
+
+            if len(matches) >= 2:
+                avg_profit = sum(p.get('profit', 0) for p in matches) / len(matches)
+                if avg_profit > 1.2:
+                    boost = min(avg_profit * 1.2, 8)
+                    label = f"Pattern(2hits,avg{avg_profit:.1f}%)"
+                    return round(boost, 1), label
+
+        except Exception as e:
+            print(f"⚠️ Pattern score error: {e}")
+        return 0, ""
+
+    # =========================================================
+    # 🏆 معدل نجاح العملة — يثق أكثر بالعملات الموثوقة
+    # =========================================================
+    def _get_symbol_win_rate_boost(self, symbol):
+        """لو العملة سجلها ناجح تاريخياً → يضيف ثقة إضافية"""
+        try:
+            data = self._load_learning_data()
+            win_data = data.get('symbol_win_rate', {}).get(symbol, {})
+            wins = win_data.get('wins', 0)
+            total = win_data.get('total', 0)
+
+            if total < 5:
+                return 0, ""  # بيانات غير كافية
+
+            win_rate = wins / total
+            if win_rate >= 0.80 and total >= 8:
+                boost = +10
+                label = f"WinRate({int(win_rate*100)}%,{total}trades)"
+                print(f"🏆 Win Rate Boost [{symbol}]: +{boost} — {label}")
+                return boost, label
+            elif win_rate >= 0.65 and total >= 5:
+                boost = +5
+                label = f"WinRate({int(win_rate*100)}%,{total}trades)"
+                return boost, label
+            elif win_rate < 0.35 and total >= 6:
+                penalty = -8
+                label = f"LowWin({int(win_rate*100)}%,{total}trades)"
+                print(f"⚠️ Win Rate Penalty [{symbol}]: {penalty} — {label}")
+                return penalty, label
+        except Exception as e:
+            print(f"⚠️ Win rate boost error: {e}")
+        return 0, ""
+
     def should_buy(self, symbol, analysis, models_scores=None, candles=None, preloaded_advisors=None):
         """القرار - كشف القاع بالشموع + مؤشرات + تصويت المستشارين"""
 
@@ -240,6 +394,35 @@ class Meta:
         except Exception as e:
             print(f"⚠️ Fibonacci error: {e}")
 
+        # =========================================================
+        # 🧠 الذاكرة الذكية — تضيف ثقة بدون تعديل نسب التصويت
+        # =========================================================
+
+        # 💪 1. الجرأة الديناميكية
+        courage_boost = self._get_courage_boost(symbol, rsi, volume_ratio)
+        if courage_boost > 0:
+            temp_conf += courage_boost
+            reasons.append(f"CourageBoost(+{courage_boost:.0f})")
+
+        # ⏰ 2. ذاكرة الوقت
+        time_mod, time_label = self._get_time_memory_modifier(symbol)
+        if time_mod != 0:
+            temp_conf += time_mod
+            reasons.append(time_label)
+
+        # 🔁 3. ذاكرة الأنماط
+        pattern_boost, pattern_label = self._get_symbol_pattern_score(symbol, rsi, macd_diff, volume_ratio)
+        if pattern_boost > 0:
+            temp_conf += pattern_boost
+            reasons.append(pattern_label)
+
+        # 🏆 4. معدل نجاح العملة
+        win_boost, win_label = self._get_symbol_win_rate_boost(symbol)
+        if win_boost != 0:
+            temp_conf += win_boost
+            reasons.append(win_label)
+
+        # =========================================================
         temp_conf = min(max(temp_conf, 0), 99)  # نضمن النطاق 0-99
 
         # --- نهاية الكود الحساس ---
@@ -727,11 +910,19 @@ class Meta:
     # =========================================================
     # 🎓 التعلم المباشر للملك - يتعلم من كل صفقة
     # =========================================================
-    def learn_from_trade(self, profit, trade_quality, buy_votes, sell_votes, symbol=None):
+    def learn_from_trade(self, profit, trade_quality, buy_votes, sell_votes, symbol=None, position=None):
         """التعلم المباشر من كل صفقة - يحفظ في الداتابيز"""
         try:
             # تحميل البيانات من الداتابيز
             data = self._load_learning_data()
+
+            # استخراج البيانات الحقيقية من الـ position
+            rsi = position.get('buy_rsi', 50) if position else 50
+            volume_ratio = position.get('buy_volume_ratio', 1.0) if position else 1.0
+            macd_diff = position.get('buy_macd_diff', 0) if position else 0
+            buy_confidence = position.get('buy_confidence', 50) if position else 50
+            current_hour = datetime.now().hour
+            hour_key = str(current_hour)
 
             # تعلم من البيع
             if trade_quality in ['GREAT', 'GOOD', 'OK']:
@@ -753,45 +944,88 @@ class Meta:
                 if buy_votes and len([v for v in buy_votes.values() if v == 1]) >= 3:
                     data['bottom_wrong'] += 1
 
-            # ✅ إضافة الذاكرة الجديدة للجرأة والذكاء
+            # =========================================================
+            # 🧠 الذاكرة الذكية - بيانات حقيقية من الصفقات
+            # =========================================================
             if trade_quality in ['GREAT', 'GOOD', 'OK']:
-                # أفضل وقت للشراء
-                from datetime import datetime
-                current_hour = datetime.now().hour
+                # ⏰ أفضل أوقات الشراء
                 if symbol not in data['best_buy_times']:
                     data['best_buy_times'][symbol] = {}
-                if current_hour not in data['best_buy_times'][symbol]:
-                    data['best_buy_times'][symbol][current_hour] = 0
-                data['best_buy_times'][symbol][current_hour] += 1
+                data['best_buy_times'][symbol][hour_key] = \
+                    data['best_buy_times'][symbol].get(hour_key, 0) + 1
 
-                # أنماط السعر الناجحة (placeholders for now)
-                rsi = 50  # will be updated when position data is available
-                volume_ratio = 1.0
+                # 📈 الأنماط الناجحة - بيانات حقيقية
                 data['successful_patterns'].append({
                     'symbol': symbol,
                     'rsi': rsi,
                     'volume_ratio': volume_ratio,
+                    'macd_diff': macd_diff,
+                    'confidence': buy_confidence,
                     'profit': profit,
+                    'hour': current_hour,
                     'date': datetime.now().isoformat()
                 })
+                # نحافظ على آخر 500 نمط فقط لتجنب تضخم الذاكرة
+                if len(data['successful_patterns']) > 500:
+                    data['successful_patterns'] = data['successful_patterns'][-500:]
 
-                # سجل الجرأة (لو اتجرأ ونجح)
-                if rsi < 35 or volume_ratio > 2.5:
+                # 💪 سجل الجرأة - بيانات حقيقية (RSI منخفض أو حجم عالي)
+                if rsi < 40 or volume_ratio > 2.0:
                     data['courage_record'].append({
                         'symbol': symbol,
                         'rsi': rsi,
                         'volume_ratio': volume_ratio,
+                        'confidence': buy_confidence,
                         'profit': profit,
+                        'hour': current_hour,
                         'date': datetime.now().isoformat()
                     })
+                    if len(data['courage_record']) > 200:
+                        data['courage_record'] = data['courage_record'][-200:]
+
+                # 🏆 معدل نجاح العملة
+                if symbol not in data['symbol_win_rate']:
+                    data['symbol_win_rate'][symbol] = {'wins': 0, 'total': 0}
+                data['symbol_win_rate'][symbol]['wins'] += 1
+                data['symbol_win_rate'][symbol]['total'] += 1
+
+                # 🎯 معايرة الثقة: هل الثقة العالية = نجاح فعلي؟
+                conf_bucket = str(int(buy_confidence // 10) * 10)  # e.g. "70", "80"
+                if conf_bucket not in data['confidence_calibration']:
+                    data['confidence_calibration'][conf_bucket] = {'wins': 0, 'total': 0}
+                data['confidence_calibration'][conf_bucket]['wins'] += 1
+                data['confidence_calibration'][conf_bucket]['total'] += 1
+
+            # ❌ عند الخسارة - تتذكر الظروف السيئة
+            if profit < -0.5 or trade_quality in ['RISKY', 'TRAP']:
+                # ⏰ أسوأ أوقات الشراء
+                if symbol not in data['worst_buy_times']:
+                    data['worst_buy_times'][symbol] = {}
+                data['worst_buy_times'][symbol][hour_key] = \
+                    data['worst_buy_times'][symbol].get(hour_key, 0) + 1
+
+                # 🏆 معدل نجاح العملة (إضافة للإجمالي بدون فوز)
+                if symbol not in data['symbol_win_rate']:
+                    data['symbol_win_rate'][symbol] = {'wins': 0, 'total': 0}
+                data['symbol_win_rate'][symbol]['total'] += 1
+
+                # 🎯 معايرة الثقة عند الخسارة
+                conf_bucket = str(int(buy_confidence // 10) * 10)
+                if conf_bucket not in data['confidence_calibration']:
+                    data['confidence_calibration'][conf_bucket] = {'wins': 0, 'total': 0}
+                data['confidence_calibration'][conf_bucket]['total'] += 1
 
             # تاريخ الأخطاء
             if trade_quality in ['RISKY', 'TRAP'] or profit < -0.5:
                 data['error_history'].append({
                     'symbol': symbol,
+                    'rsi': rsi,
+                    'volume_ratio': volume_ratio,
                     'reason': 'trap' if trade_quality in ['TRAP'] else 'low_profit' if profit < -0.5 else 'other',
                     'date': datetime.now().isoformat()
                 })
+                if len(data['error_history']) > 200:
+                    data['error_history'] = data['error_history'][-200:]
 
             # حفظ في الداتابيز
             self._save_learning_data(data)
@@ -835,17 +1069,25 @@ class Meta:
             'sell_success': 0, 'sell_fail': 0,
             'peak_correct': 0, 'peak_wrong': 0,
             'bottom_correct': 0, 'bottom_wrong': 0,
-            'best_buy_times': {},  # {symbol: {hour: success_count}}
-            'best_trade_sizes': {},  # {symbol: {size_range: avg_profit}}
-            'successful_patterns': [],  # list of {'symbol':, 'rsi':, 'volume_ratio':, 'profit':}
-            'error_history': [],  # list of {'symbol':, 'reason':, 'date':}
-            'courage_record': []  # list of {'symbol':, 'rsi':, 'volume_ratio':, 'profit':, 'date':}
+            'best_buy_times': {},       # {symbol: {hour: success_count}}
+            'worst_buy_times': {},      # {symbol: {hour: fail_count}}  ← جديد
+            'best_trade_sizes': {},     # {symbol: {size_range: avg_profit}}
+            'successful_patterns': [],  # list of {'symbol':, 'rsi':, 'volume_ratio':, 'macd_diff':, 'profit':, 'hour':}
+            'error_history': [],        # list of {'symbol':, 'rsi':, 'reason':, 'date':}
+            'courage_record': [],       # list of {'symbol':, 'rsi':, 'volume_ratio':, 'profit':, 'date':}
+            'symbol_win_rate': {},      # {symbol: {wins, total}}  ← جديد
+            'confidence_calibration': {}  # {bucket: {wins, total}}  ← جديد
         }
         try:
             if self.storage:
                 raw = self.storage.load_setting(DB_LEARNING_KEY)
                 if raw:
-                    return json.loads(raw)
+                    loaded = json.loads(raw)
+                    # Backward compatibility: أضف الحقول الجديدة لو مش موجودة
+                    for key, val in default.items():
+                        if key not in loaded:
+                            loaded[key] = val
+                    return loaded
         except:
             pass
         # Fallback: قراءة من الملف المحلي لو موجود
@@ -876,12 +1118,33 @@ class Meta:
             data = self._load_learning_data()
             total = data['buy_success'] + data['buy_fail'] + data['sell_success'] + data['sell_fail']
             success = data['buy_success'] + data['sell_success']
+
+            # إحصائيات معدلات الفوز لكل عملة
+            symbol_stats = {}
+            for sym, wr in data.get('symbol_win_rate', {}).items():
+                t = wr.get('total', 0)
+                w = wr.get('wins', 0)
+                if t > 0:
+                    symbol_stats[sym] = {'win_rate': round(w/t*100, 1), 'total': t}
+
+            # إحصائيات معايرة الثقة
+            calib = {}
+            for bucket, cc in data.get('confidence_calibration', {}).items():
+                t = cc.get('total', 0)
+                w = cc.get('wins', 0)
+                if t >= 3:
+                    calib[f"conf_{bucket}"] = {'win_rate': round(w/t*100, 1), 'total': t}
+
             return {
                 'total': total,
                 'success': success,
                 'accuracy': (success / total * 100) if total > 0 else 0,
                 'peak_accuracy': (data['peak_correct'] / (data['peak_correct'] + data['peak_wrong']) * 100) if (data['peak_correct'] + data['peak_wrong']) > 0 else 0,
-                'bottom_accuracy': (data['bottom_correct'] / (data['bottom_correct'] + data['bottom_wrong']) * 100) if (data['bottom_correct'] + data['bottom_wrong']) > 0 else 0
+                'bottom_accuracy': (data['bottom_correct'] / (data['bottom_correct'] + data['bottom_wrong']) * 100) if (data['bottom_correct'] + data['bottom_wrong']) > 0 else 0,
+                'patterns_stored': len(data.get('successful_patterns', [])),
+                'courage_records': len(data.get('courage_record', [])),
+                'symbol_win_rates': symbol_stats,
+                'confidence_calibration': calib
             }
         except:
             pass
