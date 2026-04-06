@@ -1065,11 +1065,9 @@ def get_market_analysis(exchange, symbol, limit=120):
         except:
             pass
 
-        return {
+        analysis_dict = {
             'candles': candles,
             'rsi': latest['rsi'],
-            'order_book': order_book,
-            'average_spread': average_spread,
             'macd': latest['macd'],
             'macd_signal': latest['macd_signal'],
             'macd_diff': latest['macd_diff'],
@@ -1100,11 +1098,9 @@ def get_market_analysis(exchange, symbol, limit=120):
             'bnb_change_1h': bnb_change_1h,
             'high_24h': high_24h,
             'low_24h': low_24h,
-            **get_sentiment_data(symbol, {
-                'close': latest['close'], 
-                'rsi': latest['rsi'],
-                'panic_greed': detect_panic_greed(latest)
-            })
+            'order_book': order_book,  # ✅ Added order_book
+            'average_spread': average_spread,  # ✅ Added average_spread
+            **get_sentiment_data(symbol, {'close': latest['close'], 'rsi': latest['rsi']})
         }
 
         # === 🚨 إضافة جميع الأعمدة 42 الجديدة هنا مباشرة بالحسابات الفعلية ===
