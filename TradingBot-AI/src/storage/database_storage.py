@@ -990,8 +990,9 @@ class DatabaseStorage:
             cursor.execute("""
                 INSERT INTO symbol_memory (
                     symbol, sentiment_avg, whale_confidence_avg, profit_loss_ratio,
-                    volume_trend, panic_score_avg, optimism_penalty_avg, psychological_summary
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    volume_trend, panic_score_avg, optimism_penalty_avg, courage_boost,
+                    time_memory_modifier, pattern_score, win_rate_boost, psychological_summary
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (symbol) DO UPDATE SET
                     sentiment_avg = EXCLUDED.sentiment_avg,
                     whale_confidence_avg = EXCLUDED.whale_confidence_avg,
@@ -999,16 +1000,24 @@ class DatabaseStorage:
                     volume_trend = EXCLUDED.volume_trend,
                     panic_score_avg = EXCLUDED.panic_score_avg,
                     optimism_penalty_avg = EXCLUDED.optimism_penalty_avg,
+                    courage_boost = EXCLUDED.courage_boost,
+                    time_memory_modifier = EXCLUDED.time_memory_modifier,
+                    pattern_score = EXCLUDED.pattern_score,
+                    win_rate_boost = EXCLUDED.win_rate_boost,
                     psychological_summary = EXCLUDED.psychological_summary,
                     updated_at = NOW()
             """, (
                 symbol,
-                data.get('sentiment_avg', 0),
-                data.get('whale_confidence_avg', 0),
-                data.get('profit_loss_ratio', 0),
+                data.get('sentiment_avg', 0.0),
+                data.get('whale_confidence_avg', 0.0),
+                data.get('profit_loss_ratio', 0.0),
                 data.get('volume_trend', 'neutral'),
-                data.get('panic_score_avg', 0),
-                data.get('optimism_penalty_avg', 0),
+                data.get('panic_score_avg', 0.0),
+                data.get('optimism_penalty_avg', 0.0),
+                data.get('courage_boost', 0.0),
+                data.get('time_memory_modifier', 0.0),
+                data.get('pattern_score', 0.0),
+                data.get('win_rate_boost', 0.0),
                 data.get('psychological_summary', '')
             ))
             conn.commit()
