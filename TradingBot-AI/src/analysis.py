@@ -989,8 +989,7 @@ def get_market_analysis(exchange, symbol, limit=120):
         df['ema_21'] = ta.trend.EMAIndicator(close=df['close'], window=21, fillna=True).ema_indicator()
         df['ema_crossover'] = (df['ema_9'] > df['ema_21']).astype(int) * 2 - 1
         
-        df['volume_trend'] = df['volume'].pct_change(3) * 100
-        df['volume_trend'] = df['volume_trend'].fillna(0)
+        df['volume_trend'] = df['volume'].pct_change(3).replace([float('inf'), float('-inf')], 0).fillna(0) * 100
         
         if len(df) >= 12:
             df['price_change_1h'] = ((df['close'] - df['close'].shift(12)) / df['close'].shift(12)) * 100
