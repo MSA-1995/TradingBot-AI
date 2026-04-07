@@ -168,16 +168,22 @@ class DeepLearningClientV2:
                     with tempfile.NamedTemporaryFile(delete=False, suffix='.lgbm') as tmp:
                         tmp.write(decompressed)
                         tmp_path = tmp.name
-                    model = pickle.load(open(tmp_path, 'rb'))
-                    os.unlink(tmp_path)
+                    try:
+                        with open(tmp_path, 'rb') as f:
+                            model = pickle.load(f)
+                    finally:
+                        os.unlink(tmp_path)
                 except Exception:
                     # Try 2: Direct pickle (raw_data)
                     try:
                         with tempfile.NamedTemporaryFile(delete=False, suffix='.lgbm') as tmp:
                             tmp.write(raw_data)
                             tmp_path = tmp.name
-                        model = pickle.load(open(tmp_path, 'rb'))
-                        os.unlink(tmp_path)
+                        try:
+                            with open(tmp_path, 'rb') as f:
+                                model = pickle.load(f)
+                        finally:
+                            os.unlink(tmp_path)
                     except Exception:
                         model = None
                 
@@ -299,9 +305,9 @@ class DeepLearningClientV2:
         from datetime import datetime
         hour_of_day = datetime.now().hour
         hour_normalized = hour_of_day / 24.0
-        is_asian_session = 1 if 0 <= hour_of_day <= 8 else 0
-        is_european_session = 1 if 8 < hour_of_day <= 16 else 0
-        is_us_session = 1 if 16 < hour_of_day <= 24 else 0
+        is_asian_session = 1 if 0 <= hour_of_day < 8 else 0
+        is_european_session = 1 if 8 <= hour_of_day < 16 else 0
+        is_us_session = 1 if 16 <= hour_of_day < 24 else 0
         optimal_hold_score = 0.5
         
         # فيبوناتشي (defaults)
@@ -397,8 +403,10 @@ class DeepLearningClientV2:
         """
         Multi-Timeframe: توقع الترند
         Returns: confidence_boost (-10 to +10)
+        ملاحظة: يستخدم نموذج smart_money كبديل عن mtf غير الموجود
         """
-        accuracy = self.get_model_accuracy('mtf')
+        # ✅ إصلاح: 'mtf' غير موجود في قائمة النماذج - نستخدم smart_money كبديل
+        accuracy = self.get_model_accuracy('smart_money')
         
         if accuracy < 0.55:
             return 0
