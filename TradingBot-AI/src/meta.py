@@ -170,7 +170,8 @@ class Meta:
             sell_votes = analysis_data.get('sell_votes', {})
             buy_count = sum(1 for v in buy_votes.values() if v == 1) if buy_votes else 0
             sell_count = sum(1 for v in sell_votes.values() if v == 1) if sell_votes else 0
-            consensus = buy_count / 7.0
+            # ✅ إصلاح: المستشارين الفعليين 5 (exit, risk, pattern, anomaly, liquidity)
+            consensus = buy_count / 5.0
 
             # ========== SYMBOL MEMORY من CACHE (سريع جداً) ==========
             symbol_memory = {}
@@ -278,7 +279,8 @@ class Meta:
             
             # الـ votes من الـ consultants
             buy_votes = analysis_data.get('buy_votes', {})
-            consensus = sum(1 for v in buy_votes.values() if v == 1) / 7.0 if buy_votes else 0
+            # ✅ إصلاح: المستشارين الفعليين 5
+            consensus = sum(1 for v in buy_votes.values() if v == 1) / 5.0 if buy_votes else 0
             
             # ذاكرة الـ symbol
             symbol_memory = {}
@@ -823,14 +825,15 @@ class Meta:
                 buy_vote_count = 0
                 vote_breakdown = {}
 
-            votes_required = 3  # متوسط: تصويت ثابت 3/5 للشراء
+            # ✅ إصلاح: نستخدم min_votes_needed من mood_details (3/4/5) بدل القيمة الثابتة
+            votes_required = mood_details.get('min_votes_needed', 4)
 
             #print(f"✅ Votes: {buy_vote_count}/{total_advisors} (Need {votes_required}) | ⚪ Market: {market_status}")
 
             if buy_vote_count < votes_required:
               return {
                     'action': 'DISPLAY',
-                    'reason': f'Score:{temp_conf:.0f}/110 | Votes:{buy_vote_count}/{votes_required} | {market_status}',
+                    'reason': f'Score:{temp_conf:.0f}/99 | Votes:{buy_vote_count}/{votes_required} | {market_status}',
                     'votes': buy_votes,
                     'confidence': temp_conf
                 }
@@ -1172,8 +1175,15 @@ class Meta:
             vote_breakdown = {'king_fallback': fallback_votes}
 
         # --- 4. القرار الملكي النهائي: النموذج + النقاط + التصويت ---
-        min_votes_needed = mood_details.get('min_votes_needed', 4)
-        effective_total = mood_details.get('total_advisors', 5)
+        # ✅ للبيع: النسب عكسية الشراء
+        # Bullish → صعب بيع (5/5) | Neutral → متوسط (4/5) | Bearish → سهل بيع (3/5)
+        market_mood_for_sell = mood_details.get('mood', 'Neutral')
+        if market_mood_for_sell == 'Bullish':
+            min_votes_needed = 5   # سوق صاعد: يلزم 5/5 للبيع (صعب)
+        elif market_mood_for_sell == 'Bearish':
+            min_votes_needed = 3   # سوق هابط: يكفي 3/5 للبيع (سهل)
+        else:
+            min_votes_needed = 4   # محايد: 4/5
         
         if sell_vote_count >= min_votes_needed and sell_conf >= MIN_SELL_CONFIDENCE:
             action = 'SELL'
@@ -1192,38 +1202,28 @@ class Meta:
         return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
 
     def _get_market_mood(self, analysis):
-        """Analyzes BTC, ETH, BNB changes to determine the overall market mood and required consensus."""
+        """
+        يحدد حالة السوق بناءً على تغير BTC خلال ساعة.
+        - Bullish  : btc_change > +1%  → يكفي 3/5 أصوات للشراء
+        - Bearish  : btc_change < -1%  → يلزم 5/5 أصوات للشراء
+        - Neutral  : بين -1% و +1%    → يلزم 4/5 أصوات للشراء
+        """
         btc_change = analysis.get('btc_change_1h', 0) if analysis else 0
-        eth_change = analysis.get('eth_change_1h', 0) if analysis else 0
-        bnb_change = analysis.get('bnb_change_1h', 0) if analysis else 0
-
-        up_count = 0
-        down_count = 0
-        threshold = 0.5
-
-        if btc_change > threshold: up_count += 1
-        elif btc_change < -threshold: down_count += 1
-
-        if eth_change > threshold: up_count += 1
-        elif eth_change < -threshold: down_count += 1
-
-        if bnb_change > threshold: up_count += 1
-        elif bnb_change < -threshold: down_count += 1
 
         mood_details = {}
-        if up_count >= 2:
+        if btc_change > 1.0:
             mood_details['mood'] = "Bullish"
-            mood_details['min_votes_needed'] = 3   # 3/5 موافقين - سوق صاعد
+            mood_details['min_votes_needed'] = 3   # 3/5 - سوق صاعد
             mood_details['total_advisors'] = 5
-        elif down_count >= 2:
+        elif btc_change < -1.0:
             mood_details['mood'] = "Bearish"
-            mood_details['min_votes_needed'] = 5   # 5/5 موافقين - سوق هابط
+            mood_details['min_votes_needed'] = 5   # 5/5 - سوق هابط
             mood_details['total_advisors'] = 5
         else:
             mood_details['mood'] = "Neutral"
-            mood_details['min_votes_needed'] = 4   # 4/5 موافقين - سوق محايد
+            mood_details['min_votes_needed'] = 4   # 4/5 - سوق محايد
             mood_details['total_advisors'] = 5
-        
+
         return mood_details
 
     def _calculate_smart_amount(self, symbol, confidence, analysis):
@@ -1415,7 +1415,7 @@ class Meta:
                 pattern_type = 'SUCCESS' if trade_quality in ['GREAT', 'GOOD', 'OK'] else 'TRAP'
                 pattern_data = {
                     'type': pattern_type,
-                    'success_rate': 1.0 if trade_quality in ['GREAT', 'GOOD'] else 0.0,
+                    'success_rate': 1.0 if trade_quality == 'GREAT' else (0.7 if trade_quality == 'GOOD' else 0.5 if trade_quality == 'OK' else 0.0),
                     'features': {
                         'profit': profit,
                         'trade_quality': trade_quality,
