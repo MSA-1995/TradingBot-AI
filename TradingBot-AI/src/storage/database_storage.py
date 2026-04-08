@@ -768,6 +768,22 @@ class DatabaseStorage:
         """تحديث ذاكرة العملة بعد كل صفقة"""
         conn = None
         try:
+            # --- FIX: Convert numpy types to native Python to prevent SQL schema errors ---
+            import numpy as np
+            def _to_native(v):
+                if isinstance(v, np.generic):
+                    return v.item()
+                if hasattr(v, '__float__'):
+                    return float(v)
+                return v
+
+            profit          = _to_native(profit)
+            hours_held      = _to_native(hours_held)
+            rsi             = _to_native(rsi)
+            volume_ratio    = _to_native(volume_ratio)
+            smart_stop_loss = _to_native(smart_stop_loss)
+            # --- END FIX ---
+
             conn = self._get_conn()
             cursor = conn.cursor()
             cursor.execute("""
@@ -1031,17 +1047,18 @@ class DatabaseStorage:
             return True
         except Exception as e:
             print(f"Error saving symbol memory: {e}")
+            if conn: conn.rollback()
             return False
         finally:
             if conn:
-                conn.close()
+                self._put_conn(conn)
 
     def get_symbol_memory(self, symbol):
         """جلب ذاكرة الملك للعملة"""
         conn = None
         try:
             conn = self._get_conn()
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
             cursor.execute("SELECT * FROM symbol_memory WHERE symbol = %s", (symbol,))
             result = cursor.fetchone()
             cursor.close()
@@ -1051,7 +1068,8 @@ class DatabaseStorage:
             return None
         finally:
             if conn:
-                conn.close()
+                conn.rollback()
+                self._put_conn(conn)
 
     def get_symbol_trade_stats(self, symbol):
         """حساب إحصائيات التداول للعملة من trades_history"""
