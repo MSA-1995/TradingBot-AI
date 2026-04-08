@@ -196,7 +196,7 @@ class DatabaseStorage:
             import numpy as np
             def convert_to_native(d):
                 """Recursively converts NumPy data types in a dictionary or list to native Python types."""
-                if isinstance(d, np.generic):
+                if isinstance(d, np.generic) or hasattr(d, 'item'):
                     return d.item()
                 if isinstance(d, dict):
                     return {k: convert_to_native(v) for k, v in d.items()}
