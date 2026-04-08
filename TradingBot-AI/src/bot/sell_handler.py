@@ -561,6 +561,11 @@ def process_sell(result, exchange, ctx):
             'panic_score': safe_float(analysis_data.get('panic_score'), 0),
             'profit': safe_float(trade_data.get('profit_percent', 0))
         })
+        # حساب smart_stop_loss
+        volume_ratio = float(position.get('ai_data', {}).get('volume_ratio', 1.0))
+        price_volatility = abs(analysis_data.get('price_momentum', 0)) / 100.0
+        smart_stop_loss = max(0.8, min(2.5, (volume_ratio * price_volatility * 50) + 0.5))
+
         # تحديث ذاكرة العملة
         try:
             if hasattr(storage.storage, 'update_symbol_memory'):
@@ -570,7 +575,8 @@ def process_sell(result, exchange, ctx):
                     trade_quality=str(trade_quality),
                     hours_held=float(hours_held),
                     rsi=float(position.get('ai_data', {}).get('rsi', 50)),
-                    volume_ratio=float(position.get('ai_data', {}).get('volume_ratio', 1))
+                    volume_ratio=volume_ratio,
+                    smart_stop_loss=smart_stop_loss
                 )
         except Exception as e:
             print(f"⚠️ Symbol memory update error: {e}")
