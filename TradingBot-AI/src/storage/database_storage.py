@@ -202,6 +202,8 @@ class DatabaseStorage:
                     return {k: convert_to_native(v) for k, v in d.items()}
                 if isinstance(d, list):
                     return [convert_to_native(i) for i in d]
+                if isinstance(d, np.ndarray):
+                    return d.tolist()
                 return d
             
             if not isinstance(trade_data, dict):
