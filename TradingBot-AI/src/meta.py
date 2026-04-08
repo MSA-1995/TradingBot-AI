@@ -79,26 +79,15 @@ class Meta:
                 # استخدام ATR تقريبي من نسبة الحجم والتغير في السعر
                 volume_ratio = analysis.get('volume_ratio', 1.0)
                 price_volatility = abs(analysis.get('price_momentum', 0)) / 100.0
-                base_stop = max(0.8, min(2.5, (volume_ratio * price_volatility * 50) + 0.5))  # نطاق معقول 0.8% إلى 2.5%
+                base_stop = (volume_ratio * price_volatility * 50) + 0.5  # بدون قيود ثابتة
                 return base_stop
             
-            # حساب المتوسط المرجّح لآراء المستشارين
+            # حساب المتوسط المرجّح لآراء المستشارين - بدون قيم ثابتة أو تعديلات
             weighted_sum = sum(vote * weight for vote, weight in zip(advisor_votes, advisor_weights))
             total_weight = sum(advisor_weights)
-            smart_stop_distance = weighted_sum / total_weight if total_weight > 0 else 1.5
-            
-            # تعديل مسافة الستوبロス بناءً على ثقة النموذج في الاستمرار في الصعود
-            buy_probability = self._get_meta_model_prediction(analysis, symbol=symbol)
-            if buy_probability is not None:
-                # إذا كان النموذج متفائلاً fortement (احتمال شراء גבוה)، زيادة مسافة الستوبロス لمنح مساحة أكبر للربح
-                if buy_probability > 0.7:
-                    smart_stop_distance *= 1.2  # زيادة 20% للسماح بتقلبات أعلى
-                elif buy_probability < 0.3:  # إذا كان النموذج متشائماً، تقليل مسافة الستوبロス للحماية
-                    smart_stop_distance *= 0.8  # تقليل 20% للحماية أفضل
-            
-            # ضمان أن المسافة ضمن نطاق معقول (لتجنب القيم المتطرفة)
-            smart_stop_distance = max(0.5, min(smart_stop_distance, 5.0))
-            
+            smart_stop_distance = weighted_sum / total_weight if total_weight > 0 else 0.0  # بدون قيمة افتراضية ثابتة
+
+            # ميتا والمستشارين يحددون المسافة بحرية تامة بدون أي تعديلات أو قيود
             return smart_stop_distance
             
         except Exception as e:
