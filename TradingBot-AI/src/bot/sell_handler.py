@@ -561,10 +561,8 @@ def process_sell(result, exchange, ctx):
             'panic_score': safe_float(analysis_data.get('panic_score'), 0),
             'profit': safe_float(trade_data.get('profit_percent', 0))
         })
-        # حساب smart_stop_loss
-        volume_ratio = float(position.get('ai_data', {}).get('volume_ratio', 1.0))
-        price_volatility = abs(analysis_data.get('price_momentum', 0)) / 100.0
-        smart_stop_loss = max(0.8, min(2.5, (volume_ratio * price_volatility * 50) + 0.5))
+        # smart_stop_loss سيتم تحديده بواسطة ميتا والمستشارين بدون قيود ثابتة
+        smart_stop_loss = 0.0  # لا قيمة ثابتة، ميتا يحدد
 
         # تحديث ذاكرة العملة
         try:
