@@ -999,14 +999,39 @@ class Meta:
         buy_price = position['buy_price']
         profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
 
-        # --- 1. شبكة الأمان النهائية: وقف الخسارة الذكي المتحرك ---
+        # ✅ تحديث highest_price / peak_price دائماً في كل دورة
         highest_price = position.get('highest_price', buy_price)
+        if current_price > highest_price:
+            highest_price = current_price
+            position['highest_price'] = current_price  # ✅ نحفظها في الـ position
+        # peak_price مرادف لـ highest_price — نبقيهما متزامنين
+        position['peak_price'] = highest_price
+
         drop_from_high = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
         
-        # حساب مسافة الستوبロス الذكي عبر تصويت المستشارين
+        # ✅ تصويت المستشارين على مسافة الستوب بناءً على القمة الفعلية
         smart_stop_distance = self._calculate_smart_stop_loss(symbol, position, analysis, mtf, preloaded_advisors)
-        
-        # تفعيل الستوبロス إذا وصل الانخفاض إلى المسافة الذكية المحسوبة
+
+        # ✅ استشارة ExitStrategyModel للـ Trailing Stop من القمة
+        exit_advisor = self.advisor_manager.get('ExitStrategyModel') if self.advisor_manager else None
+        if exit_advisor and hasattr(exit_advisor, 'check_trailing_stop_from_peak'):
+            try:
+                trailing_decision = exit_advisor.check_trailing_stop_from_peak(
+                    symbol, position, current_price
+                )
+                if trailing_decision.get('action') == 'SELL':
+                    return {
+                        'action': 'SELL',
+                        'reason': trailing_decision['reason'],
+                        'profit': profit_percent,
+                        'peak_profit': trailing_decision.get('peak_profit', 0),
+                        'drop_from_peak': trailing_decision.get('drop_from_peak', 0),
+                        'confidence': trailing_decision.get('confidence', 88)
+                    }
+            except Exception as e:
+                print(f'⚠️ Trailing stop advisor error: {e}')
+
+        # تفعيل الستوب إذا وصل الانخفاض إلى المسافة الذكية المحسوبة
         if drop_from_high >= smart_stop_distance:
             return {
                 'action': 'SELL',
