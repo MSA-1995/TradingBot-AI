@@ -34,6 +34,78 @@ class Meta:
 
         print("👑 Meta (The King) is initialized with trained Meta Model.")
     
+    def _calculate_smart_stop_loss(self, symbol, position, analysis, mtf=None, preloaded_advisors=None):
+        """حساب مسافة الستوبロス الذكي عبر تصويت المستشارين وتحليل النموذج"""
+        try:
+            # جمع آراء المستشارين حول مسافة الستوبロス المثلى
+            advisor_votes = []
+            advisor_weights = []
+            
+            # مستشار الخروج المتخصص في تحديد نقاط الخروج المثلى
+            exit_advisor = self.advisor_manager.get('ExitStrategyModel') if self.advisor_manager else None
+            if exit_advisor and hasattr(exit_advisor, 'suggest_stop_loss'):
+                try:
+                    stop_distance = exit_advisor.suggest_stop_loss(symbol, position, analysis, mtf or {})
+                    if stop_distance is not None and stop_distance > 0:
+                        advisor_votes.append(float(stop_distance))
+                        advisor_weights.append(2.0)  # وزن أعلى للمستشار المتخصص
+                except Exception as e:
+                    print(f"⚠️ Exit advisor stop loss error: {e}")
+            
+            # مستشار إدارة المخاطر
+            risk_advisor = self.advisor_manager.get('RiskManager') if self.advisor_manager else None
+            if risk_advisor and hasattr(risk_advisor, 'suggest_stop_loss'):
+                try:
+                    stop_distance = risk_advisor.suggest_stop_loss(symbol, position, analysis, mtf or {})
+                    if stop_distance is not None and stop_distance > 0:
+                        advisor_votes.append(float(stop_distance))
+                        advisor_weights.append(1.5)
+                except Exception as e:
+                    print(f"⚠️ Risk advisor stop loss error: {e}")
+            
+            # المستشار العميق (Deep Learning) إذا كان يدعم اقتراح ستوبロス
+            dl_client = self.advisor_manager.get('dl_client') if self.advisor_manager else None
+            if dl_client and hasattr(dl_client, 'suggest_stop_loss'):
+                try:
+                    stop_distance = dl_client.suggest_stop_loss(symbol, position, analysis, mtf or {})
+                    if stop_distance is not None and stop_distance > 0:
+                        advisor_votes.append(float(stop_distance))
+                        advisor_weights.append(1.0)
+                except Exception as e:
+                    print(f"⚠️ DL advisor stop loss error: {e}")
+            
+            # إذا لم تكن هناك آراء من المستشارين، استخدم الحساب الافتراضي بناءً على التقلبات
+            if not advisor_votes:
+                # استخدام ATR تقريبي من نسبة الحجم والتغير في السعر
+                volume_ratio = analysis.get('volume_ratio', 1.0)
+                price_volatility = abs(analysis.get('price_momentum', 0)) / 100.0
+                base_stop = max(0.8, min(2.5, (volume_ratio * price_volatility * 50) + 0.5))  # نطاق معقول 0.8% إلى 2.5%
+                return base_stop
+            
+            # حساب المتوسط المرجّح لآراء المستشارين
+            weighted_sum = sum(vote * weight for vote, weight in zip(advisor_votes, advisor_weights))
+            total_weight = sum(advisor_weights)
+            smart_stop_distance = weighted_sum / total_weight if total_weight > 0 else 1.5
+            
+            # تعديل مسافة الستوبロス بناءً على ثقة النموذج في الاستمرار في الصعود
+            buy_probability = self._get_meta_model_prediction(analysis, symbol=symbol)
+            if buy_probability is not None:
+                # إذا كان النموذج متفائلاً fortement (احتمال شراء גבוה)، زيادة مسافة الستوبロス لمنح مساحة أكبر للربح
+                if buy_probability > 0.7:
+                    smart_stop_distance *= 1.2  # زيادة 20% للسماح بتقلبات أعلى
+                elif buy_probability < 0.3:  # إذا كان النموذج متشائماً، تقليل مسافة الستوبロス للحماية
+                    smart_stop_distance *= 0.8  # تقليل 20% للحماية أفضل
+            
+            # ضمان أن المسافة ضمن نطاق معقول (لتجنب القيم المتطرفة)
+            smart_stop_distance = max(0.5, min(smart_stop_distance, 5.0))
+            
+            return smart_stop_distance
+            
+        except Exception as e:
+            print(f"⚠️ Smart stop loss calculation error: {e}")
+            # العودة إلى القيمة الافتراضية في حالة الخطأ
+            return 1.5  # مسافة افتراضية معقولة
+
     def is_meta_model_loaded(self):
         """✅ طريقة سريعة للتحقق: هل النموذج المتعلم محمل؟"""
         if self.meta_model is None:
@@ -927,13 +999,18 @@ class Meta:
         buy_price = position['buy_price']
         profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
 
-        # --- 1. شبكة الأمان النهائية: وقف الخسارة المتحرك ---
+        # --- 1. شبكة الأمان النهائية: وقف الخسارة الذكي المتحرك ---
         highest_price = position.get('highest_price', buy_price)
         drop_from_high = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
-        if drop_from_high >= PEAK_DROP_THRESHOLD:
+        
+        # حساب مسافة الستوبロス الذكي عبر تصويت المستشارين
+        smart_stop_distance = self._calculate_smart_stop_loss(symbol, position, analysis, mtf, preloaded_advisors)
+        
+        # تفعيل الستوبロス إذا وصل الانخفاض إلى المسافة الذكية المحسوبة
+        if drop_from_high >= smart_stop_distance:
             return {
                 'action': 'SELL',
-                'reason': f'TRAILING STOP -{drop_from_high:.1f}%',
+                'reason': f'SMART STOP LOSS -{drop_from_high:.1f}% (limit {smart_stop_distance:.1f}%)',
                 'profit': profit_percent
             }
         
