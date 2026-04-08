@@ -334,3 +334,32 @@ class ExitStrategyModel:
                 'optimal_sl': 2.0,
                 'confidence': 50
             }
+
+    def suggest_stop_loss(self, symbol, position, analysis, mtf):
+        """اقتراح مسافة ستوبロス ذكية بناءً على تحليل الخروج"""
+        try:
+            # الحصول على مسافة الستوبロス من تحليل الخروج المثالي
+            exit_point = self.get_optimal_exit_point(symbol, 0)  # 수익 = 0 للوقف
+            stop_distance = exit_point['optimal_sl']
+            
+            # تعديل بناءً على التقلبات الحالية
+            volume_ratio = analysis.get('volume_ratio', 1.0)
+            if volume_ratio > 2.0:
+                stop_distance *= 1.2  # زيادة المسafe في التقلبات العالية
+            elif volume_ratio < 0.5:
+                stop_distance *= 0.8  # تقليل المسafe في التقلبات المنخفضة
+            
+            # تعديل بناءً على RSI
+            rsi = analysis.get('rsi', 50)
+            if rsi > 70:  #overbought - قد تحتاج مسافة أقرب للوقف
+                stop_distance *= 0.9
+            elif rsi < 30:  #oversold - قد تحتاج مسافة أوسع للوقف
+                stop_distance *= 1.1
+                
+            # ضمان أن القيمة ضمن نطاق معقول
+            stop_distance = max(0.5, min(stop_distance, 5.0))
+            
+            return stop_distance
+        except Exception as e:
+            print(f"⚠️ Exit strategy stop loss suggestion error: {e}")
+            return 1.5  # مسافة افتراضية معقولة
