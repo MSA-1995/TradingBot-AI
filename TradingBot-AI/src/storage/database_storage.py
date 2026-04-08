@@ -228,7 +228,8 @@ class DatabaseStorage:
                     statistical_outliers, pattern_anomalies, behavioral_anomalies, volume_anomalies,
                     attention_mechanism_score, multi_scale_features, temporal_features,
                     volume_trend_strength, volume_volatility, volume_momentum, volume_seasonality, volume_correlation,
-                    dynamic_consultant_weights, uncertainty_quantification, context_aware_score
+                    dynamic_consultant_weights, uncertainty_quantification, context_aware_score,
+                    peak_score, peak_detected
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
@@ -293,6 +294,9 @@ class DatabaseStorage:
                 trade_data.get('dynamic_consultant_weights', 0),
                 trade_data.get('uncertainty_quantification', 0),
                 trade_data.get('context_aware_score', 0),
+                # peak columns
+                trade_data.get('analysis', {}).get('peak', {}).get('confidence', 0),
+                trade_data.get('analysis', {}).get('peak', {}).get('candle_signal', False)
             ))
             conn.commit()
             cursor.close()
