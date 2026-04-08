@@ -1662,6 +1662,14 @@ class Meta:
                 elif win_rate >= 0.65: win_rate_boost = 5.0
                 elif win_rate < 0.35:  win_rate_boost = -8.0
 
+            # ===== Get trade stats from database =====
+            trade_stats = {}
+            if hasattr(self.storage, 'get_symbol_trade_stats'):
+                trade_stats = self.storage.get_symbol_trade_stats(symbol)
+
+            # ===== time_memory_modifier =====
+            time_mod, _ = self._get_time_memory_modifier(symbol, _ld=data)
+
             memory_data = {
                 'win_count':           wins,
                 'total_trades':        total,
@@ -1669,12 +1677,12 @@ class Meta:
                 'trap_count':          trap_count,
                 'profit_loss_ratio':   profit_loss_ratio,
                 'volume_trend':        1.0,
-                'sentiment_avg':       0.0,
-                'whale_confidence_avg': 0.0,
-                'panic_score_avg':     0.0,
-                'optimism_penalty_avg': 0.0,
+                'sentiment_avg':       trade_stats.get('sentiment_avg', 0.0) or 0.0,
+                'whale_confidence_avg': trade_stats.get('whale_confidence_avg', 0.0) or 0.0,
+                'panic_score_avg':     trade_stats.get('panic_score_avg', 0.0) or 0.0,
+                'optimism_penalty_avg': trade_stats.get('optimism_penalty_avg', 0.0) or 0.0,
                 'courage_boost':       courage_boost,
-                'time_memory_modifier': 0.0,
+                'time_memory_modifier': time_mod,
                 'pattern_score':       pattern_score,
                 'win_rate_boost':      win_rate_boost,
                 'psychological_summary': f'WR:{win_rate*100:.0f}% T:{total} P:{avg_profit:.1f}%'
