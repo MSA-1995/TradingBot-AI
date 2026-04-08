@@ -1014,12 +1014,18 @@ class DeepLearningClientV2:
 
         return votes, market_status
 
-    def vote_sell_now(self, rsi, macd, volume_ratio, price_momentum, liquidity_metrics=None, candle_analysis=None, market_sentiment=None):
+    def vote_sell_now(self, rsi, macd, volume_ratio, price_momentum, liquidity_metrics=None, candle_analysis=None, market_sentiment=None, peak_detected=False, peak_score=0):
         """
         البيع: 5 مستشارين يصوتون بالقمة
         Bullish: 3/5 | Neutral: 4/5 | Bearish: 5/5
+        peak_detected: إشارة القمة من النظام الخارجي
+        peak_score: قوة القمة (0-100)
         """
         votes = {'exit': 0, 'risk': 0, 'pattern': 0, 'anomaly': 0, 'liquidity': 0}
+        reasons = {'exit': '', 'risk': '', 'pattern': '', 'anomaly': '', 'liquidity': ''}
+
+        # ✅ Peak Override: إذا القمة مؤكدة وقوية، Exit و Pattern يصوتون فوراً
+        _strong_peak = peak_detected and peak_score >= 75
 
         # استخراج تحليل الشموع
         is_peak_candle = False
@@ -1057,11 +1063,17 @@ class DeepLearningClientV2:
             return 0
 
         # 1. Exit model
-        exit_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
-                                                     extra_features=[24, _tp_acc, _sl_acc])
-        exit_names = BASE_FEATURE_NAMES + ['hours_held', 'tp_accuracy', 'sell_accuracy']
-        exit_pred = self._predict_buy('exit', exit_features, exit_names)
-        votes['exit'] = _rule_sell('exit', exit_pred)
+        if _strong_peak:
+            # ✅ القمة المؤكدة (peak_score>=75) تطغى على Exit — الخروج عند القمة أهم من انتظار ربح أعلى
+            votes['exit'] = 1
+        else:
+            exit_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                         extra_features=[24, _tp_acc, _sl_acc])
+            exit_names = BASE_FEATURE_NAMES + ['hours_held', 'tp_accuracy', 'sell_accuracy']
+            exit_pred = self._predict_buy('exit', exit_features, exit_names)
+            votes['exit'] = _rule_sell('exit', exit_pred)
+            if votes['exit'] == 0:
+                reasons['exit'] = f"Exit model predicted no sell (rsi={rsi:.1f}, profit low or peak weak)"
 
         # 2. Risk model
         risk_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1071,13 +1083,19 @@ class DeepLearningClientV2:
         votes['risk'] = _rule_sell('risk', risk_pred)
 
         # 3. Pattern model
-        pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
-                                                        market_sentiment=market_sentiment,
-                                                        candle_analysis=candle_analysis,
-                                                        extra_features=[price_momentum, _tp_acc, _sl_acc])
-        pattern_names = BASE_FEATURE_NAMES + ['pattern_momentum', 'tp_accuracy', 'sell_accuracy']
-        pattern_pred = self._predict_buy('pattern', pattern_features, pattern_names)
-        votes['pattern'] = _rule_sell('pattern', pattern_pred)
+        if _strong_peak:
+            # ✅ القمة المؤكدة + CandleSignal=True تعوّض ضعف نمط الشمعة المنفرد
+            votes['pattern'] = 1
+        else:
+            pattern_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
+                                                            market_sentiment=market_sentiment,
+                                                            candle_analysis=candle_analysis,
+                                                            extra_features=[price_momentum, _tp_acc, _sl_acc])
+            pattern_names = BASE_FEATURE_NAMES + ['pattern_momentum', 'tp_accuracy', 'sell_accuracy']
+            pattern_pred = self._predict_buy('pattern', pattern_features, pattern_names)
+            votes['pattern'] = _rule_sell('pattern', pattern_pred)
+            if votes['pattern'] == 0:
+                reasons['pattern'] = f"Pattern model predicted no sell (candle pattern not strong enough despite signal)"
 
         # 4. Anomaly model
         anomaly_features = self._prepare_base_features(rsi, macd, volume_ratio, price_momentum,
@@ -1111,7 +1129,7 @@ class DeepLearningClientV2:
         votes['liquidity'] = _rule_sell('liquidity', liq_pred)
 
         # ✅ 5 مستشارين (exit, risk, pattern, anomaly, liquidity)
-        return votes, market_status
+        return votes, market_status, reasons
 
     # =========================================================
     # 🎓 التعلم المباشر للمستشارين الـ5 - يتعلمون من كل صفقة
