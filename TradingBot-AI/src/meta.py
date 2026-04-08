@@ -1260,13 +1260,21 @@ class Meta:
                 }
 
                 # جلب التصويت من كل مستشار
-                sell_votes, market_status = dl_client.vote_sell_now(
+                sell_votes, market_status, vote_reasons = dl_client.vote_sell_now(
                     rsi=rsi, macd=macd_diff, volume_ratio=volume_ratio,
                     price_momentum=price_momentum, liquidity_metrics=liquidity_metrics,
                     market_sentiment=market_sentiment,
-                    candle_analysis=candle_analysis
+                    candle_analysis=candle_analysis,
+                    peak_detected=is_real_peak,
+                    peak_score=peak_score
                 )
-                
+
+                # طباعة نتائج التصويت وأسباب الرفض
+                print(f"🗳️ Voting on sell/peak for {symbol}: {sell_votes}")
+                rejection_reasons = {k: v for k, v in vote_reasons.items() if v}
+                if rejection_reasons:
+                    print(f"❌ Rejection reasons: {rejection_reasons}")
+
                 if sell_votes:
                     total_advisors = len(sell_votes)
                     sell_vote_count = sum(1 for v in sell_votes.values() if v == 1)
