@@ -353,7 +353,100 @@ class RiskManager:
                 'risk_level': risk_level,
                 'timestamp': datetime.now().isoformat(),
             }
-            
         except Exception as e:
             print(f"⚠️ Risk report error: {e}")
+            return None
+
+    def suggest_stop_loss(self, symbol, position, analysis, mtf):
+        """اقتراح مسافة ستوبロス ذكية بناءً على إدارة المخاطر"""
+        try:
+            # حساب مسافة الستوبロス基于 ATR ونسبة المخاطرة/العائد
+            atr = analysis.get('atr', 0)
+            current_price = analysis.get('close', 0)
+            
+            if atr > 0 and current_price > 0:
+                # مسافة الستوبロス基于 ATR (مضاعف 1.5 إلى 2.5 basado على الثقة)
+                atr_multiplier = 2.0  # 기본값
+                confidence = analysis.get('confidence', 50)  # اگر در analysis نیست، از تابع利用可能
+                
+                # تعديل المضاعف baseado على الثقة
+                if confidence > 70:
+                    atr_multiplier = 2.5  # مسافة أوسع للثقة العالية
+                elif confidence < 30:
+                    atr_multiplier = 1.5  # مسافة أقرب للثقة المنخفضة
+                
+                stop_distance_percent = (atr * atr_multiplier / current_price) * 100
+                
+                # تعديل بناءً على نسبة المخاطرة/العائد من Kelly Criterion
+                kelly_data = self._get_kelly_data(symbol)
+                if kelly_data:
+                    # إذا كانت فرصة Kelly جيدة (فرصة ربح عالية)، podemos aumentar ligeramente el stop
+                    if kelly_data['kelly_fraction'] > 0.3:
+                        stop_distance_percent *= 1.1
+                    elif kelly_data['kelly_fraction'] < 0.1:  # فرصة ضعيفة، נחזק את ההגנה
+                        stop_distance_percent *= 0.9
+                
+                # ضمان أن القيمة ضمن نطاق معقول
+                stop_distance_percent = max(0.5, min(stop_distance_percent, 5.0))
+                return stop_distance_percent
+            
+            # phương pháp dự phòng: استخدام Kelly Criterion напрямую
+            kelly_data = self._get_kelly_data(symbol)
+            if kelly_data:
+                # تحويل نسبة Kelly إلى مسافة توقف معقولة
+                # Kelly العالي = ثقة أعلى = مسافة توقف أوسع قليلًا
+                base_stop = 1.5
+                kelly_adjustment = 1.0 + (kelly_data['kelly_fraction'] * 0.5)  # 0 إلى 0.5
+                stop_distance = base_stop * kelly_adjustment
+                return max(0.5, min(stop_distance, 5.0))
+            
+            # última fallback: مسافة افتراضية معقولة
+            return 1.5
+        except Exception as e:
+            print(f"⚠️ Risk manager stop loss suggestion error: {e}")
+            return 1.5  # مسافة افتراضية معقولة
+
+    def _get_kelly_data(self, symbol):
+        """الحصول على بيانات Kelly Criterion لحساب مسافة الستوبロス"""
+        try:
+            trades = self._get_symbol_trades(symbol)
+            
+            if len(trades) < 5:
+                return None
+            
+            # حساب Win Rate و متوسط الربح/الخسارة
+            wins = [t for t in trades if t['profit_percent'] > 0]
+            losses = [t for t in trades if t['profit_percent'] < 0]
+            
+            if not wins or not losses:
+                return None
+                
+            win_rate = len(wins) / len(trades)
+            loss_rate = 1 - win_rate
+            avg_win = sum(t['profit_percent'] for t in wins) / len(wins)
+            avg_loss = abs(sum(t['profit_percent'] for t in losses) / len(losses))
+            
+            if avg_loss == 0:
+                avg_loss = 1
+            
+            # Kelly Criterion: f = (p * b - q) / b
+            # p = win rate, q = loss rate, b = avg_win / avg_loss
+            b = avg_win / avg_loss if avg_loss > 0 else 0
+            
+            if b == 0:
+                kelly_fraction = 0
+            else:
+                kelly_fraction = (win_rate * b - loss_rate) / b
+            
+            # Kelly محافظ (نصف Kelly) مع حدود آمنة
+            kelly_fraction = max(0.0, min(kelly_fraction * 0.5, 0.5))
+            
+            return {
+                'win_rate': win_rate,
+                'avg_win': avg_win,
+                'avg_loss': avg_loss,
+                'kelly_fraction': kelly_fraction
+            }
+        except Exception as e:
+            print(f"⚠️ Kelly data error: {e}")
             return None
