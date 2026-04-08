@@ -1050,3 +1050,32 @@ class DatabaseStorage:
         finally:
             if conn:
                 conn.close()
+
+    def get_symbol_trade_stats(self, symbol):
+        """حساب إحصائيات التداول للعملة من trades_history"""
+        conn = None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor(cursor_factory=self.RealDictCursor)
+            cursor.execute("SET TRANSACTION READ ONLY;")
+            cursor.execute("""
+                SELECT
+                    AVG(sentiment_score) as sentiment_avg,
+                    AVG(whale_confidence) as whale_confidence_avg,
+                    AVG(panic_score) as panic_score_avg,
+                    AVG(optimism_penalty) as optimism_penalty_avg,
+                    COUNT(*) as total_trades,
+                    AVG(profit_percent) as avg_profit_percent
+                FROM trades_history
+                WHERE symbol = %s
+            """, (symbol,))
+            result = cursor.fetchone()
+            cursor.close()
+            return dict(result) if result else {}
+        except Exception as e:
+            print(f"❌ DB get symbol trade stats error: {e}")
+            return {}
+        finally:
+            if conn:
+                conn.rollback()
+                self._put_conn(conn)
