@@ -231,7 +231,7 @@ class DatabaseStorage:
                     dynamic_consultant_weights, uncertainty_quantification, context_aware_score,
                     peak_score, peak_detected
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 trade_data.get('symbol'),
                 trade_data.get('action'),
@@ -295,8 +295,8 @@ class DatabaseStorage:
                 trade_data.get('uncertainty_quantification', 0),
                 trade_data.get('context_aware_score', 0),
                 # peak columns
-                trade_data.get('analysis', {}).get('peak', {}).get('confidence', 0),
-                trade_data.get('analysis', {}).get('peak', {}).get('candle_signal', False)
+                trade_data.get('peak_score', 0),
+                trade_data.get('peak_detected', False)
             ))
             conn.commit()
             cursor.close()
