@@ -616,18 +616,19 @@ print("  ██║╚██╔╝██║╚════██║██╔═�
 print("  ██║ ╚═╝ ██║███████║██║  ██║")
 print("  ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝\n")
 print("  ✦•······················•✦•······················•✦")
-print("        🚀 MSA Smart Trading Bot V2.0")
-print("        💰 Binance Testnet - Enhanced AI & Whale Tracking")
+print("        🚀 MSA Smart Trading Bot V2.1")
+print("        💰 Binance Testnet - Smart Stop Loss & Adaptive Risk")
 if meta:
-    print("        👑 The King (Meta): ACTIVE with King Memory")
-print("        🧠 Deep Learning Models (LightGBM) - 41 Features")
-print("        📊 Multi-Timeframe + Advanced Risk Manager")
+    print("        👑 The King (Meta): ACTIVE with King Memory & Smart SL")
+print("        🧠 Deep Learning Models (LightGBM) - 42 Features (+Smart SL)")
+print("        📊 Multi-Timeframe + Adaptive Risk Manager")
 print("        🐋 Whale Tracking + Sentiment Analysis")
 print("        🏆 Coin Ranking + Enhanced Anomaly Detection")
 print("        🎯 Smart Exit Strategy + Pattern Recognition")
 print("        📰 News Sentiment + Panic/Greed Analysis")
 print("        🔍 Top 10 from 50 Coins with King Memory")
-print("        ✅ Version 2.0 - AI Learning V4 with External APIs")
+print("        🛡️ Protection: Dynamic Stop Loss based on Advisor Votes & Market Volatility")
+print("        ✅ Version 2.1 - AI Learning V5 with Smart Stop Loss")
 print("  ✦•······················•✦•······················•✦\n")
 print("=" * 60)
 
@@ -675,7 +676,7 @@ if NEWS_ENABLED:
     print(f"📰 News Sentiment Analyzer: ACTIVE")
 
 print(f"💰 Amount: ~$15 (Dynamic)")
-print(f"🎯 TP: Dynamic | SL: Dynamic TSL (ATR Based, -2%)")
+print(f"🎯 TP: Dynamic | SL: Smart Dynamic (Advisor-Voted & ATR-Based)")
 print(f"🎯 Min Buy Confidence: {MIN_CONFIDENCE}/100\n")
 
 # Startup notification calls removed for simplification.
@@ -1031,10 +1032,11 @@ ctx = {
 }
 
 # طباعة رسالة البداية المحدثة
-print("🤖 MSA Trading Bot V2.0 - Enhanced AI Learning, Whale Tracking, Sentiment Analysis")
+print("🤖 MSA Trading Bot V2.1 - Smart Stop Loss System, Adaptive Risk Management")
 print("🔗 External APIs: NewsAPI, Alpha Vantage, CoinGecko, Whale Alert")
-print("🧠 Features: Panic/Greed Detection, Optimism Avoidance, King Memory")
-print("🚀 Ready for Smart Trading!")
+print("🧠 Features: Panic/Greed Detection, Optimism Avoidance, King Memory, Smart Stop Loss")
+print("🛡️ Protection: Dynamic Stop Loss based on Advisor Votes & Market Volatility")
+print("🚀 Ready for Intelligent Trading!")
 
 while True:
     try:
