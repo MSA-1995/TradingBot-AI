@@ -22,12 +22,13 @@ MAX_TRADE_AMOUNT = 30
 BASE_AMOUNT = 12
 
 # Risk Management
-# Stop Loss removed - الحماية عبر:
-# 1. تصويت المستشارين (-0.8% إلى -1.2%)
-# 2. Trailing Stop -2% من أعلى سعر (جدار نهائي)
+# Smart Stop Loss handled dynamically by Meta and Advisors based on:
+# - Trailing distance from highest price (volatility-adjusted)
+# - Advisor voting on optimal stop distance
+# - Market conditions and trend strength
 
 VOLUME_SPIKE_FACTOR = 1.0 # Multiplier for detecting significant volume spikes (lowered for more opportunities)
-PEAK_DROP_THRESHOLD = 2.0   # % هبوط من القمة يعتبر إشارة بيع (Dynamic Trailing Stop-Loss)
+PEAK_DROP_THRESHOLD = 2.0   # % هبوط من القمة يعتبر إشارة بيع (Used by Meta for sell decisions)
 BOTTOM_BOUNCE_THRESHOLD = 2.0  # % ارتداد من القاع يعتبر إشارة شراء (0.5% = وسط)
 REVERSAL_CANDLES = 10       # عدد الشموع للبحث عن القاع والقمة (أسرع)
 
