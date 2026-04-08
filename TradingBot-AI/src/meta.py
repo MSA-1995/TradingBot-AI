@@ -1302,11 +1302,11 @@ class Meta:
         # Bullish → صعب بيع (5/5) | Neutral → متوسط (4/5) | Bearish → سهل بيع (3/5)
         market_mood_for_sell = mood_details.get('mood', 'Neutral')
         if market_mood_for_sell == 'Bullish':
-            min_votes_needed = 5   # سوق صاعد: يلزم 5/5 للبيع (صعب)
+            min_votes_needed = 4   # سوق صاعد: يلزم 5/5 للبيع (صعب)
         elif market_mood_for_sell == 'Bearish':
-            min_votes_needed = 3   # سوق هابط: يكفي 3/5 للبيع (سهل)
+            min_votes_needed = 2   # سوق هابط: يكفي 3/5 للبيع (سهل)
         else:
-            min_votes_needed = 4   # محايد: 4/5
+            min_votes_needed = 3   # محايد: 4/5
         
         if sell_vote_count >= min_votes_needed and sell_conf >= MIN_SELL_CONFIDENCE:
             action = 'SELL'
