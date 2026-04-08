@@ -762,7 +762,7 @@ class DatabaseStorage:
                 self._put_conn(conn)
     
     # ========== Symbol Memory ==========
-    def update_symbol_memory(self, symbol, profit, trade_quality, hours_held, rsi, volume_ratio):
+    def update_symbol_memory(self, symbol, profit, trade_quality, hours_held, rsi, volume_ratio, smart_stop_loss=0.0):
         """تحديث ذاكرة العملة بعد كل صفقة"""
         conn = None
         try:
@@ -772,8 +772,8 @@ class DatabaseStorage:
                 INSERT INTO symbol_memory 
                 (symbol, total_trades, win_count, loss_count, trap_count, avg_profit, 
                  max_profit, min_profit, avg_hold_hours, best_rsi, best_volume_ratio, 
-                 last_trade_quality, last_updated)
-                VALUES (%s, 1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                 last_trade_quality, last_updated, smart_stop_loss)
+                VALUES (%s, 1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)
                 ON CONFLICT (symbol) DO UPDATE SET
                     total_trades = symbol_memory.total_trades + 1,
                     win_count = symbol_memory.win_count + %s,
@@ -786,12 +786,14 @@ class DatabaseStorage:
                     best_rsi = %s,
                     best_volume_ratio = %s,
                     last_trade_quality = %s,
+                    smart_stop_loss = EXCLUDED.smart_stop_loss,
                     last_updated = NOW();
             """, (
                 symbol,
                 1 if profit > 0 else 0, 1 if profit <= 0 else 0,
                 1 if trade_quality in ['TRAP', 'RISKY'] else 0,
                 profit, profit, profit, hours_held, rsi, volume_ratio, trade_quality,
+                smart_stop_loss,
                 1 if profit > 0 else 0, 1 if profit <= 0 else 0,
                 1 if trade_quality in ['TRAP', 'RISKY'] else 0,
                 profit, profit, profit, hours_held, rsi, volume_ratio, trade_quality
@@ -991,8 +993,8 @@ class DatabaseStorage:
                 INSERT INTO symbol_memory (
                     symbol, sentiment_avg, whale_confidence_avg, profit_loss_ratio,
                     volume_trend, panic_score_avg, optimism_penalty_avg, courage_boost,
-                    time_memory_modifier, pattern_score, win_rate_boost, psychological_summary
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    time_memory_modifier, pattern_score, win_rate_boost, psychological_summary, smart_stop_loss
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (symbol) DO UPDATE SET
                     sentiment_avg = EXCLUDED.sentiment_avg,
                     whale_confidence_avg = EXCLUDED.whale_confidence_avg,
@@ -1005,6 +1007,7 @@ class DatabaseStorage:
                     pattern_score = EXCLUDED.pattern_score,
                     win_rate_boost = EXCLUDED.win_rate_boost,
                     psychological_summary = EXCLUDED.psychological_summary,
+                    smart_stop_loss = EXCLUDED.smart_stop_loss,
                     updated_at = NOW()
             """, (
                 symbol,
@@ -1018,7 +1021,8 @@ class DatabaseStorage:
                 data.get('time_memory_modifier', 0.0),
                 data.get('pattern_score', 0.0),
                 data.get('win_rate_boost', 0.0),
-                data.get('psychological_summary', '')
+                data.get('psychological_summary', ''),
+                data.get('smart_stop_loss', 0.0)
             ))
             conn.commit()
             cursor.close()
