@@ -336,30 +336,90 @@ class ExitStrategyModel:
             }
 
     def suggest_stop_loss(self, symbol, position, analysis, mtf):
-        """اقتراح مسافة ستوبロス ذكية بناءً على تحليل الخروج"""
+        """اقتراح مسافة ستوب لوس ذكية بناءً على تحليل الخروج"""
         try:
-            # الحصول على مسافة الستوبロス من تحليل الخروج المثالي
-            exit_point = self.get_optimal_exit_point(symbol, 0)  # 수익 = 0 للوقف
+            # ✅ إصلاح: تمرير الربح الحالي الفعلي بدل 0 دائماً
+            buy_price = position.get('buy_price', 0)
+            current_price = analysis.get('close', buy_price)
+            current_profit = ((current_price - buy_price) / buy_price * 100) if buy_price > 0 else 0
+
+            exit_point = self.get_optimal_exit_point(symbol, current_profit)
             stop_distance = exit_point['optimal_sl']
-            
+
             # تعديل بناءً على التقلبات الحالية
             volume_ratio = analysis.get('volume_ratio', 1.0)
             if volume_ratio > 2.0:
-                stop_distance *= 1.2  # زيادة المسafe في التقلبات العالية
+                stop_distance *= 1.2
             elif volume_ratio < 0.5:
-                stop_distance *= 0.8  # تقليل المسafe في التقلبات المنخفضة
-            
+                stop_distance *= 0.8
+
             # تعديل بناءً على RSI
             rsi = analysis.get('rsi', 50)
-            if rsi > 70:  #overbought - قد تحتاج مسافة أقرب للوقف
+            if rsi > 70:
                 stop_distance *= 0.9
-            elif rsi < 30:  #oversold - قد تحتاج مسافة أوسع للوقف
+            elif rsi < 30:
                 stop_distance *= 1.1
-                
-            # ضمان أن القيمة ضمن نطاق معقول
+
             stop_distance = max(0.5, min(stop_distance, 5.0))
-            
             return stop_distance
         except Exception as e:
             print(f"⚠️ Exit strategy stop loss suggestion error: {e}")
-            return 1.5  # مسافة افتراضية معقولة
+            return 1.5
+
+    def check_trailing_stop_from_peak(self, symbol, position, current_price):
+        """
+        ✅ جديد: فحص Trailing Stop بناءً على أعلى سعر وصلته العملة (Peak).
+        يُحدّث peak_price في الـ position ويُعيد قرار SELL إذا انخفض السعر
+        عن القمة بمقدار يتجاوز مسافة الـ trailing المُقررة.
+        """
+        try:
+            buy_price = position.get('buy_price', 0)
+            if buy_price <= 0 or current_price <= 0:
+                return {'action': 'HOLD', 'reason': 'Invalid prices'}
+
+            profit_percent = ((current_price - buy_price) / buy_price) * 100
+
+            # تحديث القمة إذا السعر الحالي أعلى
+            peak_price = position.get('peak_price', buy_price)
+            if current_price > peak_price:
+                position['peak_price'] = current_price
+                peak_price = current_price
+
+            peak_profit = ((peak_price - buy_price) / buy_price) * 100
+
+            # لا نُفعّل الـ trailing إلا إذا وصل لربح 0.5% على الأقل
+            if peak_profit < 0.5:
+                return {'action': 'HOLD', 'reason': 'Peak profit too low to trail'}
+
+            # تحديد مسافة الـ trailing حسب حجم الربح من القمة
+            if peak_profit >= 3.0:
+                trail_distance = 1.0   # ربح كبير → نحمي بـ 1% من القمة
+            elif peak_profit >= 1.5:
+                trail_distance = 0.8
+            elif peak_profit >= 0.8:
+                trail_distance = 0.5
+            else:
+                trail_distance = 0.4
+
+            # حساب نسبة الانخفاض عن القمة
+            drop_from_peak = ((peak_price - current_price) / peak_price) * 100
+
+            if drop_from_peak >= trail_distance:
+                return {
+                    'action': 'SELL',
+                    'reason': f'TRAILING STOP: dropped {drop_from_peak:.2f}% from peak {peak_profit:.2f}%',
+                    'profit': profit_percent,
+                    'peak_profit': peak_profit,
+                    'drop_from_peak': drop_from_peak,
+                    'confidence': 88
+                }
+
+            return {
+                'action': 'HOLD',
+                'reason': f'Trailing OK: drop={drop_from_peak:.2f}% < trail={trail_distance}%',
+                'peak_profit': peak_profit
+            }
+
+        except Exception as e:
+            print(f"⚠️ Trailing stop from peak error {symbol}: {e}")
+            return {'action': 'HOLD', 'reason': 'Error in trailing stop'}
