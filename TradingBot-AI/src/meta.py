@@ -1336,15 +1336,15 @@ class Meta:
         mood_details = {}
         if btc_change > 1.0:
             mood_details['mood'] = "Bullish"
-            mood_details['min_votes_needed'] = 3   # 3/5 - سوق صاعد
+            mood_details['min_votes_needed'] = 2   # 2/5 - سوق صاعد
             mood_details['total_advisors'] = 5
         elif btc_change < -1.0:
             mood_details['mood'] = "Bearish"
-            mood_details['min_votes_needed'] = 5   # 5/5 - سوق هابط
+            mood_details['min_votes_needed'] = 4   # 4/5 - سوق هابط
             mood_details['total_advisors'] = 5
         else:
             mood_details['mood'] = "Neutral"
-            mood_details['min_votes_needed'] = 4   # 4/5 - سوق محايد
+            mood_details['min_votes_needed'] = 3   # 3/5 - سوق محايد
             mood_details['total_advisors'] = 5
 
         return mood_details
