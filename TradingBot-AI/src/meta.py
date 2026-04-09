@@ -1269,11 +1269,7 @@ class Meta:
                     peak_score=peak_score
                 )
 
-                # طباعة نتائج التصويت وأسباب الرفض
-                print(f"🗳️ Voting on sell/peak for {symbol}: {sell_votes}")
                 rejection_reasons = {k: v for k, v in vote_reasons.items() if v}
-                if rejection_reasons:
-                    print(f"❌ Rejection reasons: {rejection_reasons}")
 
                 if sell_votes:
                     total_advisors = len(sell_votes)
@@ -1322,7 +1318,7 @@ class Meta:
         if profit_percent > 15:
             reason += " | Optimism Warning"
 
-        return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown}
+        return {'action': action, 'reason': reason, 'profit': profit_percent, 'sell_votes': vote_breakdown, 'peak_score': peak_score}
 
     def _get_market_mood(self, analysis):
         """
