@@ -515,6 +515,13 @@ def process_sell(result, exchange, ctx):
             context_aware_score = 0
 
         # Add to trade_data - READ ALL VALUES FROM REAL ANALYSIS DATA!!!
+        # First add values from result
+        trade_data.update({
+            'whale_confidence': safe_float(result.get('whale_confidence', 0)),
+            'atr_value': safe_float(result.get('atr_value', 0)),
+            'peak_score': safe_float(result.get('peak_score', 0)),
+        })
+
         trade_data.update({
             'order_book_imbalance': safe_float(analysis_data.get('order_book_imbalance')),
             'spread_volatility': safe_float(analysis_data.get('spread_volatility')),
