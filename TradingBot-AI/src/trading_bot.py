@@ -826,33 +826,6 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
             #print(f"🔍 DEBUG FREE [{symbol}] → Meta={meta_action} Conf={meta_conf} | RSI={analysis.get('rsi',0):.0f} Vol={analysis.get('volume_ratio',0):.1f}x")
 
             if decision and meta_action == 'BUY':
-                # ✅ حساب الأعمدة الجديدة للنماذج
-                market_data = {'btc_correlation': 0, 'market_volatility': 1}  # بيانات سوق مؤقتة
-                candles = analysis.get('candles', [])
-                consultant_votes = decision.get('consultant_votes', {})
-
-                # حساب جميع الميزات الجديدة
-                liquidity_data = calculate_liquidity_features(symbol, analysis)
-                risk_data = calculate_risk_features(symbol, analysis, market_data)
-                exit_data = calculate_exit_features(symbol, analysis, 0)  # profit = 0 للشراء
-                pattern_data = calculate_pattern_features(symbol, analysis, candles)
-                smart_money_data = calculate_smart_money_features(symbol, analysis)
-                anomaly_data = calculate_anomaly_features(symbol, analysis)
-                cnn_data = calculate_chart_cnn_features(symbol, analysis, candles)
-                meta_data = calculate_meta_learner_features(symbol, analysis, consultant_votes)
-
-                # دمج البيانات
-                advanced_features = {
-                    **liquidity_data,
-                    **risk_data,
-                    **exit_data,
-                    **pattern_data,
-                    **smart_money_data,
-                    **anomaly_data,
-                    **cnn_data,
-                    **meta_data
-                }
-
                 return {
                     'symbol': symbol,
                     'action': 'BUY',
@@ -866,7 +839,7 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                     'macd_diff': analysis.get('macd_diff', 0),
                     'news_summary': decision.get('news_summary'),
                     'models_scores': decision.get('meta_scores', {}),
-                    **advanced_features  # ✅ إضافة جميع الميزات الجديدة
+                    **analysis  # ✅ سحب كافة الميزات المتقدمة مباشرة من المحلل الفني
                 }
 
             # عملة قوية - الملك راضي لكن الأصوات ناقصة
