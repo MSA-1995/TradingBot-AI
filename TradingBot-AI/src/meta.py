@@ -605,7 +605,7 @@ class Meta:
         buy_price = position['buy_price']
         profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
 
-        # --- 🌊 1. نظام الوقف الزاحف الواسع (Wide Trailing Stop) ---
+        # --- 1. نظام الوقف الزاحف الواسع (Wide Trailing Stop) ---
         highest_price = position.get('highest_price', buy_price)
         drop_from_peak = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
         
@@ -624,7 +624,7 @@ class Meta:
         if drop_from_peak >= trailing_threshold:
             return {
                 'action': 'SELL',
-                'reason': f'🌊 Wave Rider Exit: Trend Broken (-{drop_from_peak:.1f}% from peak)',
+                'reason': f'Wave Rider Exit: Trend Broken (-{drop_from_peak:.1f}% from peak)',
                 'profit': profit_percent,
                 'optimism_penalty': optimism_penalty
             }
@@ -643,7 +643,7 @@ class Meta:
 
         return {
             'action': 'HOLD', 
-            'reason': f'🌊 Wave Rider | Profit: {profit_percent:+.1f}% | Peak: {peak_score}/110', 
+            'reason': f'Wave Rider | Profit: {profit_percent:+.1f}% | Peak: {peak_score}/110', 
             'profit': profit_percent
         }
 
