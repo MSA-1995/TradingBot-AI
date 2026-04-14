@@ -548,12 +548,12 @@ class Meta:
             pos_keywords = ['Safe', 'Bullish', 'Sweep', 'Alpha', 'Wall', 'Institutional', 'Opportunity', 'Building']
             
             buy_vote_count = 0
-            print(f"\n🗳️  [VOTING SESSION: {symbol}] (Confidence: {temp_conf})")
+            #print(f"\n🗳️  [VOTING SESSION: {symbol}] (Confidence: {temp_conf})")
             for name, adv_text in advisors_advice.items():
                 has_voted = any(k in str(adv_text) for k in pos_keywords)
                 status = "✅ VOTE BUY" if has_voted else "⚪ ABSTAIN "
                 if has_voted: buy_vote_count += 1
-                print(f"   🎙️ {name:12}: {status} | {adv_text}")
+                #print(f"   🎙️ {name:12}: {status} | {adv_text}")
             
             total_advisors = 10
             vote_breakdown = advisors_advice
