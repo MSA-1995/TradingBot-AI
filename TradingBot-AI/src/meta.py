@@ -16,7 +16,8 @@ class Meta:
     def __init__(self, advisor_manager=None, storage=None):
         self.advisor_manager = advisor_manager
         self.storage = storage
-        self.meta_learner_data = None
+        self.meta_model = None
+        self.meta_feature_names = None
         self._load_model_data_from_db()
 
         print("👑 Meta (The King) is initialized and ready to rule.")
@@ -36,13 +37,22 @@ class Meta:
             model_data = dl_client.get_model_data('meta_trading')
 
             if model_data:
-                self.meta_learner_data = model_data
+                import gzip, pickle
+                try:
+                    # فك ضغط وتحميل الموديل الذكي للملك
+                    raw = bytes(model_data)
+                    if raw.startswith(b'\x1f\x8b'):
+                        raw = gzip.decompress(raw)
+                    self.meta_model = pickle.loads(raw)
+                    print("✅ Meta: King's Intelligence (AI Model) loaded from DB.")
+                except Exception as e:
+                    print(f"⚠️ Meta: Failed to unpickle model: {e}")
             else:
                 print("⚠️ Meta: Meta-Learner model blueprint not found in DB. Buy decisions will be disabled.")
-                self.meta_learner_data = None
+                self.meta_model = None
         except Exception as e:
             print(f"❌ Meta: Error loading Meta-Learner blueprint from DB: {e}")
-            self.meta_learner_data = None
+            self.meta_model = None
 
     # =========================================================
     # 📰 NEWS CONFIDENCE MODIFIER (يُعدّل الثقة فقط، لا يقرر)
@@ -341,6 +351,21 @@ class Meta:
             temp_conf += 15
             reasons.append("🔄 Dynamic Re-Entry (Trend Continuation)")
 
+        # --- 🤖 AI META PREDICTION (ذكاء الملك من الداتابيز) ---
+        if self.meta_model:
+            try:
+                # استخلاص الميزات كما تعلمها الموديل في الداتابيز
+                # نستخدم دالة مساعدة لجلب الـ features الـ 42
+                from MSA_DeepLearning_Trainer.core.features import calculate_enhanced_features, get_feature_names
+                feats = calculate_enhanced_features(analysis_data, None)
+                # التنبؤ بناءً على الموديل
+                ai_prob = self.meta_model.predict_proba([feats])[:, 1][0]
+                if ai_prob > 0.65:
+                    ai_boost = int((ai_prob - 0.5) * 40) # إضافة حتى 20 نقطة ثقة
+                    temp_conf += ai_boost
+                    reasons.append(f"🧠 AI King Confidence (+{ai_boost})")
+            except Exception: pass
+
         # =====================================================================
         # 🛰️ SUPER-INSTITUTIONAL LAYER (التحقق المتقاطع وبصمة الحيتان)
         # =====================================================================
@@ -545,16 +570,24 @@ class Meta:
             )
 
             # حساب الأصوات الإيجابية فقط التي تدعم الشراء (Keywords Check)
-            pos_keywords = ['Safe', 'Bullish', 'Sweep', 'Alpha', 'Wall', 'Institutional', 'Opportunity', 'Building']
-            
+            pos_keywords = ['Safe', 'Bullish', 'Sweep', 'Alpha', 'Wall', 'Institutional', 'Opportunity', 'Building', 'Flow', 'Rider', 'Clean', 'Velocity']
+
             buy_vote_count = 0
-            #print(f"\n🗳️  [VOTING SESSION: {symbol}] (Confidence: {temp_conf})")
+            print(f"\n🗳️  [VOTING SESSION: {symbol}] (Confidence: {temp_conf})")
             for name, adv_text in advisors_advice.items():
+                is_offline = "N/A" in str(adv_text)
                 has_voted = any(k in str(adv_text) for k in pos_keywords)
-                status = "✅ VOTE BUY" if has_voted else "⚪ ABSTAIN "
-                if has_voted: buy_vote_count += 1
-                #print(f"   🎙️ {name:12}: {status} | {adv_text}")
-            
+                
+                if is_offline:
+                    status = "💀 OFFLINE "
+                elif has_voted:
+                    status = "✅ VOTE BUY"
+                    buy_vote_count += 1
+                else:
+                    status = "⚪ NEUTRAL "
+                
+                print(f"   🎙️ {name:12}: {status} | {adv_text}")
+
             total_advisors = 10
             vote_breakdown = advisors_advice
 
