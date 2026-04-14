@@ -1159,16 +1159,6 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
             **get_sentiment_data(symbol, {'close': latest['close'], 'rsi': latest['rsi']})
         }
 
-        # ✅ حساب whale_confidence الذكي (دمج الحجم مع سجل الطلبات)
-        w_conf = 0
-        v_ratio = latest['volume_ratio']
-        ob_imbalance = analysis_dict.get('order_book_imbalance', 0)
-        if v_ratio > 2.0:
-            w_conf = (15 if latest['price_change'] > 0 else -15) + (ob_imbalance * 10)
-        elif abs(ob_imbalance) > 0.4:
-            w_conf = 10 if ob_imbalance > 0 else -10
-        analysis_dict['whale_confidence'] = round(max(-25, min(25, w_conf)), 2)
-
         # === 🚨 إضافة جميع الأعمدة 42 الجديدة هنا مباشرة بالحسابات الفعلية ===
         order_book = analysis_dict.get('order_book', {})
         bids_volume = sum(float(level[1]) for level in order_book.get('bids', [])[:10])
@@ -1231,6 +1221,13 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
         analysis_dict['dynamic_consultant_weights'] = 0.7
         analysis_dict['uncertainty_quantification'] = abs(50 - analysis_dict.get('rsi', 50)) / 50.0
         analysis_dict['context_aware_score'] = 1.0 - abs(analysis_dict.get('btc_change_1h', 0)) / 10.0
+
+        # ✅ حساب whale_confidence النهائي (بصمة الحوت الموحدة)
+        v_ratio = latest['volume_ratio']
+        ob_imbalance = analysis_dict.get('order_book_imbalance', 0)
+        w_base = (15 if latest['price_change'] > 0 else -15) if v_ratio > 2.0 else 0
+        w_ob = (ob_imbalance * 10) if abs(ob_imbalance) > 0.3 else 0
+        analysis_dict['whale_confidence'] = round(max(-25, min(25, w_base + w_ob)), 2)
 
         return analysis_dict
     except Exception as e:
