@@ -85,13 +85,13 @@ class AnomalyDetector:
                 elif manipulation['risk'] == 'HIGH':
                     anomaly_score += 3
             
-            # تحديد الخطورة بناءً على النقاط
-            if anomaly_score >= 5:
+            # تحديد الخطورة بناءً على النقاط (تشديد)
+            if anomaly_score >= 4:  # كان 5
                 severity = 'CRITICAL'
                 safe_to_trade = False
-            elif anomaly_score >= 3:
+            elif anomaly_score >= 2:  # كان 3
                 severity = 'HIGH'
-                safe_to_trade = True  # تحذير قوي لكن مو رفض
+                safe_to_trade = False  # تغيير: رفض التداول عند HIGH
             elif anomaly_score >= 1:
                 severity = 'MEDIUM'
                 safe_to_trade = True  # تحذير خفيف
