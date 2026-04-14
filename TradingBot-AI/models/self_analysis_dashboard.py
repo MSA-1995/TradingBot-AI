@@ -237,21 +237,40 @@ class SelfAnalysisDashboard:
             else:
                 color = 0xff0000  # أحمر
             
-            # بناء الـ Embed
+            # بناء الـ Embed - نفس أسلوب Portfolio Report
             embed = {
-                "title": f"📊 تقرير الأداء - {report['period']}",
+                "title": f"PERFORMANCE REPORT - {report['period']}",
                 "color": color,
                 "fields": [
                     {
-                        "name": "📈 الملخص العام",
-                        "value": f"""```
-إجمالي الصفقات: {summary['total_trades']}
-معدل النجاح: {summary['win_rate']:.1f}%
-إجمالي الربح: {summary['total_profit']:+.2f}%
-متوسط الربح: {summary['avg_profit_per_trade']:+.2f}%
-نسبة الفخاخ: {summary['trap_rate']:.1f}%
-```""",
-                        "inline": False
+                        "name": "Total Trades",
+                        "value": f"{summary['total_trades']}",
+                        "inline": True
+                    },
+                    {
+                        "name": "Win Rate",
+                        "value": f"{summary['win_rate']:.1f}%",
+                        "inline": True
+                    },
+                    {
+                        "name": "Total Profit",
+                        "value": f"{summary['total_profit']:+.2f}%",
+                        "inline": True
+                    },
+                    {
+                        "name": "Average Profit",
+                        "value": f"{summary['avg_profit_per_trade']:+.2f}%",
+                        "inline": True
+                    },
+                    {
+                        "name": "Trap Rate",
+                        "value": f"{summary['trap_rate']:.1f}%",
+                        "inline": True
+                    },
+                    {
+                        "name": "Winning Trades",
+                        "value": f"{summary['winning_trades']}",
+                        "inline": True
                     }
                 ],
                 "footer": {
@@ -260,56 +279,54 @@ class SelfAnalysisDashboard:
                 "timestamp": report['generated_at']
             }
             
-            # أفضل صفقة
+            # أفضل وأسوأ صفقة
             best = report['best_trade']
-            embed['fields'].append({
-                "name": "🏆 أفضل صفقة",
-                "value": f"{best['symbol']}: **{best['profit']:+.2f}%**",
-                "inline": True
-            })
-            
-            # أسوأ صفقة
             worst = report['worst_trade']
             embed['fields'].append({
-                "name": "📉 أسوأ صفقة",
-                "value": f"{worst['symbol']}: **{worst['profit']:+.2f}%**",
+                "name": "Best Trade",
+                "value": f"{best['symbol']}: {best['profit']:+.2f}%",
+                "inline": True
+            })
+            embed['fields'].append({
+                "name": "Worst Trade",
+                "value": f"{worst['symbol']}: {worst['profit']:+.2f}%",
                 "inline": True
             })
             
             # أفضل العملات
             if report['top_symbols']:
                 top_text = "\n".join([
-                    f"• {s['symbol']}: {s['total_profit']:+.2f}% (معدل: {s['win_rate']:.0f}%)"
+                    f"**{s['symbol']}**\nProfit: {s['total_profit']:+.2f}% | Win Rate: {s['win_rate']:.0f}%\n"
                     for s in report['top_symbols'][:3]
                 ])
                 embed['fields'].append({
-                    "name": "💎 أفضل العملات",
-                    "value": top_text or "لا توجد بيانات",
+                    "name": "Top Performing Symbols",
+                    "value": top_text.strip() or "No data available",
                     "inline": False
                 })
             
             # أفضل الأوقات
             if report['best_hours']:
                 hours_text = "\n".join([
-                    f"• {h['hour']}: {h['total_profit']:+.2f}%"
+                    f"**{h['hour']}**\nProfit: {h['total_profit']:+.2f}% | Trades: {h['wins'] + h['losses']}\n"
                     for h in report['best_hours'][:3]
                 ])
                 embed['fields'].append({
-                    "name": "⏰ أفضل الأوقات",
-                    "value": hours_text or "لا توجد بيانات",
+                    "name": "Best Trading Hours",
+                    "value": hours_text.strip() or "No data available",
                     "inline": False
                 })
             
             # التوصيات
             if report['recommendations']:
                 rec_text = "\n".join([
-                    f"{'🚨' if r['type'] == 'CRITICAL' else '⚠️' if r['type'] == 'WARNING' else '✅' if r['type'] == 'SUCCESS' else 'ℹ️'} **{r['title']}**\n{r['message']}"
+                    f"**{r['title']}**\n{r['message']}\n"
                     for r in report['recommendations'][:3]
                 ])
                 if rec_text:
                     embed['fields'].append({
-                        "name": "💡 التوصيات",
-                        "value": rec_text,
+                        "name": "Recommendations",
+                        "value": rec_text.strip(),
                         "inline": False
                     })
             
