@@ -2,7 +2,11 @@
 Meta (The King) - The Ultimate Decision Maker
 """
 import pandas as pd
-from config import MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT, MIN_CONFIDENCE, PEAK_DROP_THRESHOLD, BOTTOM_BOUNCE_THRESHOLD, VOLUME_SPIKE_FACTOR
+from config import (
+    MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT, MIN_CONFIDENCE, MIN_SELL_CONFIDENCE,
+    MIN_CANDLE_SCORE, MIN_VOLUME_RATIO, MACRO_CANDLE_THRESHOLD,
+    PEAK_DROP_THRESHOLD, BOTTOM_BOUNCE_THRESHOLD, VOLUME_SPIKE_FACTOR
+)
 from datetime import datetime
 import gc
 import psutil
@@ -686,15 +690,15 @@ class Meta:
         king_wants_to_buy = False
 
         # حارس الماكرو: Wave Rider يحتاج اتجاه صاعد قوي
-        if not is_macro_bullish and candle_score < 95:
+        if not is_macro_bullish and candle_score < MACRO_CANDLE_THRESHOLD:
             return {
                 'action': 'DISPLAY',
-                'reason': f'⏳ Wave Rider Block: Macro Bearish | King:{temp_conf}/85',
+                'reason': f'⏳ Wave Rider Block: Macro Bearish | King:{temp_conf}/{MIN_CONFIDENCE}',
                 'confidence': temp_conf
             }
 
         # الشرط 1: إشارة شمعية انعكاسية قوية من القاع
-        if reversal.get('candle_signal', False) and candle_score >= 90:
+        if reversal.get('candle_signal', False) and candle_score >= MIN_CANDLE_SCORE:
             king_wants_to_buy = True
             king_reason = f"King: Strong Wave Start ({candle_score}/110)"
 
@@ -704,7 +708,7 @@ class Meta:
             king_reason = f"King: Wave Bottom ({candle_score}/110)"
 
         # الشرط 3: انفجار حجم قوي مع بداية ارتداد
-        elif volume_ratio >= 2.5 and reversal.get('is_reversing', False):
+        elif volume_ratio >= MIN_VOLUME_RATIO and reversal.get('is_reversing', False):
             king_wants_to_buy = True
             king_reason = f"King: Volume Wave Start ({volume_ratio:.1f}x)"
         
