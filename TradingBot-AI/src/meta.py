@@ -237,10 +237,13 @@ class Meta:
 
         # --- 🎯 1.2 Macro Filter (مرشح الاتجاه الماكرو) ---
         macro_advisor = self.advisor_manager.get('MacroTrendAdvisor')
-        is_macro_bullish = macro_advisor.can_aim_high()
-        if not is_macro_bullish and market_mood != "Bullish":
-            reasons.append("Waiting for Macro Bullish Alignment")
-            temp_conf -= 30 # عقوبة قوية لو السوق العام هابط
+        macro_status = macro_advisor.get_macro_status()
+        is_macro_bullish = macro_status in ["STRONG_BULL_MARKET", "BULL_MARKET"]
+        
+        # بدلاً من رقم ثابت، نعدل الثقة بناءً على "بيئة السوق"
+        if macro_status == "BEAR_MARKET":
+            temp_conf -= 25
+            reasons.append(f"Macro Risk: {macro_status}")
 
         # --- 🎯 1.5 Market Regime Detection - حالة السوق ---
         market_regime = analysis_data.get('market_regime', {})
@@ -369,12 +372,11 @@ class Meta:
         volume_ratio = analysis_data.get('volume_ratio', 1.0)
         ema_crossover = analysis_data.get('ema_crossover', 0)
 
-        # 🚨 استراتيجية Wave Rider: نمنع الشراء إذا RSI > 60 
-        # نحن نبحث عن "قاع دورة" حقيقي وليس مجرد اختراق مؤقت
-        if rsi > 60:
+        # 🚨 تجنب الأفخاخ والقمم الوهمية: لو السعر محلياً أعلى بكثير من السعر العالمي (Local Pump)
+        if temp_conf < 40 and analysis_data.get('liquidity_trap'):
             return {
                 'action': 'DISPLAY',
-                'reason': f'⏳ Cycle Entry Block: RSI too high for Wave Catch ({rsi:.0f})',
+                'reason': '🚫 Trap Avoidance: Liquidity Trap Detected',
                 'confidence': 0
             }
 
@@ -544,7 +546,15 @@ class Meta:
 
             # حساب الأصوات الإيجابية فقط التي تدعم الشراء (Keywords Check)
             pos_keywords = ['Safe', 'Bullish', 'Sweep', 'Alpha', 'Wall', 'Institutional', 'Opportunity', 'Building']
-            buy_vote_count = sum(1 for adv in advisors_advice.values() if any(k in str(adv) for k in pos_keywords))
+            
+            buy_vote_count = 0
+            print(f"\n🗳️  [VOTING SESSION: {symbol}] (Confidence: {temp_conf})")
+            for name, adv_text in advisors_advice.items():
+                has_voted = any(k in str(adv_text) for k in pos_keywords)
+                status = "✅ VOTE BUY" if has_voted else "⚪ ABSTAIN "
+                if has_voted: buy_vote_count += 1
+                print(f"   🎙️ {name:12}: {status} | {adv_text}")
+            
             total_advisors = 10
             vote_breakdown = advisors_advice
 
@@ -641,17 +651,9 @@ class Meta:
         highest_price = position.get('highest_price', buy_price)
         drop_from_peak = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
         
-        # --- 1. نظام الوقف الزاحف الديناميكي (ATR Adaptive Trailing Stop) ---
-        # نربط الخروج بمعدل التقلب الحالي (ATR Percent)
+        # --- 1. نظام الوقف الزاحف السلوكي (Behavioral Trailing Stop) ---
         atr_p = analysis.get('atr_percent', 2.5) 
-        
-        # الخيار A: تشديد الوقف الزاحف (3% - 8%) لحماية رأس المال
-        if atr_p < 1.8: 
-            trailing_threshold = 3.5  # ضيق جداً في الهدوء
-        elif atr_p > 4.0:
-            trailing_threshold = 8.5  # أقصى تحمل في الجنون
-        else:
-            trailing_threshold = 5.5  # الطبيعي
+        trailing_threshold = atr_p * 2.0  # الوقف يتحرك بمقدار ضعفي التقلب الطبيعي للعملة
 
         # حساب التفاؤل للأرشفة (إذا كان RSI عالٍ وقت كسر الوقف الزاحف)
         optimism_penalty = round((analysis.get('rsi', 50) - 75) * 0.8, 2) if analysis.get('rsi', 50) > 75 else 0
@@ -668,10 +670,14 @@ class Meta:
         peak_analysis = analysis.get('peak', {})
         peak_score = peak_analysis.get('confidence', 0)
         
-        if peak_score >= 95 and profit_percent >= 15:
+        # البيع عند القمة بناءً على "إنهاك المؤشرات" وليس النسبة المئوية
+        rsi = analysis.get('rsi', 50)
+        macd_diff = analysis.get('macd_diff', 0)
+        
+        if peak_score >= 100 or (peak_score >= 85 and rsi > 70 and macd_diff < 0):
             return {
                 'action': 'SELL',
-                'reason': f'🏆 Target Reached! Profit: {profit_percent:.1f}%',
+                'reason': f'🏆 Smart Peak Exit: {profit_percent:.1f}% (Peak Score: {peak_score})',
                 'profit': profit_percent,
                 'optimism_penalty': round((profit_percent - 40) * 0.5, 2)
             }
@@ -919,7 +925,7 @@ class Meta:
                     rsi=rsi,
                     volume_ratio=volume_ratio,
                     sentiment=sent,
-                    whale_conf=extra_data.get('whale_conf', 0) if extra_data else 0,
+                    whale_conf=extra_data.get('whale_confidence', 0) if extra_data else ai_data.get('whale_confidence', 0),
                     panic=panc,
                     optimism=float(optimism),
                     profit_loss_ratio=plr,
