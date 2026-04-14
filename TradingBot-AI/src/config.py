@@ -5,8 +5,11 @@ All bot settings and constants
 
 # Trading Parameters
 
-MIN_CONFIDENCE = 85  # Wave Rider: دخول فقط عند بداية موجة قوية
-MIN_SELL_CONFIDENCE = 90  # Wave Rider: خروج عند قمة الموجة 50-80%
+MIN_CONFIDENCE = 75  # Wave Rider: دخول متوازن عند بداية موجة قوية (تم التخفيف من 85)
+MIN_SELL_CONFIDENCE = 85  # Wave Rider: خروج عند قمة الموجة 50-80% (تم التخفيف من 90)
+MIN_CANDLE_SCORE = 75  # نقاط الشموع المطلوبة للشراء (تم التخفيف من 90)
+MIN_VOLUME_RATIO = 1.8  # الحجم المطلوب للشراء الفوري (تم التخفيف من 2.5)
+MACRO_CANDLE_THRESHOLD = 85  # حد الشموع لتجاوز حارس الماكرو (تم التخفيف من 95)
 MAX_POSITIONS = 5  # صفقة واحدة لكل عملة قيادية
 TOTAL_COINS_TO_SCAN = 5
 
