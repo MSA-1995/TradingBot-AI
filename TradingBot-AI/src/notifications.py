@@ -148,7 +148,7 @@ def send_sell_notification(symbol, amount, price, value, profit_percent, reason)
 
 # Cooldown for the report to avoid rate limiting
 last_report_sent_time = None
-REPORT_COOLDOWN = timedelta(seconds=60)
+REPORT_COOLDOWN = timedelta(minutes=30)  # كل 30 دقيقة
 
 def send_positions_report(balance, invested, active_count, max_positions, open_positions=None):
     """Send positions report with open positions details, respecting a cooldown."""
@@ -210,10 +210,12 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
             field_name = f"Open Positions ({field_count})" if field_count > 1 else "Open Positions"
             fields.append({"name": field_name, "value": positions_text.strip(), "inline": False})
     
+    # إرسال للويب هوك الحرج بدلاً من الرئيسي
     send_discord_embed(
         "PORTFOLIO REPORT",
         fields,
-        color='blue'
+        color='blue',
+        webhook_url=CRITICAL_WEBHOOK
     )
 
     last_report_sent_time = datetime.now()
