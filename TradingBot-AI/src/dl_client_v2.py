@@ -21,6 +21,7 @@ class DeepLearningClientV2:
         self._models = {}        # {model_name: model_object}
         self._model_accuracy = {} # {model_name: accuracy}
         self._model_trained_at = {} # {model_name: trained_at}
+        self._feature_names = {} # {model_name: list_of_feature_names}
         try:
             self._connect_db()
             self._load_all_models_from_db()
@@ -172,12 +173,17 @@ class DeepLearningClientV2:
                     if isinstance(raw_data, memoryview):
                         raw_data = bytes(raw_data)
                     try:
+                        # فك ضغط الموديل المستخرج من الـ 16 ألف صفقة
                         if raw_data.startswith(b'\x1f\x8b'):
-                            self._models[name] = pickle.loads(gzip.decompress(raw_data))
+                            model_obj = pickle.loads(gzip.decompress(raw_data))
                         else:
-                            self._models[name] = pickle.loads(raw_data)
-                    except:
-                        pass
+                            model_obj = pickle.loads(raw_data)
+                        
+                        # تخزين الموديل وأسماء الميزات (Features) لضمان التوافق
+                        self._models[name] = model_obj
+                        from MSA_DeepLearning_Trainer.core.features import get_feature_names
+                        self._feature_names[name] = get_feature_names()
+                    except Exception: pass
                 
                 cursor.close()
                 conn.close()
@@ -290,6 +296,7 @@ class DeepLearningClientV2:
     def get_model_accuracy(self, model_name):
         """جلب دقة الموديل المدرب"""
         return self._model_accuracy.get(model_name, 0)
+
     
     def get_advice(self, rsi, macd, volume_ratio, price_momentum, confidence=50,
                    liquidity_metrics=None, market_sentiment=None, candle_analysis=None, analysis_data=None):
@@ -299,41 +306,97 @@ class DeepLearningClientV2:
         """
         advice = {}
         
-        # ✅ دالة ذكية: المستشار يُحسب فقط إذا كان الموديل موجود والبيانات متوفرة
-        def is_active(name, data_needed=True):
-            # 1. فحص وجود الموديل في الذاكرة
-            if name not in self._models or self._models[name] is None:
-                return False
-            # 2. فحص توفر البيانات الأساسية
-            if data_needed is None:
-                return False
-            return True
-        
         analysis = analysis_data if analysis_data else {}
 
+        # ✅ دالة مساعدة لاستخلاص الميزات والتنبؤ
+        def _get_prediction_advice(advisor_name, current_analysis_data, trade_data=None):
+            model = self._models.get(advisor_name)
+            feature_names = self._feature_names.get(advisor_name)
+
+            if not model or not feature_names:
+                return "N/A" # الموديل غير متاح
+
+            try:
+                # ✅ استخدام calculate_enhanced_features لاستخلاص الميزات
+                from MSA_DeepLearning_Trainer.core.features import calculate_enhanced_features
+                features_vector = calculate_enhanced_features(current_analysis_data, trade_data)
+                
+                # تحويل المتجه إلى DataFrame ليتوافق مع متطلبات LightGBM
+                # يجب أن تتطابق أسماء الميزات مع تلك التي تدرب عليها الموديل
+                # هذا يتطلب أن تكون calculate_enhanced_features ترجع الميزات بنفس الترتيب
+                # أو أن نستخدم قاموساً لإنشاء DataFrame
+                
+                # هنا نفترض أن calculate_enhanced_features ترجع قائمة مرتبة من القيم
+                # وأن feature_names هي قائمة مرتبة من أسماء الميزات
+                
+                # ✅ التأكد من أن عدد الميزات المستخلصة يطابق عدد الميزات المتوقعة للموديل
+                if len(features_vector) != len(feature_names):
+                    # هذا يعني أن هناك مشكلة في استخلاص الميزات أو عدم تطابق
+                    # يجب تصحيح calculate_enhanced_features لترجع دائماً نفس العدد من الميزات
+                    # أو تعديل feature_names هنا
+                    print(f"⚠️ Feature mismatch for {advisor_name}: Expected {len(feature_names)}, got {len(features_vector)}")
+                    return "N/A"
+
+                features_df = pd.DataFrame([features_vector], columns=feature_names)
+                
+                # التنبؤ باحتمالية الفئة الإيجابية (1)
+                proba = model.predict_proba(features_df)[:, 1][0]
+
+                # ترجمة الاحتمالية إلى نصيحة
+                if proba > 0.8:
+                    return "Strong-Bullish-Signal"
+                elif proba > 0.6:
+                    return "Bullish-Signal"
+                elif proba < 0.2:
+                    return "Strong-Bearish-Warning"
+                elif proba < 0.4:
+                    return "Bearish-Warning"
+                else:
+                    return "Neutral-Outlook"
+            except Exception as e:
+                print(f"❌ Error in {advisor_name} prediction: {e}")
+                return "N/A"
+
         # 🛡️ 1. Risk Advisor (Dynamic Risk)
-        flash_risk = analysis.get('flash_crash_protection', {}).get('risk_score', 0)
-        advice['risk'] = f"Risk: {'CRITICAL-FLASH' if flash_risk > 60 else 'Systemic-Risk' if analysis.get('systemic_risk', 0) > 0.8 else 'Stable-Flow'}" if is_active('risk') else "N/A"
+        advice['risk'] = _get_prediction_advice('risk', analysis)
+        
         # 🎯 2. Exit Advisor (Smart Rotation)
-        advice['exit'] = f"Exit: {'Cycle-Peak' if rsi > 70 else 'Wave-Rider-Hold' if analysis.get('price_change_1h', 0) > 2 else 'Holding'}" if is_active('exit') else "N/A"
+        advice['exit'] = _get_prediction_advice('exit', analysis)
+        
         # 🧠 3. Pattern Advisor (Institutional Flow)
-        advice['pattern'] = f"Pattern: {'Sweep-In-Progress' if analysis.get('liquidity_sweep') else 'Shadow-Alpha-Ready' if analysis.get('relative_strength_btc', 0) > 1 else 'Searching'}" if is_active('pattern') else "N/A"
+        advice['pattern'] = _get_prediction_advice('pattern', analysis)
+        
         # 🚨 4. Anomaly Advisor (Abnormal Move)
-        advice['anomaly'] = f"Anomaly: {'Trap-Detected' if analysis.get('liquidity_trap') else 'Outlier-Move' if analysis.get('statistical_outliers', 0) > 2 else 'Clean-Data'}" if is_active('anomaly') else "N/A"
+        advice['anomaly'] = _get_prediction_advice('anomaly', analysis)
+        
         # 💧 5. Liquidity Advisor (Depth Check)
-        imbalance = analysis.get('order_book_imbalance', 0)
-        advice['liquidity'] = f"Liquidity: {'Buy-Wall-Strong' if imbalance > 0.5 else 'Ask-Pressure' if imbalance < -0.3 else 'Balanced'}" if is_active('liquidity') else "N/A"
+        advice['liquidity'] = _get_prediction_advice('liquidity', analysis)
+        
         # 🐋 6. Smart Money Advisor (Whale Watch)
-        advice['smart_money'] = f"Whales: {'Institutional-Entry' if analysis.get('institutional_accumulation', 0) > 0.7 else 'Whale-Passive'}" if is_active('smart_money') else "N/A"
+        advice['smart_money'] = _get_prediction_advice('smart_money', analysis)
+        
         # 📊 7. Chart CNN (Deep Vision)
-        advice['chart_cnn'] = f"CNN: {'Multi-Scale-Bullish' if analysis.get('multi_scale_features', 0) > 1 else 'Neutral-Structure'}" if is_active('chart_cnn') else "N/A"
+        advice['chart_cnn'] = _get_prediction_advice('chart_cnn', analysis)
+        
         # 📈 8. Volume Predictor (Future Inflow)
-        advice['volume_pred'] = f"VolPred: {'Momentum-Building' if analysis.get('volume_momentum', 0) > 0.5 else 'Volume-Fading'}" if is_active('volume_pred') else "N/A"
+        advice['volume_pred'] = _get_prediction_advice('volume_pred', analysis)
+        
         # 9. Sentiment Advisor (Velocity Focus)
-        real_score = (market_sentiment or {}).get('sentiment_score', 0)
-        advice['sentiment'] = f"Mood: {'Velocity-Up' if analysis.get('sentiment_velocity', 0) > 1 else 'Stable-Mood'}" if is_active('sentiment') else "N/A"
+        # ✅ هنا نستخدم market_sentiment مباشرة من analysis_data
+        sentiment_analysis_data = {
+            'sentiment_score': (market_sentiment or {}).get('sentiment_score', 0),
+            'sentiment_velocity': analysis.get('sentiment_velocity', 0),
+            'panic_score': (market_sentiment or {}).get('panic_score', 0),
+            'optimism_penalty': (market_sentiment or {}).get('optimism_penalty', 0)
+        }
+        advice['sentiment'] = _get_prediction_advice('sentiment', sentiment_analysis_data)
+        
         # 10. Crypto News (Propagation Speed)
-        advice['crypto_news'] = f"News: {'Market-Moving' if confidence > 85 else 'Speculative' if confidence > 60 else 'Quiet'}" if is_active('crypto_news') else "N/A"
+        # ✅ هنا نستخدم news_score مباشرة من analysis_data
+        news_analysis_data = {
+            'news_score': (market_sentiment or {}).get('news_score', 0)
+        }
+        advice['crypto_news'] = _get_prediction_advice('crypto_news', news_analysis_data)
 
         return advice
 
