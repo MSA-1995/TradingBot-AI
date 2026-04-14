@@ -155,12 +155,11 @@ def calculate_enhanced_features(data, trade=None):
         whale_dump_detected = 1 if flash_crash.get('whale_dump_detected', False) else 0
         cascade_risk_score = flash_crash.get('cascade_risk', {}).get('score', 0) / 100.0
 
-        whale_confidence = (trade.get('whale_confidence', 0) / 25.0) if trade else 0
+        whale_confidence = (full_data.get('whale_confidence', 0) / 25.0)
 
-        atr_value = trade.get('atr_value', 0) if trade else 0
-        sentiment_score = trade.get('sentiment_score', 0) if trade else 0
-        panic_score = trade.get('panic_score', 0) if trade else 0
-        optimism_penalty = trade.get('optimism_penalty', 0) if trade else 0
+        atr_value = full_data.get('atr_value', 0)
+        sentiment_score = full_data.get('sentiment_score', 0)
+        panic_score = full_data.get('panic_score', 0)
         
         return [
             # 15 التقليدية
@@ -180,8 +179,8 @@ def calculate_enhanced_features(data, trade=None):
             regime_score, regime_adx, volatility_ratio, position_multiplier,
             # 4 Flash Crash
             flash_risk_score, flash_crash_detected, whale_dump_detected, cascade_risk_score,
-            # 5 إضافية
-            whale_confidence, atr_value, sentiment_score, panic_score, optimism_penalty
+            # 4 إضافية
+            whale_confidence, atr_value, sentiment_score, panic_score
         ]
     except Exception as e:
         print(f"⚠️ Feature calculation error: {e}")
@@ -192,12 +191,12 @@ def calculate_enhanced_features(data, trade=None):
             0, 0,
             0.5, 0.4, 1.0, 1.0,
             0, 0, 0, 0,
-            0, 0, 0, 0, 0
+            0, 0, 0, 0
         ]
 
 
 def get_feature_names():
-    """أسماء الميزات الـ 43"""
+    """أسماء الميزات الـ 42"""
     return [
         'rsi', 'macd', 'volume_ratio', 'price_momentum',
         'bb_position', 'atr_estimate', 'stochastic', 'ema_signal',
@@ -210,5 +209,5 @@ def get_feature_names():
         'fib_score', 'fib_level_encoded',
         'regime_score', 'regime_adx', 'volatility_ratio', 'position_multiplier',
         'flash_risk_score', 'flash_crash_detected', 'whale_dump_detected', 'cascade_risk_score',
-        'whale_confidence', 'atr_value', 'sentiment_score', 'panic_score', 'optimism_penalty'
+        'whale_confidence', 'atr_value', 'sentiment_score', 'panic_score'
     ]
