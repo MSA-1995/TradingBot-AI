@@ -258,7 +258,7 @@ def run_main_loop(exchange, ctx):
             if len(active_results) <= active_count and skipped_count > 0:
                 print(f"{Fore.CYAN}ℹ️  Scanned {skipped_count} other coins... (No opportunities found){Style.RESET_ALL}")
 
-            # Report
+            # Report - كل 30 دقيقة
             if should_send_report(last_report_time, REPORT_INTERVAL):
                 # 📊 تقرير الأداء الذكي (Self-Analysis Dashboard)
                 try:
@@ -266,9 +266,9 @@ def run_main_loop(exchange, ctx):
                     if dashboard:
                         report = dashboard.generate_performance_report(days=7)
                         if 'error' not in report:
-                            # إرسال للديسكورد فقط
-                            from config_encrypted import get_discord_webhook
-                            webhook = get_discord_webhook()
+                            # إرسال للويب هوك الحرج بدلاً من الرئيسي
+                            from config_encrypted import get_critical_webhook
+                            webhook = get_critical_webhook()
                             if webhook:
                                 success = dashboard.send_report_to_discord(report, webhook)
                                 if success:
@@ -354,7 +354,7 @@ def run_main_loop(exchange, ctx):
             except Exception as e:
                 print(f"⚠️ Memory optimizer error: {e}")
 
-            # Risk / Anomaly / Pattern Reports (عند كل report interval)
+            # Risk / Anomaly / Pattern Reports (كل 30 دقيقة)
             if should_send_report(last_report_time, REPORT_INTERVAL):
                 risk_manager       = preloaded_advisors.get('RiskManager')
                 anomaly_detector   = preloaded_advisors.get('AnomalyDetector')
