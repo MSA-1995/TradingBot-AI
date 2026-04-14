@@ -301,102 +301,90 @@ class DeepLearningClientV2:
     def get_advice(self, rsi, macd, volume_ratio, price_momentum, confidence=50,
                    liquidity_metrics=None, market_sentiment=None, candle_analysis=None, analysis_data=None):
         """
-        النصائح من المستشارين بناءً على التخصص الافتراضي (بدون ميزات إضافية)
+        النصائح من المستشارين بناءً على النماذج المدربة
         Returns: dict of advisor_name: advice_string
         """
         advice = {}
-        
         analysis = analysis_data if analysis_data else {}
 
-        # ✅ دالة مساعدة لاستخلاص الميزات والتنبؤ
-        def _get_prediction_advice(advisor_name, current_analysis_data, trade_data=None):
+        def _get_prediction_advice(advisor_name, features_dict):
             model = self._models.get(advisor_name)
-            feature_names = self._feature_names.get(advisor_name)
-
-            if not model or not feature_names:
-                return "N/A" # الموديل غير متاح
-
-            try:
-                # ✅ استخدام calculate_enhanced_features لاستخلاص الميزات
-                from MSA_DeepLearning_Trainer.core.features import calculate_enhanced_features
-                features_vector = calculate_enhanced_features(current_analysis_data, trade_data)
-                
-                # تحويل المتجه إلى DataFrame ليتوافق مع متطلبات LightGBM
-                # يجب أن تتطابق أسماء الميزات مع تلك التي تدرب عليها الموديل
-                # هذا يتطلب أن تكون calculate_enhanced_features ترجع الميزات بنفس الترتيب
-                # أو أن نستخدم قاموساً لإنشاء DataFrame
-                
-                # هنا نفترض أن calculate_enhanced_features ترجع قائمة مرتبة من القيم
-                # وأن feature_names هي قائمة مرتبة من أسماء الميزات
-                
-                # ✅ التأكد من أن عدد الميزات المستخلصة يطابق عدد الميزات المتوقعة للموديل
-                if len(features_vector) != len(feature_names):
-                    # هذا يعني أن هناك مشكلة في استخلاص الميزات أو عدم تطابق
-                    # يجب تصحيح calculate_enhanced_features لترجع دائماً نفس العدد من الميزات
-                    # أو تعديل feature_names هنا
-                    print(f"⚠️ Feature mismatch for {advisor_name}: Expected {len(feature_names)}, got {len(features_vector)}")
-                    return "N/A"
-
-                features_df = pd.DataFrame([features_vector], columns=feature_names)
-                
-                # التنبؤ باحتمالية الفئة الإيجابية (1)
-                proba = model.predict_proba(features_df)[:, 1][0]
-
-                # ترجمة الاحتمالية إلى نصيحة
-                if proba > 0.8:
-                    return "Strong-Bullish-Signal"
-                elif proba > 0.6:
-                    return "Bullish-Signal"
-                elif proba < 0.2:
-                    return "Strong-Bearish-Warning"
-                elif proba < 0.4:
-                    return "Bearish-Warning"
-                else:
-                    return "Neutral-Outlook"
-            except Exception as e:
-                print(f"❌ Error in {advisor_name} prediction: {e}")
+            if not model:
                 return "N/A"
 
-        # 🛡️ 1. Risk Advisor (Dynamic Risk)
-        advice['risk'] = _get_prediction_advice('risk', analysis)
-        
-        # 🎯 2. Exit Advisor (Smart Rotation)
-        advice['exit'] = _get_prediction_advice('exit', analysis)
-        
-        # 🧠 3. Pattern Advisor (Institutional Flow)
-        advice['pattern'] = _get_prediction_advice('pattern', analysis)
-        
-        # 🚨 4. Anomaly Advisor (Abnormal Move)
-        advice['anomaly'] = _get_prediction_advice('anomaly', analysis)
-        
-        # 💧 5. Liquidity Advisor (Depth Check)
-        advice['liquidity'] = _get_prediction_advice('liquidity', analysis)
-        
-        # 🐋 6. Smart Money Advisor (Whale Watch)
-        advice['smart_money'] = _get_prediction_advice('smart_money', analysis)
-        
-        # 📊 7. Chart CNN (Deep Vision)
-        advice['chart_cnn'] = _get_prediction_advice('chart_cnn', analysis)
-        
-        # 📈 8. Volume Predictor (Future Inflow)
-        advice['volume_pred'] = _get_prediction_advice('volume_pred', analysis)
-        
-        # 9. Sentiment Advisor (Velocity Focus)
-        # ✅ هنا نستخدم market_sentiment مباشرة من analysis_data
-        sentiment_analysis_data = {
-            'sentiment_score': (market_sentiment or {}).get('sentiment_score', 0),
-            'sentiment_velocity': analysis.get('sentiment_velocity', 0),
-            'panic_score': (market_sentiment or {}).get('panic_score', 0),
-            'optimism_penalty': (market_sentiment or {}).get('optimism_penalty', 0)
+            try:
+                # استخلاص الميزات الأساسية من البيانات الموجودة
+                features = [
+                    features_dict.get('rsi', 50),
+                    features_dict.get('macd', 0),
+                    features_dict.get('volume_ratio', 1.0),
+                    features_dict.get('price_momentum', 0),
+                    features_dict.get('atr_percent', 2.5),
+                    features_dict.get('ema_crossover', 0),
+                    features_dict.get('close', 0),
+                    features_dict.get('volume', 0),
+                    features_dict.get('liquidity_score', 50),
+                    features_dict.get('whale_confidence', 0),
+                    features_dict.get('sentiment_score', 0),
+                    features_dict.get('news_score', 0),
+                    features_dict.get('panic_score', 0),
+                    features_dict.get('btc_change_1h', 0),
+                    features_dict.get('eth_change_1h', 0),
+                    features_dict.get('relative_strength_btc', 0),
+                ]
+                
+                # إضافة ميزات إضافية لتصل إلى 42 ميزة
+                for i in range(len(features), 42):
+                    features.append(0)
+                
+                # التنبؤ
+                proba = model.predict_proba([features])[0][1]
+
+                # ترجمة الاحتمالية إلى نصيحة
+                if proba > 0.7:
+                    return "Strong-Bullish"
+                elif proba > 0.55:
+                    return "Bullish"
+                elif proba < 0.3:
+                    return "Strong-Bearish"
+                elif proba < 0.45:
+                    return "Bearish"
+                else:
+                    return "Neutral"
+            except Exception as e:
+                return "N/A"
+
+        # تجهيز البيانات لكل مستشار
+        base_features = {
+            'rsi': rsi,
+            'macd': macd,
+            'volume_ratio': volume_ratio,
+            'price_momentum': price_momentum,
+            'atr_percent': analysis.get('atr_percent', 2.5),
+            'ema_crossover': analysis.get('ema_crossover', 0),
+            'close': analysis.get('close', 0),
+            'volume': analysis.get('volume', 0),
+            'liquidity_score': (liquidity_metrics or {}).get('liquidity_score', 50) if liquidity_metrics else 50,
+            'whale_confidence': analysis.get('whale_confidence', 0),
+            'sentiment_score': (market_sentiment or {}).get('sentiment_score', 0) if market_sentiment else 0,
+            'news_score': analysis.get('news_score', 0),
+            'panic_score': (market_sentiment or {}).get('panic_score', 0) if market_sentiment else 0,
+            'btc_change_1h': analysis.get('btc_change_1h', 0),
+            'eth_change_1h': analysis.get('eth_change_1h', 0),
+            'relative_strength_btc': analysis.get('relative_strength_btc', 0),
         }
-        advice['sentiment'] = _get_prediction_advice('sentiment', sentiment_analysis_data)
-        
-        # 10. Crypto News (Propagation Speed)
-        # ✅ هنا نستخدم news_score مباشرة من analysis_data
-        news_analysis_data = {
-            'news_score': (market_sentiment or {}).get('news_score', 0)
-        }
-        advice['crypto_news'] = _get_prediction_advice('crypto_news', news_analysis_data)
+
+        # استشارة كل مستشار
+        advice['risk'] = _get_prediction_advice('risk', base_features)
+        advice['exit'] = _get_prediction_advice('exit', base_features)
+        advice['pattern'] = _get_prediction_advice('pattern', base_features)
+        advice['anomaly'] = _get_prediction_advice('anomaly', base_features)
+        advice['liquidity'] = _get_prediction_advice('liquidity', base_features)
+        advice['smart_money'] = _get_prediction_advice('smart_money', base_features)
+        advice['chart_cnn'] = _get_prediction_advice('chart_cnn', base_features)
+        advice['volume_pred'] = _get_prediction_advice('volume_pred', base_features)
+        advice['sentiment'] = _get_prediction_advice('sentiment', base_features)
+        advice['crypto_news'] = _get_prediction_advice('crypto_news', base_features)
 
         return advice
 
