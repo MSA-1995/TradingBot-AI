@@ -75,32 +75,18 @@ class ExitStrategyModel:
     def _check_smart_tp(self, symbol, profit_percent, position, analysis, mtf, history):
         """فحص TP الذكي - محسّن للسرعة"""
         try:
-            # الخيار A: حماية رأس المال - استهداف أرباح 15-20% 
-            # نرفع الهدف الافتراضي ليتماشى مع فلسفة الاستراتيجية الجديدة
-            tp_target = max(position.get('tp_target', 1.0), 15.0)
+            peak_analysis = analysis.get('peak', {})
+            peak_score = peak_analysis.get('confidence', 0)
+            rsi = analysis.get('rsi', 50)
             
-            # فحص الوصول للهدف
-            if profit_percent >= tp_target:
-                # فحص قوة السوق قبل البيع
-                rsi = analysis.get('rsi', 50)
-                macd_diff = analysis.get('macd_diff', 0)
-                trend = mtf.get('trend', 'neutral')
-                
-                # استثناء وحيد للبيع الفوري: إذا كان الزخم صاعداً بقوة شديدة جداً
-                market_very_strong = (
-                    rsi < 65 and macd_diff > 2 and trend == 'strong_bullish'
-                )
-                
-                if market_very_strong and profit_percent < tp_target + 0.2:
-                    return {
-                        'action': 'HOLD',
-                        'reason': f'TP {tp_target}% reached but market very strong'
-                    }
-                
-                # القرار الافتراضي في الخيار A: تأمين الربح فوراً
+            # الخروج عند تأكيد "ضعف الاتجاه" (Divergence/Exhaustion)
+            # إذا كان هناك ربح، وأعطى البوت إشارة قمة قوية أو تشبع شرائي مع ضعف حجم
+            volume_ratio = analysis.get('volume_ratio', 1.0)
+            
+            if profit_percent > 0.5 and (peak_score > 90 or (rsi > 75 and volume_ratio < 1.0)):
                 return {
                     'action': 'SELL',
-                    'reason': f'CAPITAL PROTECTION TP: {profit_percent:.1f}%',
+                    'reason': f'SMART TP: Peak Exhaustion ({peak_score} pts)',
                     'profit': profit_percent,
                     'confidence': 95
                 }
@@ -119,18 +105,9 @@ class ExitStrategyModel:
             profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
             drop_from_peak = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
 
-            # تفعيل الوقف الزاحف فقط بعد تحقيق ربح أمان (2%)
-            if profit_percent < 2.0:
-                return {'action': 'HOLD'}
-
-            # معايير الخيار A: وقف ضيق لحماية الأرباح (3.5% - 8.5%)
+            # الوقف الزاحف السلوكي: يتنفس مع تقلب العملة
             atr_p = analysis.get('atr_percent', 2.5)
-            if atr_p < 1.8:
-                threshold = 3.5  # هدوء: وقف ضيق جداً
-            elif atr_p > 4.0:
-                threshold = 8.5  # تقلب: إعطاء مساحة بسيطة
-            else:
-                threshold = 5.5  # طبيعي
+            threshold = max(1.5, atr_p * 1.5) # ديناميكي بالكامل
 
             if drop_from_peak >= threshold:
                 return {
@@ -150,21 +127,11 @@ class ExitStrategyModel:
 
             # Bearish قوي
             if trend in ['bearish', 'strong_bearish']:
-                # الخيار A: حماية رأس المال - الخروج فوراً عند الربح البسيط إذا انقلب الترند
-                threshold = 0.2
-                if profit_percent > threshold:
+                # الخروج فوراً إذا تأكد الهيكل الهابط حتى لو بربح بسيط أو خسارة طفيفة
+                if profit_percent > -1.0:
                     return {
                         'action': 'SELL',
-                        'reason': 'BEARISH TREND',
-                        'profit': profit_percent,
-                        'confidence': 85
-                    }
-                
-                # لو الخسارة صغيرة والسوق bearish جداً
-                if profit_percent > -0.8 and trend == 'strong_bearish':
-                    return {
-                        'action': 'SELL',
-                        'reason': 'STRONG BEARISH',
+                        'reason': 'STRUCTURAL EXIT: Bearish Trend Confirmed',
                         'profit': profit_percent,
                         'confidence': 80
                     }
