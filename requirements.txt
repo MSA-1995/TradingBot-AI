@@ -5,6 +5,7 @@ scikit-learn
 cryptography
 requests
 pandas
+numpy
 ta
 colorama
 psycopg2-binary
