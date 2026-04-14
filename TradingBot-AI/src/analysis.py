@@ -1068,14 +1068,6 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
         high_24h = df['high'].tail(288).max() if len(df) >= 288 else (df['high'].max() if not df.empty else 0)
         low_24h = df['low'].tail(288).min() if len(df) >= 288 else (df['low'].min() if not df.empty else 0)
 
-        # ✅ حساب whale_confidence بدقة من كامل البيانات
-        whale_conf = 0
-        vol_ratio = latest['volume_ratio']
-        momentum = latest['price_change']
-        if vol_ratio > 2.5 and momentum > 0.5: whale_conf = 15
-        elif vol_ratio > 2.5 and momentum < -0.5: whale_conf = -15
-        elif vol_ratio > 1.5: whale_conf = 8 if momentum > 0 else -8
-        
         # ✅ حساب optimism_penalty بناءً على RSI والربح المتوقع
         opt_penalty = 0
         if latest['rsi'] > 85: opt_penalty = 20
@@ -1149,7 +1141,6 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
             'price_drop': price_drop,
             'liquidity_metrics': liquidity_metrics,
             **liquidity_metrics,
-            'whale_confidence': whale_conf,
             'atr_value': latest['atr'],
             'optimism_penalty': opt_penalty,
             'psychological_analysis': f"Panic:{detect_panic_greed(latest)['panic_score']:.1f}, RSI:{latest['rsi']:.1f}",
@@ -1167,6 +1158,16 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
             'average_spread': average_spread,  # ✅ Added average_spread
             **get_sentiment_data(symbol, {'close': latest['close'], 'rsi': latest['rsi']})
         }
+
+        # ✅ حساب whale_confidence الذكي (دمج الحجم مع سجل الطلبات)
+        w_conf = 0
+        v_ratio = latest['volume_ratio']
+        ob_imbalance = analysis_dict.get('order_book_imbalance', 0)
+        if v_ratio > 2.0:
+            w_conf = (15 if latest['price_change'] > 0 else -15) + (ob_imbalance * 10)
+        elif abs(ob_imbalance) > 0.4:
+            w_conf = 10 if ob_imbalance > 0 else -10
+        analysis_dict['whale_confidence'] = round(max(-25, min(25, w_conf)), 2)
 
         # === 🚨 إضافة جميع الأعمدة 42 الجديدة هنا مباشرة بالحسابات الفعلية ===
         order_book = analysis_dict.get('order_book', {})
