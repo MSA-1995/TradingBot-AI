@@ -11,8 +11,8 @@ from src.external_apis import get_external_atr
 class RiskManager:
     def __init__(self, storage):
         self.storage = storage
-        self.max_drawdown_percent = 10  # أقصى خسارة مسموحة
-        self.max_daily_loss = 5  # أقصى خسارة يومية %
+        self.max_drawdown_percent = 8  # كان 10 - تشديد لحماية رأس المال
+        self.max_daily_loss = 4  # كان 5 - تشديد لحماية يومية
         self.min_sharpe_ratio = 0.5  # الحد الأدنى لـ Sharpe Ratio
         print("🛡️ Risk Manager initialized")
     
