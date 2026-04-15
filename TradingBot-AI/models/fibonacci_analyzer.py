@@ -21,14 +21,22 @@ class FibonacciAnalyzer:
         
         print("📊 Fibonacci Analyzer initialized (Enhanced)")
     
-    def calculate_levels(self, high, low):
-        """حساب مستويات فيبوناتشي"""
+    def calculate_levels(self, high, low, use_extensions=False):
+        """حساب مستويات فيبوناتشي + Extensions"""
         try:
             diff = high - low
             levels = {}
             
+            # Retracement Levels
             for name, ratio in self.levels.items():
                 levels[name] = high - (diff * ratio)
+            
+            # Fibonacci Extensions (للأهداف)
+            if use_extensions:
+                levels['127.2'] = high + (diff * 0.272)
+                levels['161.8'] = high + (diff * 0.618)
+                levels['200'] = high + (diff * 1.0)
+                levels['261.8'] = high + (diff * 1.618)
             
             return levels
         except:
@@ -236,3 +244,60 @@ class FibonacciAnalyzer:
             return 0
         except:
             return 0
+    
+    def detect_fibonacci_clusters(self, current_price, analysis):
+        """كشف Fibonacci Clusters - تجمع المستويات"""
+        try:
+            # حساب مستويات متعددة (24h, 7d, 30d)
+            high_24h = analysis.get('high_24h')
+            low_24h = analysis.get('low_24h')
+            
+            if not high_24h or not low_24h:
+                return {'detected': False, 'strength': 0}
+            
+            levels_24h = self.calculate_levels(high_24h, low_24h)
+            
+            # فحص إذا كان السعر الحالي عند تجمع مستويات
+            nearby_levels = []
+            for name, price in levels_24h.items():
+                distance = abs((current_price - price) / current_price) * 100
+                if distance < 1.0:  # ضمن 1%
+                    nearby_levels.append((name, price, distance))
+            
+            # إذا كان هناك 2+ مستويات قريبة = Cluster
+            if len(nearby_levels) >= 2:
+                # حساب قوة التجمع
+                strength = 0
+                for name, price, distance in nearby_levels:
+                    if name in ['61.8', '50']:
+                        strength += 15
+                    elif name in ['38.2', '78.6']:
+                        strength += 10
+                    else:
+                        strength += 5
+                
+                return {
+                    'detected': True,
+                    'strength': min(strength, 30),
+                    'levels': nearby_levels,
+                    'reason': f'{len(nearby_levels)} Fib levels clustered'
+                }
+            
+            return {'detected': False, 'strength': 0}
+            
+        except:
+            return {'detected': False, 'strength': 0}
+    
+    def get_swing_high_low(self, df, lookback=20):
+        """حساب Swing High/Low بدلاً من 24h"""
+        try:
+            if df is None or len(df) < lookback:
+                return None, None
+            
+            recent = df.tail(lookback)
+            swing_high = recent['high'].max()
+            swing_low = recent['low'].min()
+            
+            return swing_high, swing_low
+        except:
+            return None, None
