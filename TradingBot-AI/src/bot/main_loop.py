@@ -204,7 +204,16 @@ def run_main_loop(exchange, ctx):
                 # Hold position
                 if action == 'HOLD':
                     profit_emoji = "📈" if result['profit'] > 0 else "📉"
-                    print(f"{profit_emoji} {symbol:12} {format_price(result['price'])} | Profit:{result['profit']:>+7.1f}% | Buy:{format_price(result['buy_price'])} | High:{format_price(result['highest'])} | {result['reason']}")
+                    
+                    # 🎨 تحديد اللون بناءً على الربح/الخسارة
+                    if result['profit'] < 0:
+                        line_color = Fore.RED
+                    elif result['profit'] > 0:
+                        line_color = Fore.GREEN
+                    else:
+                        line_color = Fore.YELLOW  # أصفر للصفر
+                    
+                    print(f"{line_color}{profit_emoji} {symbol:12} {format_price(result['price'])} | Profit:{result['profit']:>+7.1f}% | Buy:{format_price(result['buy_price'])} | High:{format_price(result['highest'])} | {result['reason']}{Style.RESET_ALL}")
                     continue
 
                 # Sell (waiting for minimum)
