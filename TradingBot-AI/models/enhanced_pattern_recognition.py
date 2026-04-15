@@ -386,23 +386,119 @@ class EnhancedPatternRecognition:
         
         return adjustment
 
-    def _detect_head_and_shoulders(self, analysis):
-        """كشف نمط head & shoulders (أكثر تعقيداً)"""
+    def _detect_head_and_shoulders(self, df):
+        """كشف نمط Head & Shoulders - مكتمل"""
         try:
-            # افترض أن analysis يحتوي على بيانات شموع
-            # هذا مثال بسيط؛ يحتاج بيانات تاريخية أكثر للدقة
-            # Left Shoulder, Head, Right Shoulder
-            # في الواقع، يحتاج تحليل 20-30 شمعة
-
-            # مثال: إذا كان هناك قمم: منخفضة، عالية، منخفضة، عالية، منخفضة
-            # هذا placeholder للتنفيذ الحقيقي
-
-            # افتراض كشف بسيط
-            return {
-                'detected': False,  # غير مكتشف في هذا التحليل البسيط
-                'type': 'HEAD_AND_SHOULDERS',
-                'confidence': 0
-            }
-
-        except Exception as e:
+            if df is None or len(df) < 20:
+                return {'detected': False, 'confidence': 0}
+            
+            highs = df['high'].tail(20).tolist()
+            
+            # البحث عن 3 قمم: كتف أيسر، رأس، كتف أيمن
+            peaks = []
+            for i in range(1, len(highs) - 1):
+                if highs[i] > highs[i-1] and highs[i] > highs[i+1]:
+                    peaks.append((i, highs[i]))
+            
+            if len(peaks) < 3:
+                return {'detected': False, 'confidence': 0}
+            
+            # فحص إذا كان النمط موجود
+            for i in range(len(peaks) - 2):
+                left_shoulder = peaks[i][1]
+                head = peaks[i+1][1]
+                right_shoulder = peaks[i+2][1]
+                
+                # الرأس يجب أن يكون أعلى من الكتفين
+                if head > left_shoulder and head > right_shoulder:
+                    # الكتفان يجب أن يكونا متقاربين
+                    shoulder_diff = abs(left_shoulder - right_shoulder) / left_shoulder
+                    if shoulder_diff < 0.05:  # 5% تفاوت
+                        return {
+                            'detected': True,
+                            'type': 'HEAD_AND_SHOULDERS',
+                            'confidence': 85,
+                            'signal': 'BEARISH'
+                        }
+            
+            return {'detected': False, 'confidence': 0}
+            
+        except:
+            return {'detected': False, 'confidence': 0}
+    
+    def _detect_double_top_bottom(self, df):
+        """كشف Double Top/Bottom"""
+        try:
+            if df is None or len(df) < 15:
+                return {'detected': False, 'confidence': 0}
+            
+            highs = df['high'].tail(15).tolist()
+            lows = df['low'].tail(15).tolist()
+            
+            # Double Top: قمتين متقاربتين
+            peaks = []
+            for i in range(1, len(highs) - 1):
+                if highs[i] > highs[i-1] and highs[i] > highs[i+1]:
+                    peaks.append(highs[i])
+            
+            if len(peaks) >= 2:
+                last_two_peaks = peaks[-2:]
+                diff = abs(last_two_peaks[0] - last_two_peaks[1]) / last_two_peaks[0]
+                if diff < 0.02:  # 2% تفاوت
+                    return {
+                        'detected': True,
+                        'type': 'DOUBLE_TOP',
+                        'confidence': 80,
+                        'signal': 'BEARISH'
+                    }
+            
+            # Double Bottom: قاعين متقاربين
+            troughs = []
+            for i in range(1, len(lows) - 1):
+                if lows[i] < lows[i-1] and lows[i] < lows[i+1]:
+                    troughs.append(lows[i])
+            
+            if len(troughs) >= 2:
+                last_two_troughs = troughs[-2:]
+                diff = abs(last_two_troughs[0] - last_two_troughs[1]) / last_two_troughs[0]
+                if diff < 0.02:
+                    return {
+                        'detected': True,
+                        'type': 'DOUBLE_BOTTOM',
+                        'confidence': 80,
+                        'signal': 'BULLISH'
+                    }
+            
+            return {'detected': False, 'confidence': 0}
+            
+        except:
+            return {'detected': False, 'confidence': 0}
+    
+    def _detect_cup_and_handle(self, df):
+        """كشف Cup & Handle"""
+        try:
+            if df is None or len(df) < 30:
+                return {'detected': False, 'confidence': 0}
+            
+            closes = df['close'].tail(30).tolist()
+            
+            # الكوب: هبوط ثم صعود بشكل U
+            first_third = closes[:10]
+            middle_third = closes[10:20]
+            last_third = closes[20:]
+            
+            # فحص إذا كان الوسط أقل من البداية والنهاية
+            if min(middle_third) < min(first_third) and min(middle_third) < min(last_third):
+                # المقبض (Handle): هبوط طفيف في النهاية
+                if last_third[-1] < max(last_third[:5]):
+                    return {
+                        'detected': True,
+                        'type': 'CUP_AND_HANDLE',
+                        'confidence': 75,
+                        'signal': 'BULLISH'
+                    }
+            
+            return {'detected': False, 'confidence': 0}
+            
+        except:
             return {'detected': False, 'confidence': 0}
