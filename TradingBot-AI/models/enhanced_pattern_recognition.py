@@ -502,3 +502,25 @@ class EnhancedPatternRecognition:
             
         except:
             return {'detected': False, 'confidence': 0}
+    
+    def get_pattern_statistics(self):
+        """جلب إحصائيات الأنماط المتعلمة"""
+        try:
+            total = len(self.all_patterns)
+            success = len(self.success_patterns)
+            traps = len(self.trap_patterns)
+            success_rate = (success / total * 100) if total > 0 else 0
+            
+            return {
+                'total_patterns': total,
+                'success_patterns': success,
+                'trap_patterns': traps,
+                'success_rate': success_rate
+            }
+        except:
+            return {
+                'total_patterns': 0,
+                'success_patterns': 0,
+                'trap_patterns': 0,
+                'success_rate': 0
+            }
