@@ -64,6 +64,7 @@ def run_main_loop(exchange, ctx):
         loop_count = 0
         available  = 0
         last_report_time = datetime.now()
+        last_performance_report_time = datetime.now()  # ⏰ مؤقت منفصل لتقرير الأداء (24 ساعة)
 
         # ⏰ مؤقت فحص تحديثات النماذج كل 7 ساعات
         _last_model_check = datetime.now()
@@ -258,9 +259,9 @@ def run_main_loop(exchange, ctx):
             if len(active_results) <= active_count and skipped_count > 0:
                 print(f"{Fore.CYAN}ℹ️  Scanned {skipped_count} other coins... (No opportunities found){Style.RESET_ALL}")
 
-            # Report - كل 30 دقيقة
-            if should_send_report(last_report_time, REPORT_INTERVAL):
-                # 📊 تقرير الأداء الذكي (Self-Analysis Dashboard)
+            # 📊 تقرير الأداء الذكي (Self-Analysis Dashboard) - كل 24 ساعة
+            hours_since_performance_report = (datetime.now() - last_performance_report_time).total_seconds() / 3600
+            if hours_since_performance_report >= 24:
                 try:
                     dashboard = advisor_manager.get('SelfAnalysisDashboard')
                     if dashboard:
@@ -273,8 +274,12 @@ def run_main_loop(exchange, ctx):
                                 success = dashboard.send_report_to_discord(report, webhook)
                                 if success:
                                     print("✅ Performance report sent to Discord")
+                                    last_performance_report_time = datetime.now()  # ✅ تحديث الوقت فقط بعد الإرسال الناجح
                 except Exception as e:
                     print(f"⚠️ Dashboard error: {e}")
+
+            # 📋 تقرير المحفظة (Portfolio Report) - كل 30 دقيقة
+            if should_send_report(last_report_time, REPORT_INTERVAL):
                 
                 # 🔄 فحص تحديثات النماذج كل 7 ساعات
                 try:
@@ -334,10 +339,9 @@ def run_main_loop(exchange, ctx):
                             else:
                                 print(f"⚠️ Report: Skipping {sym} due to incomplete position data.")
 
-                # Only send report and update time if there are positions to report
-                if open_positions_data:
-                    send_positions_report(available, invested, active_count, MAX_POSITIONS, open_positions_data)
-                    last_report_time = datetime.now() # Update time ONLY after sending
+                # Send report even if no open positions (to show portfolio status)
+                send_positions_report(available, invested, active_count, MAX_POSITIONS, open_positions_data)
+                last_report_time = datetime.now() # Update time after sending
 
                 # Auto-cleanup old data (every report interval)
                 try:
