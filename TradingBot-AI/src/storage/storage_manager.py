@@ -107,6 +107,10 @@ class StorageManager:
         """حذف صفقة مغلقة"""
         return self.storage.delete_position(symbol)
     
+    def get_open_positions(self):
+        """جلب الصفقات المفتوحة (alias لـ load_positions)"""
+        return self.load_positions()
+    
     # ========== Settings & Models ==========
     def save_setting(self, key, value):
         """حفظ إعداد في الداتابيز"""
