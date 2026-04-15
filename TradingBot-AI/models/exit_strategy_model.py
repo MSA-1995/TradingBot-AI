@@ -120,7 +120,7 @@ class ExitStrategyModel:
             return {'action': 'HOLD'}
     
     def _check_smart_trailing(self, symbol, current_price, position, analysis, history):
-        """فحص Trailing Stop الذكي - مع تحليل الشموع الانعكاسية"""
+        """فحص Trailing Stop الذكي المتقدم - مع تحليل الشموع الانعكاسية"""
         try:
             buy_price = position.get('buy_price', 0)
             highest_price = position.get('highest_price', buy_price)
@@ -140,22 +140,66 @@ class ExitStrategyModel:
                     'confidence': reversal_signal['confidence']
                 }
             
-            # الوقف الزاحف السلوكي: مخفض من 11.1% إلى 5-7%
-            atr_p = analysis.get('atr_percent', 2.5)
-            # تخفيض المضاعف من 1.5 إلى 1.0 للبيع الأسرع
-            threshold = max(3.0, atr_p * 1.0)  # حد أدنى 3% بدلاً من 11.1%
-
-            if drop_from_peak >= threshold:
+            # Wave Protection الذكي المتقدم
+            wave_protection = self._calculate_dynamic_wave_protection(
+                profit_percent, analysis, history, drop_from_peak
+            )
+            
+            if wave_protection['should_exit']:
                 return {
                     'action': 'SELL',
-                    'reason': f'WAVE PROTECTION: -{drop_from_peak:.1f}% from peak',
+                    'reason': wave_protection['reason'],
                     'profit': profit_percent,
                     'confidence': 90
                 }
+            
             return {'action': 'HOLD'}
         except Exception as e:
             print(f"⚠️ Smart Trailing error {symbol}: {e}")
             return {'action': 'HOLD'}
+    
+    def _calculate_dynamic_wave_protection(self, profit_percent, analysis, history, drop_from_peak):
+        """حساب Wave Protection الديناميكي المتقدم"""
+        try:
+            atr_p = analysis.get('atr_percent', 2.5)
+            
+            # 1. الحد الأساسي
+            base_threshold = max(3.0, atr_p * 1.0)
+            
+            # 2. تعديل حسب الربح الحالي
+            if profit_percent > 50:  # ربح عالي جداً - اصبر أكثر
+                threshold = base_threshold * 2.0
+            elif profit_percent > 30:  # ربح جيد - اصبر
+                threshold = base_threshold * 1.5
+            elif profit_percent > 10:  # ربح متوسط
+                threshold = base_threshold * 1.2
+            elif profit_percent > 2:  # ربح بسيط
+                threshold = base_threshold * 1.0
+            else:  # ربح ضعيف - احمي بسرعة
+                threshold = base_threshold * 0.7
+            
+            # 3. تعديل حسب التاريخ
+            if history:
+                avg_profit = history.get('avg_profit', 0)
+                if profit_percent < avg_profit * 0.5:  # تحت المتوسط - اصبر
+                    threshold *= 1.3
+            
+            # 4. تعديل حسب الحجم
+            volume_ratio = analysis.get('volume_ratio', 1.0)
+            if volume_ratio < 0.5:  # حجم ضعيف - احمي بسرعة
+                threshold *= 0.8
+            
+            # 5. القرار
+            if drop_from_peak >= threshold:
+                return {
+                    'should_exit': True,
+                    'reason': f'WAVE PROTECTION: -{drop_from_peak:.1f}% from peak (threshold: {threshold:.1f}%)'
+                }
+            
+            return {'should_exit': False}
+            
+        except:
+            return {'should_exit': False}
     
     def _check_smart_bearish(self, symbol, profit_percent, mtf, analysis, history):
         """فحص Bearish Exit الذكي - محسّن للسرعة"""
