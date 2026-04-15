@@ -1046,7 +1046,8 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
         flash_crash_protection = check_flash_crash(df, symbol)
         time_analysis = get_time_analysis()
         
-        candles = df.tail(2).to_dict('records') if len(df) >= 2 else []
+        # 🕯️ جلب آخر 3 شموع لتحليل الانعكاس في Exit Strategy
+        candles = df.tail(3).to_dict('records') if len(df) >= 3 else []
         
         # جلب order_book لاستخدامه في حساب أعمدة النماذج
         order_book = {}
