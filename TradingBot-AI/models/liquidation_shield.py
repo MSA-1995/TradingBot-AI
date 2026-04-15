@@ -17,60 +17,62 @@ class LiquidationShield:
     
     def analyze_liquidation_risk(self, symbol, current_price, order_book, leverage_data=None):
         """
-        تحليل خطر التصفية
+        تحليل خطر التصفية المتقدم
         Returns: {'risk_level': 'LOW/MEDIUM/HIGH', 'safe_entry': price, 'danger_zones': []}
         """
         if not order_book or not order_book.get('bids') or not order_book.get('asks'):
             return {'risk_level': 'UNKNOWN', 'safe_entry': current_price, 'danger_zones': []}
         
-        # 1. كشف الجدران الكبيرة (Large Walls)
         bids = order_book['bids'][:50]
         asks = order_book['asks'][:50]
         
-        # حساب متوسط حجم الطلبات
+        # 1. كشف الجدران الكبيرة
         avg_bid_size = np.mean([b[1] for b in bids]) if bids else 0
         avg_ask_size = np.mean([a[1] for a in asks]) if asks else 0
         
-        # كشف الجدران (أكبر من 5x المتوسط)
         large_bid_walls = [b for b in bids if b[1] > avg_bid_size * 5]
         large_ask_walls = [a for a in asks if a[1] > avg_ask_size * 5]
         
-        # 2. حساب مناطق التصفية المحتملة
-        # (في الرافعة المالية، التصفية تحدث عند انخفاض 10-20% من سعر الدخول)
+        # 2. Liquidation Heatmap Analysis
+        heatmap = self._generate_liquidation_heatmap(current_price, leverage_data)
+        
+        # 3. حساب مناطق التصفية
         liquidation_zones = []
         
-        # منطقة تصفية Long positions (تحت السعر الحالي)
-        long_liq_zone = current_price * 0.90  # -10%
-        liquidation_zones.append({
-            'type': 'LONG_LIQUIDATION',
-            'price': long_liq_zone,
-            'risk': 'HIGH' if any(b[0] <= long_liq_zone * 1.02 for b in large_bid_walls) else 'MEDIUM'
-        })
+        # Long liquidation (10x leverage = -10%, 20x = -5%)
+        for leverage in [10, 20, 50]:
+            liq_price = current_price * (1 - 1/leverage)
+            liquidation_zones.append({
+                'type': f'LONG_LIQ_{leverage}x',
+                'price': liq_price,
+                'risk': self._assess_zone_risk(liq_price, large_bid_walls, current_price)
+            })
         
-        # منطقة تصفية Short positions (فوق السعر الحالي)
-        short_liq_zone = current_price * 1.10  # +10%
-        liquidation_zones.append({
-            'type': 'SHORT_LIQUIDATION',
-            'price': short_liq_zone,
-            'risk': 'HIGH' if any(a[0] >= short_liq_zone * 0.98 for a in large_ask_walls) else 'MEDIUM'
-        })
+        # Short liquidation
+        for leverage in [10, 20, 50]:
+            liq_price = current_price * (1 + 1/leverage)
+            liquidation_zones.append({
+                'type': f'SHORT_LIQ_{leverage}x',
+                'price': liq_price,
+                'risk': self._assess_zone_risk(liq_price, large_ask_walls, current_price)
+            })
         
-        # 3. تقييم الخطر الإجمالي
+        # 4. Cascade Liquidation Detection
+        cascade_risk = self._detect_cascade_risk(liquidation_zones, heatmap)
+        
+        # 5. تقييم الخطر الإجمالي
         risk_level = 'LOW'
         
-        # إذا كان هناك جدار كبير قريب جداً (أقل من 2%)
         close_walls = [w for w in large_ask_walls if abs(w[0] - current_price) / current_price < 0.02]
-        if len(close_walls) >= 2:
+        if len(close_walls) >= 2 or cascade_risk == 'HIGH':
             risk_level = 'HIGH'
-        elif len(close_walls) == 1:
+        elif len(close_walls) == 1 or cascade_risk == 'MEDIUM':
             risk_level = 'MEDIUM'
         
-        # 4. اقتراح نقطة دخول آمنة
-        # (بعيداً عن مناطق التصفية بـ 3%)
+        # 6. نقطة دخول آمنة
         safe_entry = current_price
         if risk_level == 'HIGH':
-            # انتظر حتى يكسر الجدار أو ابتعد عنه
-            safe_entry = current_price * 0.97  # ادخل أقل بـ 3%
+            safe_entry = current_price * 0.97
         
         return {
             'risk_level': risk_level,
@@ -80,6 +82,8 @@ class LiquidationShield:
                 'bids': len(large_bid_walls),
                 'asks': len(large_ask_walls)
             },
+            'cascade_risk': cascade_risk,
+            'heatmap': heatmap,
             'recommendation': self._get_recommendation(risk_level)
         }
     
@@ -97,11 +101,80 @@ class LiquidationShield:
         كشف الجدران الوهمية
         الجدار الوهمي = جدار كبير لكن لا يتم تنفيذ صفقات عنده
         """
-        # فحص إذا كان هناك صفقات قريبة من سعر الجدار
         trades_near_wall = [t for t in recent_trades if abs(t['price'] - wall_price) / wall_price < 0.005]
         
-        # إذا الجدار كبير لكن ما في صفقات = وهمي
         if wall_size > 100000 and len(trades_near_wall) < 3:
             return True
         
         return False
+    
+    def _generate_liquidation_heatmap(self, current_price, leverage_data):
+        """إنشاء Liquidation Heatmap"""
+        try:
+            heatmap = {'zones': []}
+            
+            # حساب مناطق التصفية لكل رافعة
+            for leverage in [5, 10, 20, 50, 100]:
+                # Long liquidation
+                long_liq = current_price * (1 - 1/leverage)
+                heatmap['zones'].append({
+                    'price': long_liq,
+                    'type': 'LONG',
+                    'leverage': leverage,
+                    'intensity': self._calculate_intensity(leverage)
+                })
+                
+                # Short liquidation
+                short_liq = current_price * (1 + 1/leverage)
+                heatmap['zones'].append({
+                    'price': short_liq,
+                    'type': 'SHORT',
+                    'leverage': leverage,
+                    'intensity': self._calculate_intensity(leverage)
+                })
+            
+            return heatmap
+        except:
+            return {'zones': []}
+    
+    def _calculate_intensity(self, leverage):
+        """حساب كثافة التصفية"""
+        # الرافعة الأعلى = كثافة أعلى
+        if leverage >= 50:
+            return 'EXTREME'
+        elif leverage >= 20:
+            return 'HIGH'
+        elif leverage >= 10:
+            return 'MEDIUM'
+        else:
+            return 'LOW'
+    
+    def _assess_zone_risk(self, zone_price, walls, current_price):
+        """تقييم خطر منطقة"""
+        # فحص إذا كان هناك جدران قريبة من منطقة التصفية
+        nearby_walls = [w for w in walls if abs(w[0] - zone_price) / zone_price < 0.03]
+        
+        if len(nearby_walls) >= 2:
+            return 'CRITICAL'
+        elif len(nearby_walls) == 1:
+            return 'HIGH'
+        elif abs(zone_price - current_price) / current_price < 0.05:
+            return 'MEDIUM'
+        else:
+            return 'LOW'
+    
+    def _detect_cascade_risk(self, liquidation_zones, heatmap):
+        """كشف خطر التصفيات المتتالية"""
+        try:
+            # فحص إذا كان هناك مناطق تصفية متقاربة (ضمن 2%)
+            high_risk_zones = [z for z in liquidation_zones if z['risk'] in ['HIGH', 'CRITICAL']]
+            
+            if len(high_risk_zones) >= 3:
+                # 3+ مناطق خطرة = خطر Cascade عالي
+                return 'HIGH'
+            elif len(high_risk_zones) >= 2:
+                return 'MEDIUM'
+            else:
+                return 'LOW'
+        except:
+            return 'LOW'
