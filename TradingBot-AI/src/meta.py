@@ -382,18 +382,10 @@ class Meta:
         # =====================================================================
         # 👑 الملك يحلل كل الذكاء المجموع
         # =====================================================================
-        
-        # 🔍 DEBUG: طباعة الذكاء المجموع من المستشارين
-        print(f"\n🔍 DEBUG [{symbol}] - Advisors Intelligence:")
-        for key, value in advisors_intelligence.items():
-            print(f"   {key}: {value}")
-        
         # Layer 1: التحليل الفني الأساسي
         rsi = analysis_data.get('rsi', 50)
         macd_diff = analysis_data.get('macd_diff', 0)
         volume_ratio = analysis_data.get('volume_ratio', 1.0)
-        
-        print(f"   RSI: {rsi:.1f} | MACD: {macd_diff:.2f} | Volume: {volume_ratio:.2f}x")
         
         technical_score = 0
         if rsi <= 35:
@@ -449,9 +441,6 @@ class Meta:
             macro_trend * 0.02                 # 2% الاتجاه الكلي
         )
         
-        print(f"   Technical Score: {technical_score}")
-        print(f"   Total Intelligence (before memory): {total_intelligence:.1f}/100")
-        
         # Layer 4: الجرأة من الذاكرة
         courage_boost = self._get_courage_boost(symbol, rsi, volume_ratio)
         time_mod, _ = self._get_time_memory_modifier(symbol)
@@ -460,9 +449,6 @@ class Meta:
         
         memory_intelligence = courage_boost + time_mod + pattern_boost + win_boost
         total_intelligence += memory_intelligence
-        
-        print(f"   Memory Intelligence: {memory_intelligence:.1f}")
-        print(f"   Total Intelligence (final): {total_intelligence:.1f}/100")
         
         # Layer 5: الحماية من المخاطر الحرجة
         flash_crash = analysis_data.get('flash_crash_protection', {})
@@ -486,8 +472,6 @@ class Meta:
         # 👑 القرار النهائي (الملك يقرر بحرية بناءً على الذكاء المجموع)
         # =====================================================================
         
-        print(f"\n👑 King Decision Process:")
-        
         king_wants_to_buy = False
         buy_reason = ""
         
@@ -495,19 +479,16 @@ class Meta:
         if total_intelligence >= 85:
             king_wants_to_buy = True
             buy_reason = f"ثقة عالية جداً: {total_intelligence:.0f}/100"
-            print(f"   ✅ Scenario 1: High Intelligence ({total_intelligence:.0f} >= 85)")
         
         # السيناريو 2: حيتان تشتري بقوة + ذكاء جيد
         elif whale_activity > 75 and total_intelligence >= 70:
             king_wants_to_buy = True
             buy_reason = f"حيتان تشتري + ثقة: {total_intelligence:.0f}/100"
-            print(f"   ✅ Scenario 2: Whale Activity ({whale_activity:.0f} > 75 & {total_intelligence:.0f} >= 70)")
         
         # السيناريو 3: بداية اتجاه قوي + ذكاء جيد
         elif trend_birth > 85 and total_intelligence >= 70:
             king_wants_to_buy = True
             buy_reason = f"بداية موجة قوية: {total_intelligence:.0f}/100"
-            print(f"   ✅ Scenario 3: Trend Birth ({trend_birth:.0f} > 85 & {total_intelligence:.0f} >= 70)")
         
         # السيناريو 4: انفجار حجم متوقع + ذكاء جيد
         elif volume_momentum > 80 and total_intelligence >= 70:
@@ -535,19 +516,9 @@ class Meta:
             if support_strength > 70: strong_signals += 1
             if historical_success > 75: strong_signals += 1
             
-            print(f"   Scenario 7: Intelligence {total_intelligence:.0f} >= 75, Strong Signals: {strong_signals}/6")
-            
             if strong_signals >= 3:
                 king_wants_to_buy = True
                 buy_reason = f"{strong_signals} مستشارين يؤكدون: {total_intelligence:.0f}/100"
-                print(f"   ✅ Scenario 7: Multiple Advisors Confirm ({strong_signals} >= 3)")
-        
-        # =====================================================================
-        # 📊 النتيجة النهائية
-        # =====================================================================
-        
-        print(f"\n📊 Final Decision: {'BUY' if king_wants_to_buy else 'DISPLAY'}")
-        print(f"   Reason: {buy_reason if king_wants_to_buy else f'Intelligence {total_intelligence:.0f}/100 - انتظار قاع أفضل'}\n")
         
         if king_wants_to_buy:
             action = "BUY"
