@@ -303,7 +303,11 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
         # ========== SELL LOGIC (Delegated to Meta) ==========
         if position:
             sell_logic_start = time.time()
-            decision = meta.should_sell(symbol, position, current_price, analysis, analysis.get('mtf', {}), preloaded_advisors) or {'action': 'HOLD', 'reason': 'Error fallback'}
+            if meta:
+                decision = meta.should_sell(symbol, position, current_price, analysis, analysis.get('mtf', {}), preloaded_advisors=preloaded_advisors)
+            else:
+                decision = {'action': 'HOLD', 'reason': 'Meta module not loaded'}
+                
             timing_data['meta_should_sell'] = (time.time() - sell_logic_start) * 1000
 
             if decision and decision.get('action') == 'SELL':
@@ -345,7 +349,10 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
         else:
             if active_count >= MAX_POSITIONS:
                 # الصفقات ممتلئة - لا نشتري لكن نحلل ونعرض STRONG إذا العملة قوية
-                decision = meta.should_buy(symbol, analysis, preloaded_advisors) or {'action': 'DISPLAY', 'reason': 'Analyzing...'}
+                if meta:
+                    decision = meta.should_buy(symbol, analysis, preloaded_advisors=preloaded_advisors)
+                else:
+                    decision = {'action': 'DISPLAY', 'reason': 'Meta not loaded'}
                 meta_action = decision.get('action', 'DISPLAY') if decision else 'DISPLAY'
                 meta_conf   = decision.get('confidence', 0) if decision else 0
                 #print(f"🔍 DEBUG FULL [{symbol}] → Meta={meta_action} Conf={meta_conf} | RSI={analysis.get('rsi',0):.0f} Vol={analysis.get('volume_ratio',0):.1f}x")
@@ -371,12 +378,14 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
                 return None # Not returning a message to avoid clutter
 
             buy_logic_start = time.time()
-            decision = meta.should_buy(symbol, analysis, preloaded_advisors) or {'action': 'DISPLAY', 'reason': 'Calculating...'}
+            if meta:
+                decision = meta.should_buy(symbol, analysis, preloaded_advisors=preloaded_advisors)
+            else:
+                decision = {'action': 'DISPLAY', 'reason': 'Meta not loaded'}
             timing_data['meta_should_buy'] = (time.time() - buy_logic_start) * 1000
 
             meta_action = decision.get('action', 'DISPLAY') if decision else 'DISPLAY'
             meta_conf   = decision.get('confidence', 0) if decision else 0
-            #print(f"🔍 DEBUG FREE [{symbol}] → Meta={meta_action} Conf={meta_conf} | RSI={analysis.get('rsi',0):.0f} Vol={analysis.get('volume_ratio',0):.1f}x")
 
             if decision and meta_action == 'BUY':
                 return {
