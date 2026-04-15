@@ -38,12 +38,22 @@ class ExitStrategyModel:
         print("🎯 Exit Strategy Model initialized")
     
     def should_exit(self, symbol, position, current_price, analysis, mtf):
-        """قرار البيع الذكي + Minimum Hold Time"""
+        """قرار البيع الذكي + Minimum Hold Time + Profit Spike Detection"""
         try:
             buy_price = position['buy_price']
             profit_percent = ((current_price - buy_price) / buy_price) * 100
             
-            # ✅ Minimum Hold Time - لا تبيع قبل 5 دقائق على الأقل!
+            # ✅ Profit Spike Detection - كشف القفزات المفاجئة!
+            spike_detected = self._detect_profit_spike(symbol, profit_percent)
+            if spike_detected['should_sell']:
+                return {
+                    'action': 'SELL',
+                    'reason': spike_detected['reason'],
+                    'profit': profit_percent,
+                    'confidence': 98
+                }
+            
+            # ✅ Minimum Hold Time
             buy_time = datetime.fromisoformat(position['buy_time'])
             minutes_held = (datetime.now() - buy_time).total_seconds() / 60
             
