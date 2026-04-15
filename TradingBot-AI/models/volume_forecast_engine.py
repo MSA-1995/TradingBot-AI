@@ -19,7 +19,7 @@ class VolumeForecastEngine:
     
     def predict_next_volume(self, symbol, current_volumes, current_hour):
         """
-        التنبؤ بحجم الشمعة القادمة
+        التنبؤ بحجم الشمعة القادمة + Volume Profile Analysis
         Returns: {'predicted_volume': float, 'confidence': 0-100, 'trend': 'INCREASING/DECREASING'}
         """
         if len(current_volumes) < 20:
@@ -29,27 +29,37 @@ class VolumeForecastEngine:
         ma_20 = np.mean(current_volumes[-20:])
         ma_5 = np.mean(current_volumes[-5:])
         
-        # 2. حساب الزخم (Momentum)
-        # هل الحجم يتزايد أم يتناقص؟
+        # 2. Volume Momentum (زخم الحجم)
         recent_trend = ma_5 / ma_20 if ma_20 > 0 else 1.0
         
-        # 3. التنبؤ البسيط (Exponential Moving Average)
-        alpha = 0.3  # وزن البيانات الحديثة
+        # 3. Volume Acceleration (تسارع الحجم)
+        ma_3 = np.mean(current_volumes[-3:])
+        acceleration = (ma_3 / ma_5) if ma_5 > 0 else 1.0
+        
+        # 4. التنبؤ باستخدام EMA
+        alpha = 0.3
         predicted = alpha * current_volumes[-1] + (1 - alpha) * ma_5
         
-        # 4. تعديل بناءً على الوقت
-        # (بعض الأوقات تشهد حجم أعلى)
+        # 5. تعديل بناءً على التسارع
+        if acceleration > 1.2:
+            predicted *= 1.15  # حجم يتسارع
+        elif acceleration < 0.8:
+            predicted *= 0.85  # حجم يتباطأ
+        
+        # 6. تعديل بناءً على الوقت
         time_multiplier = self._get_time_multiplier(symbol, current_hour)
         predicted *= time_multiplier
         
-        # 5. حساب الثقة
-        # (كلما كان الحجم مستقر، كلما زادت الثقة)
+        # 7. Volume Profile Analysis
+        volume_profile = self._analyze_volume_profile(current_volumes)
+        
+        # 8. حساب الثقة
         volume_std = np.std(current_volumes[-20:])
-        volume_cv = (volume_std / ma_20) if ma_20 > 0 else 1.0  # Coefficient of Variation
+        volume_cv = (volume_std / ma_20) if ma_20 > 0 else 1.0
         
         confidence = max(0, min(100, 100 - (volume_cv * 50)))
         
-        # 6. تحديد الاتجاه
+        # 9. تحديد الاتجاه
         if recent_trend > 1.2:
             trend = 'INCREASING'
         elif recent_trend < 0.8:
@@ -63,8 +73,10 @@ class VolumeForecastEngine:
             'ma_20': ma_20,
             'confidence': round(confidence, 1),
             'trend': trend,
-            'momentum': round((recent_trend - 1) * 100, 1),  # % change
-            'time_multiplier': time_multiplier
+            'momentum': round((recent_trend - 1) * 100, 1),
+            'acceleration': round((acceleration - 1) * 100, 1),
+            'time_multiplier': time_multiplier,
+            'volume_profile': volume_profile
         }
     
     def _get_time_multiplier(self, symbol, current_hour):
@@ -136,3 +148,41 @@ class VolumeForecastEngine:
         stability_score = max(0, 50 - (cv * 25))
         
         return round(volume_score + stability_score, 1)
+    
+    def _analyze_volume_profile(self, volumes):
+        """تحليل Volume Profile - توزيع الحجم"""
+        try:
+            if len(volumes) < 20:
+                return {'type': 'UNKNOWN', 'strength': 0}
+            
+            # تقسيم الحجم إلى 3 مستويات
+            sorted_volumes = sorted(volumes[-20:])
+            low_threshold = sorted_volumes[6]   # 30%
+            high_threshold = sorted_volumes[13]  # 70%
+            
+            recent_5 = volumes[-5:]
+            
+            # حساب نسبة الحجم العالي
+            high_volume_count = sum(1 for v in recent_5 if v > high_threshold)
+            low_volume_count = sum(1 for v in recent_5 if v < low_threshold)
+            
+            # Accumulation: حجم عالي مستمر
+            if high_volume_count >= 4:
+                return {'type': 'ACCUMULATION', 'strength': 85}
+            
+            # Distribution: حجم عالي متقطع
+            elif high_volume_count >= 2 and low_volume_count >= 2:
+                return {'type': 'DISTRIBUTION', 'strength': 70}
+            
+            # Climax: حجم مفاجئ جداً
+            elif recent_5[-1] > np.mean(volumes[-20:]) * 3:
+                return {'type': 'CLIMAX', 'strength': 90}
+            
+            # Low Activity: حجم ضعيف
+            elif low_volume_count >= 4:
+                return {'type': 'LOW_ACTIVITY', 'strength': 30}
+            
+            return {'type': 'NEUTRAL', 'strength': 50}
+            
+        except:
+            return {'type': 'UNKNOWN', 'strength': 0}
