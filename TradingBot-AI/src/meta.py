@@ -542,7 +542,7 @@ class Meta:
         else:
             return {
                 'action': 'DISPLAY',
-                'reason': f"ذكاء: {total_intelligence:.0f}/100 - انتظار قاع أفضل",
+                'reason': f"Intel: {total_intelligence:.0f}/100 - Waiting for better entry",
                 'confidence': min(total_intelligence, 99),
                 'advisors_intelligence': advisors_intelligence
             }
