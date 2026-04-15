@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import get_active_positions_count, get_total_invested, should_send_report, format_price
 from notifications import send_positions_report
-from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRADE, MAX_CAPITAL, BATCH_SIZE, MAX_WORKERS
+from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRADE, MAX_CAPITAL, BATCH_SIZE, MAX_WORKERS, META_DISPLAY_THRESHOLD
 
 from bot.sell_handler import process_sell
 from bot.buy_handler import process_buy
@@ -204,7 +204,7 @@ def run_main_loop(exchange, ctx):
                 # Hold position
                 if action == 'HOLD':
                     profit_emoji = "📈" if result['profit'] > 0 else "📉"
-                    print(f"{profit_emoji} {symbol:12} {format_price(result['price'])} | Profit:{result['profit']:>+7.2f}% | Buy:{format_price(result['buy_price'])} | High:{format_price(result['highest'])} | {result['reason']}")
+                    print(f"{profit_emoji} {symbol:12} {format_price(result['price'])} | Profit:{result['profit']:>+7.1f}% | Buy:{format_price(result['buy_price'])} | High:{format_price(result['highest'])} | {result['reason']}")
                     continue
 
                 # Sell (waiting for minimum)
@@ -244,15 +244,15 @@ def run_main_loop(exchange, ctx):
                 if action == 'STRONG':
                     vol_status   = "🟢" if result['volume'] > 0.8 else "🔴"
                     news_display = f" | {result['news_summary']}" if result.get('news_summary') else ""
-                    print(f"{Fore.GREEN}💪 {result['symbol']:12} {format_price(result['price'])} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {result['volume']:.1f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']}/100{news_display} | {result.get('reason', '')}{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN}💪 {result['symbol']:12} {format_price(result['price'])} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {result['volume']:.1f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']:.0f}/100{news_display} | {result.get('reason', '')}{Style.RESET_ALL}")
                     continue
 
                 # Display only
                 if action == 'DISPLAY':
-                    if result.get('confidence', 0) >= 35:  # معتدل
+                    if result.get('confidence', 0) >= META_DISPLAY_THRESHOLD:
                         vol_status   = "🟢" if result['volume'] > 0.8 else "🔴"
                         news_display = f" | {result['news_summary']}" if result.get('news_summary') else ""
-                        print(f"📊 {symbol:12} ${result['price']:>8.2f} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {result['volume']:.1f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']}/100{news_display} | {result.get('reason', '')}")
+                        print(f"📊 {symbol:12} ${result['price']:>8.2f} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {result['volume']:.1f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']:.0f}/100{news_display} | {result.get('reason', '')}")
                     continue
             
             # طباعة ملخص المسح إذا لم يتم عرض أي عملة جديدة
