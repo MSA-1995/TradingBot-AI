@@ -249,7 +249,7 @@ def run_main_loop(exchange, ctx):
 
                 # Display only
                 if action == 'DISPLAY':
-                    if result.get('confidence', 0) >= 40:  # فقط العملات القوية
+                    if result.get('confidence', 0) >= 35:  # معتدل
                         vol_status   = "🟢" if result['volume'] > 0.8 else "🔴"
                         news_display = f" | {result['news_summary']}" if result.get('news_summary') else ""
                         print(f"📊 {symbol:12} ${result['price']:>8.2f} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {result['volume']:.1f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']}/100{news_display} | {result.get('reason', '')}")
