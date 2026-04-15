@@ -3,9 +3,11 @@ Meta (The King) - The Ultimate Decision Maker
 """
 import pandas as pd
 from config import (
-    MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT, MIN_CONFIDENCE, MIN_SELL_CONFIDENCE,
-    MIN_CANDLE_SCORE, MIN_VOLUME_RATIO, MACRO_CANDLE_THRESHOLD,
-    PEAK_DROP_THRESHOLD, BOTTOM_BOUNCE_THRESHOLD, VOLUME_SPIKE_FACTOR
+    MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT, MIN_SELL_CONFIDENCE,
+    MACRO_CANDLE_THRESHOLD, PEAK_DROP_THRESHOLD, BOTTOM_BOUNCE_THRESHOLD, 
+    VOLUME_SPIKE_FACTOR, META_BUY_INTELLIGENCE, META_BUY_WHALE, META_BUY_TREND, 
+    META_BUY_VOLUME, META_BUY_PATTERN, META_BUY_SUPPORT, META_BUY_HISTORY, 
+    META_BUY_CONSENSUS, META_DISPLAY_THRESHOLD
 )
 from datetime import datetime
 import gc
@@ -476,45 +478,45 @@ class Meta:
         buy_reason = ""
         
         # السيناريو 1: ذكاء عالي جداً (ثقة قوية من المستشارين)
-        if total_intelligence >= 55:
+        if total_intelligence >= META_BUY_INTELLIGENCE:
             king_wants_to_buy = True
             buy_reason = f"ثقة عالية جداً: {total_intelligence:.0f}/100"
         
         # السيناريو 2: حيتان تشتري بقوة + ذكاء جيد
-        elif whale_activity > 45 and total_intelligence >= 55:
+        elif whale_activity > META_BUY_WHALE and total_intelligence >= META_BUY_INTELLIGENCE:
             king_wants_to_buy = True
             buy_reason = f"حيتان تشتري + ثقة: {total_intelligence:.0f}/100"
         
         # السيناريو 3: بداية اتجاه قوي + ذكاء جيد
-        elif trend_birth > 55 and total_intelligence >= 55:
+        elif trend_birth > META_BUY_TREND and total_intelligence >= META_BUY_INTELLIGENCE:
             king_wants_to_buy = True
             buy_reason = f"بداية موجة قوية: {total_intelligence:.0f}/100"
         
         # السيناريو 4: انفجار حجم متوقع + ذكاء جيد
-        elif volume_momentum > 45 and total_intelligence >= 55:
+        elif volume_momentum > META_BUY_VOLUME and total_intelligence >= META_BUY_INTELLIGENCE:
             king_wants_to_buy = True
             buy_reason = f"انفجار حجم قادم: {total_intelligence:.0f}/100"
         
         # السيناريو 5: نمط انعكاس قوي + دعم قوي + ذكاء جيد
-        elif pattern_confidence >= 45 and support_strength >= 45 and total_intelligence >= 55:
+        elif pattern_confidence >= META_BUY_PATTERN and support_strength >= META_BUY_SUPPORT and total_intelligence >= META_BUY_INTELLIGENCE:
             king_wants_to_buy = True
             buy_reason = f"نمط قوي + دعم: {total_intelligence:.0f}/100"
         
         # السيناريو 6: ذاكرة قوية (نجح هنا قبل) + ذكاء جيد
-        elif historical_success > 55 and total_intelligence >= 55:
+        elif historical_success > META_BUY_HISTORY and total_intelligence >= META_BUY_INTELLIGENCE:
             king_wants_to_buy = True
             buy_reason = f"ذاكرة قوية: {total_intelligence:.0f}/100"
         
         # السيناريو 7: ذكاء متوسط لكن عدة مستشارين يؤكدون
-        elif total_intelligence >= 50:
+        elif total_intelligence >= META_BUY_CONSENSUS:
             # فحص: كم مستشار يعطي إشارة قوية؟
             strong_signals = 0
-            if whale_activity > 45: strong_signals += 1
-            if trend_birth > 55: strong_signals += 1
-            if volume_momentum > 45: strong_signals += 1
-            if pattern_confidence > 45: strong_signals += 1
-            if support_strength > 45: strong_signals += 1
-            if historical_success > 55: strong_signals += 1
+            if whale_activity > META_BUY_WHALE: strong_signals += 1
+            if trend_birth > META_BUY_TREND: strong_signals += 1
+            if volume_momentum > META_BUY_VOLUME: strong_signals += 1
+            if pattern_confidence > META_BUY_PATTERN: strong_signals += 1
+            if support_strength > META_BUY_SUPPORT: strong_signals += 1
+            if historical_success > META_BUY_HISTORY: strong_signals += 1
             
             if strong_signals >= 3:
                 king_wants_to_buy = True
