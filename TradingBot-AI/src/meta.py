@@ -753,62 +753,152 @@ class Meta:
         return decision
 
     def should_sell(self, symbol, position, current_price, analysis, mtf, candles=None, preloaded_advisors=None):
-        """Wave Rider Strategy: استهداف 50-80% ربح مع حماية واسعة"""
+        """🔴 قرار البيع مع استشارة المستشارين عن القمة"""
         from config import MIN_SELL_CONFIDENCE
         
         buy_price = position['buy_price']
         profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
+        rsi = analysis.get('rsi', 50)
+        macd_diff = analysis.get('macd_diff', 0)
+        volume_ratio = analysis.get('volume_ratio', 1.0)
 
-        # --- 1. نظام الوقف الزاحف الواسع (Wide Trailing Stop for Wave Riding) ---
+        # =========================================================
+        # 🗣️ 1. استشارة المستشارين عن القمة (مثل الشراء تماماً)
+        # =========================================================
+        sell_vote_count = 0
+        total_advisors = 0
+        sell_votes = {}
+        
+        try:
+            dl_client = self.advisor_manager.get('dl_client') if self.advisor_manager else None
+            if dl_client:
+                # بناء candle_analysis من تحليل القمة
+                peak = analysis.get('peak', {})
+                reversal = analysis.get('reversal', {})
+                candle_analysis = {
+                    'is_reversal': peak.get('candle_signal', False),
+                    'is_bottom':   reversal.get('candle_signal', False),
+                    'is_peak':     peak.get('candle_signal', False),
+                    'is_rejection': peak.get('candle_signal', False),
+                    'reversal_confidence': reversal.get('confidence', 0),
+                    'peak_confidence':     peak.get('confidence', 0),
+                }
+
+                # جلب النصائح من كل مستشار للبيع
+                advisors_advice = dl_client.get_advice(
+                    rsi=rsi, macd=macd_diff, volume_ratio=volume_ratio,
+                    price_momentum=analysis.get('price_momentum', 0),
+                    confidence=profit_percent,  # نستخدم الربح كثقة
+                    liquidity_metrics=analysis.get('liquidity_metrics'),
+                    market_sentiment=analysis.get('market_sentiment', None),
+                    candle_analysis=candle_analysis,
+                    analysis_data=analysis,
+                    action='SELL'  # 🔑 مهم: نخبرهم إننا نسأل عن البيع
+                )
+
+                # حساب الأصوات الإيجابية للبيع (Bearish Keywords)
+                bearish_keywords = ['Bearish', 'Sell', 'Overbought', 'Peak', 'Reversal']
+
+                sell_vote_count = 0
+                for name, adv_text in advisors_advice.items():
+                    has_voted = any(k in str(adv_text) for k in bearish_keywords)
+                    if has_voted:
+                        sell_vote_count += 1
+                        sell_votes[name] = 1
+                    else:
+                        sell_votes[name] = 0
+
+                total_advisors = 10
+                
+                print(f"🗣️ Advisors Sell Votes: {sell_vote_count}/{total_advisors} ({int(sell_vote_count/total_advisors*100)}%)")
+                
+        except Exception as e:
+            print(f"⚠️ Sell voting error [{symbol}]: {e}")
+            sell_vote_count = 0
+            total_advisors = 10
+
+        # =========================================================
+        # 👑 2. الملك يقرر بناءً على القمة + المستشارين
+        # =========================================================
+        peak_analysis = analysis.get('peak', {})
+        peak_score = peak_analysis.get('confidence', 0)
+        
+        # 🚨 بيع فوري إذا:
+        # 1. المستشارون يؤكدون القمة (6+ أصوات)
+        # 2. نقاط القمة عالية (85+)
+        # 3. RSI مرتفع جداً (70+) مع MACD هابط
+        
+        king_wants_to_sell = False
+        sell_reason = ""
+        
+        # الشرط 1: المستشارون يؤكدون القمة (60%+ أصوات)
+        if sell_vote_count >= 6 and profit_percent > 1.0:
+            king_wants_to_sell = True
+            sell_reason = f"Advisors Confirm Peak: {sell_vote_count}/{total_advisors} votes"
+        
+        # الشرط 2: نقاط القمة عالية جداً
+        elif peak_score >= MIN_SELL_CONFIDENCE and profit_percent > 0.5:
+            king_wants_to_sell = True
+            sell_reason = f"Strong Peak Signal: {peak_score}/110 points"
+        
+        # الشرط 3: RSI مرتفع + MACD هابط + مستشارين يحذرون
+        elif rsi > 70 and macd_diff < -1 and sell_vote_count >= 4 and profit_percent > 1.5:
+            king_wants_to_sell = True
+            sell_reason = f"Technical Peak: RSI {rsi:.0f} + MACD {macd_diff:.1f} + {sell_vote_count} votes"
+        
+        # الشرط 4: ربح عالي (50%+) مع إشارات قمة متوسطة
+        elif profit_percent >= 50 and (peak_score >= 70 or sell_vote_count >= 5):
+            king_wants_to_sell = True
+            sell_reason = f"Wave Target Hit: {profit_percent:.1f}% (Peak: {peak_score}, Votes: {sell_vote_count})"
+        
+        # الشرط 5: ربح متوسط (30%+) مع إشارات قمة قوية جداً
+        elif profit_percent >= 30 and peak_score >= 95:
+            king_wants_to_sell = True
+            sell_reason = f"Strong Reversal at {profit_percent:.1f}% (Peak: {peak_score})"
+        
+        # =========================================================
+        # 👑 3. القرار النهائي
+        # =========================================================
+        if king_wants_to_sell:
+            optimism_penalty = round((profit_percent - 50) * 0.3, 2) if profit_percent > 50 else 0
+            return {
+                'action': 'SELL',
+                'reason': sell_reason,
+                'profit': profit_percent,
+                'optimism_penalty': optimism_penalty,
+                'sell_votes': sell_votes,
+                'peak_score': peak_score
+            }
+        
+        # =========================================================
+        # 🛡️ 4. Wave Protection (الحماية من الهبوط الحاد)
+        # =========================================================
         highest_price = position.get('highest_price', buy_price)
         drop_from_peak = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
         
+        # تخفيض Wave Protection من 11.1% إلى 5-7%
         atr_p = analysis.get('atr_percent', 2.5) 
-        trailing_threshold = atr_p * 4.0  # مساحة تنفس واسعة للموجات الكبيرة
-
-        optimism_penalty = round((analysis.get('rsi', 50) - 75) * 0.8, 2) if analysis.get('rsi', 50) > 75 else 0
+        trailing_threshold = max(3.0, atr_p * 1.0)  # حد أدنى 3% بدلاً من 11.1%
 
         if drop_from_peak >= trailing_threshold:
             return {
                 'action': 'SELL',
                 'reason': f'Wave Protection: -{drop_from_peak:.1f}% from peak',
                 'profit': profit_percent,
-                'optimism_penalty': optimism_penalty
+                'optimism_penalty': 0,
+                'sell_votes': sell_votes,
+                'peak_score': peak_score
             }
 
-        # --- 2. هدف الربح Wave Rider: 50-80% ---
-        if profit_percent >= 50:
-            peak_analysis = analysis.get('peak', {})
-            peak_score = peak_analysis.get('confidence', 0)
-            rsi = analysis.get('rsi', 50)
-            macd_diff = analysis.get('macd_diff', 0)
-            
-            # بيع عند 50%+ إذا ظهرت إشارات قمة قوية
-            if peak_score >= MIN_SELL_CONFIDENCE or (rsi > 75 and macd_diff < 0):
-                return {
-                    'action': 'SELL',
-                    'reason': f'Wave Target Hit: {profit_percent:.1f}% (Peak: {peak_score})',
-                    'profit': profit_percent,
-                    'optimism_penalty': round((profit_percent - 50) * 0.3, 2)
-                }
-
-        # --- 3. حماية من الانعكاس المفاجئ ---
-        if profit_percent >= 30:
-            peak_analysis = analysis.get('peak', {})
-            peak_score = peak_analysis.get('confidence', 0)
-            
-            if peak_score >= 100:
-                return {
-                    'action': 'SELL',
-                    'reason': f'Strong Reversal Signal at {profit_percent:.1f}%',
-                    'profit': profit_percent,
-                    'optimism_penalty': 0
-                }
-
+        # =========================================================
+        # ✅ 5. HOLD - مستمر في ركوب الموجة
+        # =========================================================
         return {
             'action': 'HOLD', 
-            'reason': f'Wave Riding | Profit: {profit_percent:+.1f}% | Target: 50-80%', 
-            'profit': profit_percent
+            'reason': f'Wave Riding | Profit: {profit_percent:+.1f}% | Peak: {peak_score} | Votes: {sell_vote_count}/{total_advisors}', 
+            'profit': profit_percent,
+            'sell_votes': sell_votes,
+            'peak_score': peak_score
         }
 
     def _get_whale_fingerprint_score(self, symbol):
