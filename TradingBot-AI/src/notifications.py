@@ -218,7 +218,7 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
         webhook_url=CRITICAL_WEBHOOK
     )
 
-    last_report_sent_time = datetime.now()
+    last_report_sent_time = datetime.now()  # ✅ تحديث الوقت بعد الإرسال الناجح
 
 
 
