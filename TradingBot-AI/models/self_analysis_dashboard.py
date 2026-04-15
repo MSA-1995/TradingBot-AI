@@ -19,13 +19,12 @@ class SelfAnalysisDashboard:
     
     def generate_performance_report(self, days=7):
         """
-        تقرير أداء شامل
+        تقرير أداء شامل متقدم
         """
         trades = self.storage.get_all_trades()
         if not trades:
             return {"error": "No trades found"}
         
-        # فلترة الصفقات حسب الفترة
         cutoff_date = datetime.now() - timedelta(days=days)
         recent_trades = [t for t in trades if self._parse_date(t.get('timestamp')) >= cutoff_date]
         
@@ -45,7 +44,16 @@ class SelfAnalysisDashboard:
         best_trade = max(recent_trades, key=lambda t: t.get('profit', 0))
         worst_trade = min(recent_trades, key=lambda t: t.get('profit', 0))
         
-        # 2. تحليل العملات
+        # 2. Profit Factor
+        profit_factor = self._calculate_profit_factor(winning_trades, losing_trades)
+        
+        # 3. Drawdown Analysis
+        drawdown_analysis = self._analyze_drawdown_periods(recent_trades)
+        
+        # 4. Trading Patterns
+        trading_patterns = self._detect_trading_patterns(recent_trades)
+        
+        # 5. تحليل العملات
         symbol_performance = {}
         for trade in recent_trades:
             symbol = trade.get('symbol')
@@ -59,14 +67,13 @@ class SelfAnalysisDashboard:
             
             symbol_performance[symbol]['total_profit'] += trade.get('profit', 0)
         
-        # ترتيب العملات حسب الأداء
         best_symbols = sorted(symbol_performance.items(), 
                             key=lambda x: x[1]['total_profit'], 
                             reverse=True)[:3]
         worst_symbols = sorted(symbol_performance.items(), 
                              key=lambda x: x[1]['total_profit'])[:3]
         
-        # 3. تحليل الأوقات
+        # 6. تحليل الأوقات
         hourly_performance = {}
         for trade in recent_trades:
             timestamp = self._parse_date(trade.get('timestamp'))
@@ -88,13 +95,14 @@ class SelfAnalysisDashboard:
         worst_hours = sorted(hourly_performance.items(), 
                            key=lambda x: x[1]['total_profit'])[:3]
         
-        # 4. تحليل الأخطاء
+        # 7. تحليل الأخطاء
         trap_trades = [t for t in recent_trades if t.get('trade_quality') in ['TRAP', 'RISKY']]
         trap_rate = (len(trap_trades) / total_trades * 100) if total_trades > 0 else 0
         
-        # 5. التوصيات
+        # 8. التوصيات
         recommendations = self._generate_recommendations(
-            win_rate, trap_rate, best_symbols, worst_symbols, best_hours, worst_hours
+            win_rate, trap_rate, best_symbols, worst_symbols, best_hours, worst_hours,
+            profit_factor, drawdown_analysis, trading_patterns
         )
         
         return {
@@ -107,7 +115,8 @@ class SelfAnalysisDashboard:
                 'win_rate': round(win_rate, 2),
                 'total_profit': round(total_profit, 2),
                 'avg_profit_per_trade': round(avg_profit, 2),
-                'trap_rate': round(trap_rate, 2)
+                'trap_rate': round(trap_rate, 2),
+                'profit_factor': profit_factor
             },
             'best_trade': {
                 'symbol': best_trade.get('symbol'),
@@ -119,6 +128,8 @@ class SelfAnalysisDashboard:
                 'profit': round(worst_trade.get('profit', 0), 2),
                 'timestamp': str(worst_trade.get('timestamp'))
             },
+            'drawdown_analysis': drawdown_analysis,
+            'trading_patterns': trading_patterns,
             'top_symbols': [
                 {
                     'symbol': s[0],
@@ -168,8 +179,8 @@ class SelfAnalysisDashboard:
         except:
             return None
     
-    def _generate_recommendations(self, win_rate, trap_rate, best_symbols, worst_symbols, best_hours, worst_hours):
-        """توليد توصيات ذكية"""
+    def _generate_recommendations(self, win_rate, trap_rate, best_symbols, worst_symbols, best_hours, worst_hours, profit_factor=None, drawdown_analysis=None, trading_patterns=None):
+        """توليد توصيات ذكية متقدمة"""
         recommendations = []
         
         # 1. توصيات معدل النجاح
@@ -188,7 +199,34 @@ class SelfAnalysisDashboard:
                 'action': 'تقليل MIN_CONFIDENCE قليلاً لزيادة الفرص'
             })
         
-        # 2. توصيات الفخاخ
+        # 2. Profit Factor
+        if profit_factor and profit_factor < 1.5:
+            recommendations.append({
+                'type': 'WARNING',
+                'title': 'Profit Factor منخفض',
+                'message': f'Profit Factor {profit_factor:.2f} - الأرباح لا تغطي الخسائر بشكل كاف',
+                'action': 'تحسين نقاط الخروج لزيادة الأرباح'
+            })
+        
+        # 3. Drawdown
+        if drawdown_analysis and drawdown_analysis.get('max_drawdown', 0) > 10:
+            recommendations.append({
+                'type': 'CRITICAL',
+                'title': 'Drawdown عالي',
+                'message': f'Max Drawdown {drawdown_analysis["max_drawdown"]:.1f}% - خطر على رأس المال',
+                'action': 'تقليل حجم الصفقات أو إيقاف التداول مؤقتاً'
+            })
+        
+        # 4. Trading Patterns
+        if trading_patterns and trading_patterns.get('overtrading'):
+            recommendations.append({
+                'type': 'WARNING',
+                'title': 'Overtrading مكتشف',
+                'message': 'عدد الصفقات عالي جداً - قد يؤدي لأخطاء',
+                'action': 'زيادة الفترة بين الصفقات'
+            })
+        
+        # 5. توصيات الفخاخ
         if trap_rate > 20:
             recommendations.append({
                 'type': 'WARNING',
@@ -197,7 +235,7 @@ class SelfAnalysisDashboard:
                 'action': 'تفعيل Liquidation Shield'
             })
         
-        # 3. توصيات العملات
+        # 6. توصيات العملات
         if worst_symbols:
             worst_symbol = worst_symbols[0][0]
             recommendations.append({
@@ -207,7 +245,7 @@ class SelfAnalysisDashboard:
                 'action': f'تجنب {worst_symbol} مؤقتاً أو رفع حد الثقة لها'
             })
         
-        # 4. توصيات الأوقات
+        # 7. توصيات الأوقات
         if worst_hours:
             worst_hour = worst_hours[0][0]
             recommendations.append({
@@ -218,6 +256,106 @@ class SelfAnalysisDashboard:
             })
         
         return recommendations
+    
+    def _calculate_profit_factor(self, winning_trades, losing_trades):
+        """حساب Profit Factor"""
+        try:
+            total_wins = sum(t.get('profit', 0) for t in winning_trades)
+            total_losses = abs(sum(t.get('profit', 0) for t in losing_trades))
+            
+            if total_losses == 0:
+                return 0
+            
+            profit_factor = total_wins / total_losses
+            return round(profit_factor, 2)
+        except:
+            return 0
+    
+    def _analyze_drawdown_periods(self, trades):
+        """تحليل فترات الانخفاض"""
+        try:
+            if not trades:
+                return {'max_drawdown': 0, 'current_drawdown': 0, 'drawdown_periods': []}
+            
+            # حساب رأس المال التراكمي
+            capital = 1000
+            peak = capital
+            max_drawdown = 0
+            drawdown_periods = []
+            current_drawdown_start = None
+            
+            for trade in trades:
+                profit = trade.get('profit', 0)
+                capital *= (1 + profit / 100)
+                
+                if capital > peak:
+                    # قمة جديدة
+                    if current_drawdown_start:
+                        # نهاية فترة انخفاض
+                        drawdown_periods.append({
+                            'start': current_drawdown_start,
+                            'end': trade.get('timestamp'),
+                            'depth': max_drawdown
+                        })
+                        current_drawdown_start = None
+                    peak = capital
+                else:
+                    # في فترة انخفاض
+                    if not current_drawdown_start:
+                        current_drawdown_start = trade.get('timestamp')
+                    
+                    drawdown = ((peak - capital) / peak) * 100
+                    max_drawdown = max(max_drawdown, drawdown)
+            
+            current_drawdown = ((peak - capital) / peak) * 100 if peak > 0 else 0
+            
+            return {
+                'max_drawdown': round(max_drawdown, 2),
+                'current_drawdown': round(current_drawdown, 2),
+                'drawdown_periods': len(drawdown_periods),
+                'longest_drawdown': max([self._parse_date(p['end']) - self._parse_date(p['start']) for p in drawdown_periods], default=timedelta(0)).days if drawdown_periods else 0
+            }
+        except:
+            return {'max_drawdown': 0, 'current_drawdown': 0, 'drawdown_periods': []}
+    
+    def _detect_trading_patterns(self, trades):
+        """كشف أنماط التداول"""
+        try:
+            if not trades:
+                return {}
+            
+            # 1. Overtrading Detection
+            trades_per_day = len(trades) / 7  # متوسط الصفقات يومياً
+            overtrading = trades_per_day > 10
+            
+            # 2. Revenge Trading Detection (التداول الانتقامي)
+            revenge_trades = 0
+            for i in range(1, len(trades)):
+                prev_trade = trades[i-1]
+                current_trade = trades[i]
+                
+                # إذا خسر ثم دخل فوراً في صفقة جديدة
+                if prev_trade.get('profit', 0) < 0:
+                    time_diff = self._parse_date(current_trade.get('timestamp')) - self._parse_date(prev_trade.get('timestamp'))
+                    if time_diff.total_seconds() < 300:  # أقل من 5 دقائق
+                        revenge_trades += 1
+            
+            revenge_trading = revenge_trades > len(trades) * 0.2  # أكثر من 20%
+            
+            # 3. Consistency Pattern
+            profits = [t.get('profit', 0) for t in trades]
+            import statistics
+            consistency = statistics.stdev(profits) if len(profits) > 1 else 0
+            
+            return {
+                'overtrading': overtrading,
+                'trades_per_day': round(trades_per_day, 1),
+                'revenge_trading': revenge_trading,
+                'revenge_trades_count': revenge_trades,
+                'consistency_score': round(100 - min(consistency, 100), 1)
+            }
+        except:
+            return {}
     
     def send_report_to_discord(self, report, webhook_url):
         """إرسال التقرير لديسكورد بشكل جميل"""
