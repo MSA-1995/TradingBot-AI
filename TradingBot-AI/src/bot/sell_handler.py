@@ -257,6 +257,16 @@ def process_sell(result, exchange, ctx):
             'profit': safe_float(trade_data.get('profit_percent', 0))
         })
 
+        # ✅ إصلاح: حفظ symbol_memory و trades_history للاستفادة في التدريب
+        try:
+            if meta and hasattr(meta, 'db_manager'):
+                symbol_memory_data = meta.db_manager.load_symbol_memory()
+                trade_data['symbol_memory'] = symbol_memory_data.get(symbol, {})
+                trade_data['trades_history'] = trade_data['symbol_memory'].get('total_trades', 0)
+        except Exception as e:
+            trade_data['symbol_memory'] = {}
+            trade_data['trades_history'] = 0
+
         storage.save_trade(trade_data)
         
         # =========================================================
