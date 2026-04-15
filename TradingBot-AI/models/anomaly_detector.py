@@ -255,16 +255,15 @@ class AnomalyDetector:
             return None
     
     def _detect_manipulation(self, symbol, analysis):
-        """كشف التلاعب بالسعر"""
+        """كشف التلاعب بالسعر المتقدم"""
         try:
             df = analysis.get('df')
             if df is None or len(df) < 20:
                 return None
             
-            # فحص الشموع المتطابقة (ممكن تلاعب)
+            # 1. فحص الشموع المتطابقة
             recent_closes = df['close'].tail(10).tolist()
             
-            # لو فيه 5 شموع متطابقة تقريباً
             if len(set([round(c, 4) for c in recent_closes])) <= 3:
                 return {
                     'type': 'PRICE_MANIPULATION',
@@ -273,14 +272,13 @@ class AnomalyDetector:
                     'action': 'AVOID'
                 }
             
-            # فحص Wick الطويل جداً (ممكن Stop Loss hunting)
+            # 2. فحص Wick الطويل (Stop Loss Hunting)
             for i in range(-5, 0):
                 candle = df.iloc[i]
                 body = abs(candle['close'] - candle['open'])
                 upper_wick = candle['high'] - max(candle['close'], candle['open'])
                 lower_wick = min(candle['close'], candle['open']) - candle['low']
                 
-                # لو الـ wick أطول من الـ body بـ 5 مرات
                 if body > 0 and (upper_wick > body * 5 or lower_wick > body * 5):
                     return {
                         'type': 'WICK_MANIPULATION',
@@ -289,8 +287,83 @@ class AnomalyDetector:
                         'action': 'CAUTION'
                     }
             
+            # 3. كشف Wash Trading
+            wash_trading = self._detect_wash_trading(df)
+            if wash_trading:
+                return wash_trading
+            
+            # 4. كشف Spoofing
+            spoofing = self._detect_spoofing(analysis)
+            if spoofing:
+                return spoofing
+            
             return None
             
+        except:
+            return None
+    
+    def _detect_wash_trading(self, df):
+        """كشف Wash Trading - تداول وهمي"""
+        try:
+            if len(df) < 20:
+                return None
+            
+            # Wash Trading: حجم عالي + سعر ثابت
+            volumes = df['volume'].tail(10).tolist()
+            closes = df['close'].tail(10).tolist()
+            
+            # حساب تغير السعر
+            price_change = abs((closes[-1] - closes[0]) / closes[0]) * 100
+            
+            # حساب متوسط الحجم
+            avg_volume = sum(volumes) / len(volumes)
+            recent_volume = volumes[-1]
+            
+            # Wash Trading: حجم عالي جداً + سعر يتحرك قليلاً
+            if recent_volume > avg_volume * 3 and price_change < 0.5:
+                return {
+                    'type': 'WASH_TRADING',
+                    'description': f'High volume ({recent_volume/avg_volume:.1f}x) with minimal price movement ({price_change:.2f}%)',
+                    'risk': 'CRITICAL',
+                    'action': 'AVOID'
+                }
+            
+            return None
+        except:
+            return None
+    
+    def _detect_spoofing(self, analysis):
+        """كشف Spoofing - أوامر وهمية"""
+        try:
+            # Spoofing: جدران كبيرة تظهر وتختفي بسرعة
+            # يحتاج Order Book تاريخي (غير متوفر حالياً)
+            
+            # مؤشر بسيط: إذا كان هناك تذبذب في السعر بدون تنفيذ
+            df = analysis.get('df')
+            if df is None or len(df) < 10:
+                return None
+            
+            # فحص التذبذب (Volatility Spikes)
+            highs = df['high'].tail(10).tolist()
+            lows = df['low'].tail(10).tolist()
+            closes = df['close'].tail(10).tolist()
+            
+            # حساب نطاق الشمعة
+            ranges = [(highs[i] - lows[i]) / closes[i] * 100 for i in range(len(highs))]
+            
+            # إذا كان هناك شمعة بنطاق كبير جداً (>5%) لكن الإغلاق قريب من الفتح
+            for i in range(len(ranges)):
+                if ranges[i] > 5:
+                    body = abs(closes[i] - df['open'].iloc[-(10-i)]) / closes[i] * 100
+                    if body < 1:  # جسم صغير + نطاق كبير = Spoofing
+                        return {
+                            'type': 'SPOOFING',
+                            'description': f'Large range ({ranges[i]:.1f}%) with small body - possible fake orders',
+                            'risk': 'HIGH',
+                            'action': 'CAUTION'
+                        }
+            
+            return None
         except:
             return None
     
