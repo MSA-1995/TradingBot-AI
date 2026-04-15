@@ -5,13 +5,24 @@ All bot settings and constants
 
 # Trading Parameters
 
-MIN_CONFIDENCE = 60  # تم تقليله للسماح بمزيد من الصفقات
-MIN_SELL_CONFIDENCE = 85  # Wave Rider: خروج عند قمة الموجة 50-80% (تم التخفيف من 90)
-MIN_CANDLE_SCORE = 75  # تم تقليله لجعل الدخول أسرع
-MIN_VOLUME_RATIO = 1.5  # تم تقليله لاكتشاف بداية الموجات مبكراً
-MACRO_CANDLE_THRESHOLD = 85  # حد الشموع لتجاوز حارس الماكرو (تم التخفيف من 95)
+MIN_SELL_CONFIDENCE = 85  # Wave Rider: خروج عند قمة الموجة 50-80%
+MIN_BUY_CONFIDENCE = 55   # حد الثقة للشراء (reversal analysis)
+MACRO_CANDLE_THRESHOLD = 85  # حد الشموع لتجاوز حارس الماكرو
 MAX_POSITIONS = 10  # صفقتين كحد أقصى لكل مجموعة (5+5)
 TOTAL_COINS_TO_SCAN = 10
+
+# =====================================================================
+# 👑 Meta Decision Thresholds (الأرقام المعتدلة - النظام الجديد)
+# =====================================================================
+META_BUY_INTELLIGENCE = 55      # حد الذكاء الكلي للشراء (معتدل)
+META_BUY_WHALE = 45             # حد نشاط الحيتان (معتدل)
+META_BUY_TREND = 55             # حد بداية الاتجاه (معتدل)
+META_BUY_VOLUME = 45            # حد زخم الحجم (معتدل)
+META_BUY_PATTERN = 45           # حد قوة النمط (معتدل)
+META_BUY_SUPPORT = 45           # حد قوة الدعم (معتدل)
+META_BUY_HISTORY = 55           # حد الذاكرة التاريخية (معتدل)
+META_BUY_CONSENSUS = 50         # حد الإجماع - 3+ مستشارين (معتدل)
+META_DISPLAY_THRESHOLD = 35     # حد عرض العملات (معتدل)
 
 # Capital Management
 MAX_CAPITAL = 3000
