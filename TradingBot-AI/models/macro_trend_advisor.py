@@ -17,49 +17,66 @@ class MacroTrendAdvisor:
     def get_macro_status(self):
         if not self.exchange: return "NEUTRAL"
         
-        # استخدام الكاش إذا لم تنتهِ الـ 5 دقائق
         current_time = time.time()
         if current_time - self._last_check_time < self._cache_duration:
             return self._last_status
 
         try:
-            # تحليل البتكوين على فريم يومي كمرجع للسوق العالمي
             ohlcv = self.exchange.fetch_ohlcv('BTC/USDT', '1d', limit=50)
             df = pd.DataFrame(ohlcv, columns=['ts', 'o', 'h', 'l', 'c', 'v'])
             
             available_days = len(df)
             current_price = df['c'].iloc[-1]
             
-            # ✅ نظام البديل الديناميكي (SMA20 أو SMA10 كبديل للـ Testnet)
+            # تحليل متقدم: SMA + EMA + RSI
             if available_days >= 20:
-                sma_value = df['c'].rolling(20).mean().iloc[-1]
-                sma_label = "SMA20"
+                sma_20 = df['c'].rolling(20).mean().iloc[-1]
+                ema_20 = df['c'].ewm(span=20).mean().iloc[-1]
+                
+                # حساب RSI للفريم اليومي
+                delta = df['c'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+                rs = gain / loss
+                rsi = 100 - (100 / (1 + rs))
+                current_rsi = rsi.iloc[-1]
+                
+                # حساب Momentum
+                momentum = ((current_price - df['c'].iloc[-10]) / df['c'].iloc[-10]) * 100
+                
+                print(f"\n🌐 [Macro] BTC: ${current_price:,.2f} | SMA20: ${sma_20:,.2f} | EMA20: ${ema_20:,.2f} | RSI: {current_rsi:.1f} | Momentum: {momentum:.1f}%")
+                
+                # تحديد الحالة بناءً على مؤشرات متعددة
+                if current_price > sma_20 * 1.05 and current_price > ema_20 and current_rsi > 60 and momentum > 5:
+                    status = "STRONG_BULL_MARKET"
+                elif current_price > sma_20 and current_price > ema_20 and current_rsi > 50:
+                    status = "BULL_MARKET"
+                elif current_price < sma_20 * 0.95 and current_price < ema_20 and current_rsi < 40:
+                    status = "STRONG_BEAR_MARKET"
+                elif current_price < sma_20 and current_price < ema_20:
+                    status = "BEAR_MARKET"
+                else:
+                    status = "SIDEWAYS"
+                
             elif available_days >= 10:
-                sma_value = df['c'].rolling(10).mean().iloc[-1]
-                sma_label = "SMA10 (Fallback)"
+                sma_10 = df['c'].rolling(10).mean().iloc[-1]
+                print(f"\n⚠️ [Macro] BTC: ${current_price:,.2f} | SMA10 (Fallback): ${sma_10:,.2f}")
+                
+                if current_price > sma_10 * 1.05:
+                    status = "STRONG_BULL_MARKET"
+                elif current_price > sma_10:
+                    status = "BULL_MARKET"
+                else:
+                    status = "BEAR_MARKET"
             else:
-                print(f"\n⚠️ [Macro Check] Insufficient data even for fallback (Need 10+ days, got {available_days})")
-                self._last_status = "NEUTRAL"
-                self._last_check_time = current_time
-                return "NEUTRAL"
-
-            # طباعة التأكيد مع توضيح نوع المتوسط المستخدم حالياً
-            print(f"\n🌐 [Macro Check] BTC: ${current_price:,.2f} | {sma_label}: ${sma_value:,.2f}")
-
-            # اتخاذ القرار بناءً على المتوسط المتاح
-            if current_price > sma_value * 1.05:
-                status = "STRONG_BULL_MARKET"
-            elif current_price > sma_value:
-                status = "BULL_MARKET"
-            else:
-                status = "BEAR_MARKET"
+                print(f"\n⚠️ [Macro] Insufficient data (Need 10+ days, got {available_days})")
+                status = "NEUTRAL"
             
             self._last_status = status
             self._last_check_time = current_time
             return status
             
         except Exception as e:
-            # print(f"⚠️ Macro Advisor Error: {e}")
             return "NEUTRAL"
 
     def can_aim_high(self):
