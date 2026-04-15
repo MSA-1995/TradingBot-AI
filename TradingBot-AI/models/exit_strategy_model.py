@@ -554,7 +554,7 @@ class ExitStrategyModel:
     
 
     def _detect_profit_spike(self, symbol, current_profit):
-        """🚀 كشف القفزات المفاجئة في الربح"""
+        """🚀 كشف القفزات المفاجئة - مقارنة مع آخر دورة فقط!"""
         try:
             now = datetime.now()
             
@@ -562,48 +562,44 @@ class ExitStrategyModel:
             if symbol not in self.profit_history:
                 self.profit_history[symbol] = []
             
-            self.profit_history[symbol].append((now, current_profit))
-            
-            # الاحتفاظ بآخر 60 ثانية فقط
-            self.profit_history[symbol] = [
-                (t, p) for t, p in self.profit_history[symbol]
-                if (now - t).total_seconds() <= 60
-            ]
-            
             history = self.profit_history[symbol]
             
-            if len(history) < 2:
-                return {'should_sell': False}
-            
-            # فحص آخر 30 ثانية
-            recent_30s = [(t, p) for t, p in history if (now - t).total_seconds() <= 30]
-            
-            if len(recent_30s) < 2:
-                return {'should_sell': False}
-            
-            # حساب القفزة
-            oldest_profit = recent_30s[0][1]
-            profit_jump = current_profit - oldest_profit
-            
-            # ✅ القرار: إذا قفز +8% خلال 30 ثانية = بيع فوري!
-            if profit_jump >= 8 and current_profit >= 10:
-                return {
-                    'should_sell': True,
-                    'reason': f'PROFIT SPIKE: +{profit_jump:.1f}% in 30s (from {oldest_profit:.1f}% to {current_profit:.1f}%)'
-                }
-            
-            # ✅ فحص الهبوط السريع بعد القفزة
-            if len(history) >= 3:
-                # آخر 3 قراءات
-                last_3 = history[-3:]
-                peak_profit = max(p for t, p in last_3)
+            # ✅ مقارنة مع آخر دورة فقط!
+            if len(history) >= 1:
+                last_time, last_profit = history[-1]
+                time_diff = (now - last_time).total_seconds()
                 
-                # إذا وصل قمة عالية ثم هبط بسرعة
-                if peak_profit >= 12 and current_profit < peak_profit - 3:
-                    return {
-                        'should_sell': True,
-                        'reason': f'PROFIT CRASH: Dropped from {peak_profit:.1f}% to {current_profit:.1f}% in seconds'
-                    }
+                # إذا مر أقل من 20 ثانية (دورتين)
+                if time_diff <= 20:
+                    profit_jump = current_profit - last_profit
+                    
+                    # ✅ قفزة سريعة: +5% بين دورتين
+                    if profit_jump >= 5 and current_profit >= 8:
+                        return {
+                            'should_sell': True,
+                            'reason': f'PROFIT SPIKE: +{profit_jump:.1f}% in {time_diff:.0f}s (from {last_profit:.1f}% to {current_profit:.1f}%)'
+                        }
+                    
+                    # ✅ قفزة ضخمة: +8% بين دورتين
+                    if profit_jump >= 8 and current_profit >= 10:
+                        return {
+                            'should_sell': True,
+                            'reason': f'PROFIT SPIKE: +{profit_jump:.1f}% in {time_diff:.0f}s (from {last_profit:.1f}% to {current_profit:.1f}%)'
+                        }
+                    
+                    # ✅ هبوط سريع: -3% بعد قمة
+                    if last_profit >= 10 and profit_jump <= -3:
+                        return {
+                            'should_sell': True,
+                            'reason': f'PROFIT CRASH: Dropped {profit_jump:.1f}% in {time_diff:.0f}s (from {last_profit:.1f}% to {current_profit:.1f}%)'
+                        }
+            
+            # حفظ القراءة الحالية
+            self.profit_history[symbol].append((now, current_profit))
+            
+            # الاحتفاظ بآخر 5 قراءات فقط (تقريباً 45 ثانية)
+            if len(self.profit_history[symbol]) > 5:
+                self.profit_history[symbol] = self.profit_history[symbol][-5:]
             
             return {'should_sell': False}
             
