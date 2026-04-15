@@ -196,22 +196,39 @@ class SmartMoneyTracker:
             return 0
     
     def analyze_order_flow(self, symbol, analysis):
-        """تحليل تدفق الأوامر - تم تبسيطه ليعتمد على البيانات المتاحة"""
+        """تحليل تدفق الأوامر المتقدم - CVD + Pressure Analysis"""
         try:
             price_trend = analysis.get('price_momentum', 0)
             volume_trend = analysis.get('volume_trend', 0)
-
-            if price_trend > 0 and volume_trend > 0:
-                # تراكم قوي
-                if price_trend > 2 and volume_trend > 50:
-                    return 10
-                # تراكم متوسط
-                elif price_trend > 1 and volume_trend > 30:
-                    return 5
+            current_volume = analysis.get('volume', 0)
+            avg_volume = analysis.get('volume_sma', 1)
             
-            # إذا السعر نازل والحجم يزيد = توزيع (Distribution)
+            # 1. CVD (Cumulative Volume Delta) - تقدير
+            # إذا السعر صاعد + حجم عالي = ضغط شراء
+            # إذا السعر نازل + حجم عالي = ضغط بيع
+            volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1.0
+            
+            # 2. Buying/Selling Pressure
+            if price_trend > 0 and volume_trend > 0:
+                # تراكم قوي (Accumulation)
+                if price_trend > 2 and volume_ratio > 2.0:
+                    return 15  # ضغط شراء قوي جداً
+                elif price_trend > 1 and volume_ratio > 1.5:
+                    return 10  # ضغط شراء قوي
+                elif price_trend > 0.5 and volume_trend > 30:
+                    return 5   # ضغط شراء متوسط
+            
+            # 3. Distribution (توزيع)
             elif price_trend < 0 and volume_trend > 0:
-                return -10
+                if price_trend < -2 and volume_ratio > 2.0:
+                    return -15  # ضغط بيع قوي جداً
+                elif price_trend < -1:
+                    return -10  # ضغط بيع قوي
+            
+            # 4. Weak Hands Shakeout (هز الأيدي الضعيفة)
+            # السعر نازل قليلاً لكن الحجم منخفض = لا يوجد ضغط بيع حقيقي
+            elif price_trend < -0.5 and volume_ratio < 0.8:
+                return 8  # فرصة شراء (الحيتان تجمع)
             
             return 0
         
