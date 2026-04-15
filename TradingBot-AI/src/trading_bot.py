@@ -259,7 +259,7 @@ if NEWS_ENABLED:
 
 print(f"💰 Amount: Dynamic (Institutional Scale)")
 print(f"🎯 TP: Wave Rider (50-80%) | SL: ATR Adaptive")
-print(f"🎯 Min Buy Confidence: {MIN_CONFIDENCE}/100\n")
+print(f"🎯 Min Buy Confidence: {MIN_BUY_CONFIDENCE}/100\n")
 
 # Startup notification calls removed for simplification.
 # load_status_message_id()
