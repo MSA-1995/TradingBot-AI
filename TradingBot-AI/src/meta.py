@@ -761,9 +761,75 @@ class Meta:
         rsi = analysis.get('rsi', 50)
         macd_diff = analysis.get('macd_diff', 0)
         volume_ratio = analysis.get('volume_ratio', 1.0)
+        
+        # نقاط القمة (تبدأ من 0)
+        peak_confidence = 0
+        peak_reasons = []
 
         # =========================================================
-        # 🗣️ 1. استشارة المستشارين عن القمة (مثل الشراء تماماً)
+        # 🌟 المستشارين الجدد - يكشفون القمة قبل الانهيار
+        # =========================================================
+        
+        # --- 🎯 1. Trend Early Detector - كشف إنهاك الاتجاه ---
+        try:
+            trend_detector = self.advisor_manager.get('TrendEarlyDetector') if self.advisor_manager else None
+            if trend_detector:
+                candles_data = analysis.get('candles', [])
+                if len(candles_data) >= 30:
+                    import pandas as pd
+                    df = pd.DataFrame(candles_data)
+                    
+                    # كشف إنهاك الاتجاه الصاعد
+                    exhaustion = trend_detector.get_trend_exhaustion_score(df, 'BULLISH')
+                    
+                    if exhaustion >= 75:
+                        peak_confidence += 30
+                        peak_reasons.append(f"Trend Exhaustion: {exhaustion}% (+30)")
+                        print(f"🎯 Trend Exhaustion Detected: {exhaustion}%")
+                    elif exhaustion >= 50:
+                        peak_confidence += 15
+                        peak_reasons.append(f"Trend Weakening: {exhaustion}% (+15)")
+        except Exception as e:
+            print(f"⚠️ Trend detector error: {e}")
+        
+        # --- 📊 2. Volume Forecast - كشف انهيار الحجم ---
+        try:
+            volume_engine = self.advisor_manager.get('VolumeForecastEngine') if self.advisor_manager else None
+            if volume_engine:
+                candles_data = analysis.get('candles', [])
+                if len(candles_data) >= 20:
+                    volumes = [c.get('volume', 0) for c in candles_data[-20:]]
+                    current_hour = datetime.now().hour
+                    
+                    prediction = volume_engine.predict_next_volume(symbol, volumes, current_hour)
+                    
+                    # انهيار الحجم = إشارة قمة
+                    if prediction['trend'] == 'DECREASING' and prediction['momentum'] < -20:
+                        peak_confidence += 20
+                        peak_reasons.append(f"Volume Collapse: {prediction['momentum']:.1f}% (+20)")
+                        print(f"📊 Volume Collapse Detected: {prediction['momentum']:.1f}%")
+                    elif prediction['trend'] == 'DECREASING':
+                        peak_confidence += 10
+                        peak_reasons.append(f"Volume Declining (+10)")
+        except Exception as e:
+            print(f"⚠️ Volume forecast error: {e}")
+        
+        # --- 🧬 3. Adaptive Intelligence - تعديل حد البيع ---
+        try:
+            adaptive_ai = self.advisor_manager.get('AdaptiveIntelligence') if self.advisor_manager else None
+            if adaptive_ai:
+                profile = adaptive_ai.get_symbol_profile(symbol)
+                
+                # إذا العملة تاريخياً تنهار بسرعة، نبيع أسرع
+                if profile.get('avg_profit', 0) < 2.0 and profit_percent > 5.0:
+                    peak_confidence += 15
+                    peak_reasons.append(f"Adaptive: Quick Exit for {symbol} (+15)")
+                    print(f"🧬 Adaptive: {symbol} tends to crash fast, exit now!")
+        except Exception as e:
+            print(f"⚠️ Adaptive AI error: {e}")
+
+        # =========================================================
+        # 🗣️ 4. استشارة المستشارين الـ 10 عن القمة
         # =========================================================
         sell_vote_count = 0
         total_advisors = 0
@@ -818,10 +884,10 @@ class Meta:
             total_advisors = 10
 
         # =========================================================
-        # 👑 2. الملك يقرر بناءً على القمة + المستشارين
+        # 👑 5. الملك يقرر بناءً على القمة + المستشارين
         # =========================================================
         peak_analysis = analysis.get('peak', {})
-        peak_score = peak_analysis.get('confidence', 0)
+        peak_score = peak_analysis.get('confidence', 0) + peak_confidence  # إضافة نقاط المستشارين الجدد
         
         # 🚨 بيع فوري إذا:
         # 1. المستشارون يؤكدون القمة (6+ أصوات)
@@ -836,7 +902,7 @@ class Meta:
             king_wants_to_sell = True
             sell_reason = f"Advisors Confirm Peak: {sell_vote_count}/{total_advisors} votes"
         
-        # الشرط 2: نقاط القمة عالية جداً
+        # الشرط 2: نقاط القمة عالية جداً (مع المستشارين الجدد)
         elif peak_score >= MIN_SELL_CONFIDENCE and profit_percent > 0.5:
             king_wants_to_sell = True
             sell_reason = f"Strong Peak Signal: {peak_score}/110 points"
@@ -856,8 +922,13 @@ class Meta:
             king_wants_to_sell = True
             sell_reason = f"Strong Reversal at {profit_percent:.1f}% (Peak: {peak_score})"
         
+        # الشرط 6: المستشارين الجدد يكتشفون إنهاك + انهيار حجم
+        elif peak_confidence >= 40 and profit_percent > 3.0:
+            king_wants_to_sell = True
+            sell_reason = f"New Advisors Alert: {', '.join(peak_reasons)}"
+        
         # =========================================================
-        # 👑 3. القرار النهائي
+        # 👑 6. القرار النهائي
         # =========================================================
         if king_wants_to_sell:
             optimism_penalty = round((profit_percent - 50) * 0.3, 2) if profit_percent > 50 else 0
@@ -867,16 +938,17 @@ class Meta:
                 'profit': profit_percent,
                 'optimism_penalty': optimism_penalty,
                 'sell_votes': sell_votes,
-                'peak_score': peak_score
+                'peak_score': peak_score,
+                'peak_reasons': peak_reasons
             }
         
         # =========================================================
-        # 🛡️ 4. Wave Protection (الحماية من الهبوط الحاد)
+        # 🛡️ 7. Wave Protection (الحماية من الهبوط الحاد)
         # =========================================================
         highest_price = position.get('highest_price', buy_price)
         drop_from_peak = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
         
-        # تخفيض Wave Protection من 11.1% إلى 5-7%
+        # تخفيض Wave Protection من 11.1% إلى 3-7%
         atr_p = analysis.get('atr_percent', 2.5) 
         trailing_threshold = max(3.0, atr_p * 1.0)  # حد أدنى 3% بدلاً من 11.1%
 
@@ -891,7 +963,7 @@ class Meta:
             }
 
         # =========================================================
-        # ✅ 5. HOLD - مستمر في ركوب الموجة
+        # ✅ 8. HOLD - مستمر في ركوب الموجة
         # =========================================================
         return {
             'action': 'HOLD', 
