@@ -383,10 +383,17 @@ class Meta:
         # 👑 الملك يحلل كل الذكاء المجموع
         # =====================================================================
         
+        # 🔍 DEBUG: طباعة الذكاء المجموع من المستشارين
+        print(f"\n🔍 DEBUG [{symbol}] - Advisors Intelligence:")
+        for key, value in advisors_intelligence.items():
+            print(f"   {key}: {value}")
+        
         # Layer 1: التحليل الفني الأساسي
         rsi = analysis_data.get('rsi', 50)
         macd_diff = analysis_data.get('macd_diff', 0)
         volume_ratio = analysis_data.get('volume_ratio', 1.0)
+        
+        print(f"   RSI: {rsi:.1f} | MACD: {macd_diff:.2f} | Volume: {volume_ratio:.2f}x")
         
         technical_score = 0
         if rsi <= 35:
@@ -442,6 +449,9 @@ class Meta:
             macro_trend * 0.02                 # 2% الاتجاه الكلي
         )
         
+        print(f"   Technical Score: {technical_score}")
+        print(f"   Total Intelligence (before memory): {total_intelligence:.1f}/100")
+        
         # Layer 4: الجرأة من الذاكرة
         courage_boost = self._get_courage_boost(symbol, rsi, volume_ratio)
         time_mod, _ = self._get_time_memory_modifier(symbol)
@@ -450,6 +460,9 @@ class Meta:
         
         memory_intelligence = courage_boost + time_mod + pattern_boost + win_boost
         total_intelligence += memory_intelligence
+        
+        print(f"   Memory Intelligence: {memory_intelligence:.1f}")
+        print(f"   Total Intelligence (final): {total_intelligence:.1f}/100")
         
         # Layer 5: الحماية من المخاطر الحرجة
         flash_crash = analysis_data.get('flash_crash_protection', {})
@@ -473,6 +486,8 @@ class Meta:
         # 👑 القرار النهائي (الملك يقرر بحرية بناءً على الذكاء المجموع)
         # =====================================================================
         
+        print(f"\n👑 King Decision Process:")
+        
         king_wants_to_buy = False
         buy_reason = ""
         
@@ -480,16 +495,19 @@ class Meta:
         if total_intelligence >= 85:
             king_wants_to_buy = True
             buy_reason = f"ثقة عالية جداً: {total_intelligence:.0f}/100"
+            print(f"   ✅ Scenario 1: High Intelligence ({total_intelligence:.0f} >= 85)")
         
         # السيناريو 2: حيتان تشتري بقوة + ذكاء جيد
         elif whale_activity > 75 and total_intelligence >= 70:
             king_wants_to_buy = True
             buy_reason = f"حيتان تشتري + ثقة: {total_intelligence:.0f}/100"
+            print(f"   ✅ Scenario 2: Whale Activity ({whale_activity:.0f} > 75 & {total_intelligence:.0f} >= 70)")
         
         # السيناريو 3: بداية اتجاه قوي + ذكاء جيد
         elif trend_birth > 85 and total_intelligence >= 70:
             king_wants_to_buy = True
             buy_reason = f"بداية موجة قوية: {total_intelligence:.0f}/100"
+            print(f"   ✅ Scenario 3: Trend Birth ({trend_birth:.0f} > 85 & {total_intelligence:.0f} >= 70)")
         
         # السيناريو 4: انفجار حجم متوقع + ذكاء جيد
         elif volume_momentum > 80 and total_intelligence >= 70:
@@ -517,13 +535,19 @@ class Meta:
             if support_strength > 70: strong_signals += 1
             if historical_success > 75: strong_signals += 1
             
+            print(f"   Scenario 7: Intelligence {total_intelligence:.0f} >= 75, Strong Signals: {strong_signals}/6")
+            
             if strong_signals >= 3:
                 king_wants_to_buy = True
                 buy_reason = f"{strong_signals} مستشارين يؤكدون: {total_intelligence:.0f}/100"
+                print(f"   ✅ Scenario 7: Multiple Advisors Confirm ({strong_signals} >= 3)")
         
         # =====================================================================
         # 📊 النتيجة النهائية
         # =====================================================================
+        
+        print(f"\n📊 Final Decision: {'BUY' if king_wants_to_buy else 'DISPLAY'}")
+        print(f"   Reason: {buy_reason if king_wants_to_buy else f'Intelligence {total_intelligence:.0f}/100 - انتظار قاع أفضل'}\n")
         
         if king_wants_to_buy:
             action = "BUY"
@@ -549,520 +573,6 @@ class Meta:
                 'confidence': min(total_intelligence, 99),
                 'advisors_intelligence': advisors_intelligence
             }
-        
-        # =====================================================================
-        # 🌟 الأنظمة الحصرية الـ 5 - تعمل قبل أي شيء
-        # =====================================================================
-        
-        # --- 🧬 1. Adaptive Intelligence - تعديل الثقة بناءً على تاريخ العملة ---
-        try:
-            adaptive_ai = self.advisor_manager.get('AdaptiveIntelligence') if self.advisor_manager else None
-            if adaptive_ai:
-                temp_conf = adaptive_ai.adjust_confidence(symbol, temp_conf)
-        except Exception:
-            pass
-        
-        # --- 🔮 2. Volume Forecasting - التنبؤ بانفجار الحجم ---
-        try:
-            volume_engine = self.advisor_manager.get('VolumeForecastEngine') if self.advisor_manager else None
-            if volume_engine:
-                candles = analysis_data.get('candles', [])
-                if len(candles) >= 20:
-                    volumes = [c.get('volume', 0) for c in candles[-20:]]
-                    current_hour = datetime.now().hour
-                    
-                    prediction = volume_engine.predict_next_volume(symbol, volumes, current_hour)
-                    breakout = volume_engine.detect_volume_breakout(symbol, volumes, prediction)
-                    
-                    if breakout['breakout_imminent']:
-                        temp_conf += 15
-                        reasons.append(f"Volume Breakout Imminent ({breakout['probability']}%) (+15)")
-        except Exception:
-            pass
-        
-        # --- 🎯 3. Trend Early Detection - كشف بداية الاتجاه ---
-        try:
-            trend_detector = self.advisor_manager.get('TrendEarlyDetector') if self.advisor_manager else None
-            if trend_detector:
-                candles = analysis_data.get('candles', [])
-                if len(candles) >= 30:
-                    import pandas as pd
-                    df = pd.DataFrame(candles)
-                    order_book = analysis_data.get('order_book')
-                    
-                    trend_data = trend_detector.detect_trend_birth(df, order_book)
-                    
-                    if trend_data['trend'] == 'BULLISH' and trend_data['stage'] == 'BIRTH':
-                        temp_conf += 20
-                        reasons.append(f"Trend Birth Detected ({trend_data['strength']}) (+20)")
-                    elif trend_data['trend'] == 'BULLISH' and trend_data['stage'] == 'GROWTH':
-                        temp_conf += 10
-                        reasons.append(f"Early Trend Growth (+10)")
-        except Exception:
-            pass
-        
-        # --- 🛡️ 4. Liquidation Shield - حماية من التصفية ---
-        try:
-            liq_shield = self.advisor_manager.get('LiquidationShield') if self.advisor_manager else None
-            if liq_shield:
-                current_price = analysis_data.get('close', 0)
-                order_book = analysis_data.get('order_book')
-                
-                if order_book:
-                    liq_analysis = liq_shield.analyze_liquidation_risk(symbol, current_price, order_book)
-                    
-                    if liq_analysis['risk_level'] == 'HIGH':
-                        temp_conf -= 30
-                        reasons.append(f"High Liquidation Risk (-30)")
-                        # لا نشتري في مناطق خطرة
-                        return {
-                            'action': 'DISPLAY',
-                            'reason': f'🛡️ Liquidation Risk: {liq_analysis["recommendation"]}',
-                            'confidence': 0
-                        }
-                    elif liq_analysis['risk_level'] == 'MEDIUM':
-                        temp_conf -= 10
-                        reasons.append(f"Medium Liquidation Risk (-10)")
-        except Exception:
-            pass
-        
-        # =====================================================================
-        
-        # --- 1. Market Mood ---
-        mood_details = self._get_market_mood(analysis_data)
-        market_mood = mood_details['mood']
-
-        # --- 🎯 1.2 Macro Filter (مرشح الاتجاه الماكرو) ---
-        macro_advisor = None
-        if self.advisor_manager:
-            try:
-                macro_advisor = self.advisor_manager.get('MacroTrendAdvisor')
-            except Exception:
-                pass
-        
-        macro_status = "NEUTRAL"
-        if macro_advisor:
-            try:
-                macro_status = macro_advisor.get_macro_status()
-            except Exception:
-                macro_status = "NEUTRAL"
-        
-        is_macro_bullish = macro_status in ["STRONG_BULL_MARKET", "BULL_MARKET"]
-        
-        # بدلاً من رقم ثابت، نعدل الثقة بناءً على "بيئة السوق"
-        if macro_status == "BEAR_MARKET":
-            temp_conf -= 25
-            reasons.append(f"Macro Risk: {macro_status}")
-
-        # --- 🎯 1.5 Market Regime Detection - حالة السوق ---
-        market_regime = analysis_data.get('market_regime', {})
-        regime = market_regime.get('regime', 'UNKNOWN')
-        
-        # في ترند هابط قوي - لا تشتري بدون تأكيد اضافي
-        if regime == 'STRONG_DOWNTREND':
-            temp_conf -= 15
-            reasons.append("Strong Downtrend (-15)")
-        
-        # في تقلبات عالية - خفض الحجم
-        regime_position_multiplier = market_regime.get('trading_advice', {}).get('position_size', 1.0)
-        
-        # --- 🚨 1.6 Flash Crash Protection - حماية السقوط المفاجئ ---
-        flash_crash = analysis_data.get('flash_crash_protection', {})
-        flash_risk_score = flash_crash.get('risk_score', 0)
-        
-        # خطر حرج - لا تتاجر
-        if flash_risk_score >= 70:
-            print(f"🚫 META BLOCK [{symbol}]: Flash Crash CRITICAL ({flash_risk_score}%)")
-            return {
-                'action': 'DISPLAY',
-                'reason': f'🚨 Flash Crash Risk ({flash_risk_score}%) - STOP',
-                'confidence': 0,
-                'flash_risk': flash_risk_score
-            }
-        
-        # خطر عالي - فقط البيع (متوسط: رفعنا من 50 إلى 60)
-        if flash_risk_score >= 60:
-            print(f"🚫 META BLOCK [{symbol}]: Flash Crash HIGH ({flash_risk_score}%)")
-            return {
-                'action': 'DISPLAY',
-                'reason': f'⚠️ High Risk ({flash_risk_score}%) - No Buy',
-                'confidence': 0,
-                'flash_risk': flash_risk_score
-            }
-
-        # --- ⏰ 1.7 Time Analysis - تحليل الوقت ---
-        time_analysis = analysis_data.get('time_analysis', {})
-        time_recommendation = time_analysis.get('trading_recommendation', {})
-        time_multiplier = time_recommendation.get('size_multiplier', 1.0)
-        time_can_trade = time_recommendation.get('can_trade', True)
-        
-        # وقت سيء - لا تتاجر
-        if not time_can_trade:
-            print(f"🚫 META BLOCK [{symbol}]: Bad Time ({time_recommendation.get('reason', '')})")
-            return {
-                'action': 'DISPLAY',
-                'reason': f'⏰ Bad Time: {time_recommendation.get("reason", "")}',
-                'confidence': 0,
-                'time_analysis': time_analysis
-            }
-
-        # =====================================================================
-        # 👑 THE EXCLUSIVE 10-POINT SYSTEM (النظام العشري الحصري)
-        # =====================================================================
-        rsi = analysis_data.get('rsi', 50)
-        price_mom = analysis_data.get('price_momentum', 0)
-        
-        # 1 & 8. Liquidity Sweep & Trap Detection (قنص السيولة والمصائد)
-        if analysis_data.get('liquidity_sweep'):
-            temp_conf += 25
-            reasons.append("🎯 Liquidity Sweep (Whale Buy-back)")
-        if analysis_data.get('liquidity_trap'):
-            temp_conf -= 40 # عقوبة قاسية للمصيدة
-            reasons.append("🚫 Liquidity Trap (Fake Wall)")
-
-        # 2 & 7. Sentiment Velocity & Propagation (سرعة انتشار المشاعر)
-        ext_impact = analysis_data.get('external_impact', {})
-        ext_score = ext_impact.get('score', 50)
-        if ext_score > 65 and price_mom > 2.0:
-            temp_conf += 20
-            reasons.append("⚡ Sentiment Velocity (Front-running)")
-
-        # 3 & 10. Session Personality & Time Fingerprinting (بصمة الجلسات)
-        session = analysis_data.get('time_analysis', {}).get('current_session', 'QUIET')
-        if session == 'AMERICAN' and symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']:
-            temp_conf += 15 # الجلسة الأمريكية تحب السيولة العالية
-            reasons.append(f"🏛️ Session Alpha: {session}")
-
-        # 4 & 6. BTC Shadow Alpha & Alpha Divergence (الارتباط العكسي)
-        rel_strength = analysis_data.get('relative_strength_btc', 0)
-        btc_trend = analysis_data.get('btc_change_1h', 0)
-        if btc_trend < -0.5 and rel_strength > 1.2:
-            temp_conf += 22 # العملة قوية بينما الملك يهبط (جوهر الحصرية)
-            reasons.append("💎 BTC Shadow Alpha (Resilience)")
-        elif btc_trend > 0.5 and rel_strength < -1.0:
-            temp_conf -= 20 # العملة ضعيفة رغم صعود السوق
-            reasons.append("⚠️ Negative Alpha Divergence")
-
-        # 9. Dynamic Re-Entry (إعادة التمركز الديناميكي)
-        data = self._load_learning_data()
-        win_rate_data = data.get('symbol_win_rate', {}).get(symbol, {})
-        if win_rate_data.get('wins', 0) >= 1 and 45 < rsi < 55 and price_mom > 0.3:
-            temp_conf += 15
-            reasons.append("🔄 Dynamic Re-Entry (Trend Continuation)")
-
-        # --- 🤖 AI META PREDICTION (ذكاء الملك من الداتابيز) ---
-        if self.meta_model:
-            try:
-                # استخلاص الميزات كما تعلمها الموديل في الداتابيز
-                # نستخدم دالة مساعدة لجلب الـ features الـ 42
-                from MSA_DeepLearning_Trainer.core.features import calculate_enhanced_features, get_feature_names
-                feats = calculate_enhanced_features(analysis_data, None)
-                # التنبؤ بناءً على الموديل
-                ai_prob = self.meta_model.predict_proba([feats])[:, 1][0]
-                if ai_prob > 0.65:
-                    ai_boost = int((ai_prob - 0.5) * 40) # إضافة حتى 20 نقطة ثقة
-                    temp_conf += ai_boost
-                    reasons.append(f"🧠 AI King Confidence (+{ai_boost})")
-            except Exception: pass
-
-        # =====================================================================
-        # 🛰️ SUPER-INSTITUTIONAL LAYER (التحقق المتقاطع وبصمة الحيتان)
-        # =====================================================================
-        
-        # 1. نظام التحقق المتقاطع (Cross-Exchange Verification)
-        ext_impact = analysis_data.get('external_impact', {})
-        global_p = ext_impact.get('global_price')
-        current_p = analysis_data.get('close', 0)
-        if global_p and current_p > 0:
-            deviation = ((current_p - global_p) / global_p) * 100
-            if deviation > 0.8: # سعر بينانس أعلى بكثير من السعر العالمي
-                temp_conf -= 35
-                reasons.append(f"⚠️ Local Pump Detected (Dev:{deviation:.1f}%)")
-            elif deviation < -0.8:
-                temp_conf += 10 # فرصة أربيتراج أو تجميع محلي
-                reasons.append("💎 Local Discount (Arbitrage Op)")
-
-        # 2. ذاكرة بصمة الحيتان (Whale Behavior Fingerprinting)
-        whale_conf = analysis_data.get('whale_confidence', 0)
-        if whale_conf != 0:
-            # ✅ استشارة ذاكرة الحيتان: هل الحيتان صادقون في هذه العملة؟
-            whale_impact_memory = self._get_whale_fingerprint_score(symbol)
-            temp_conf += whale_impact_memory
-            if whale_impact_memory > 0: reasons.append("🐋 Whale Signature Validated (Memory)")
-            elif whale_impact_memory < 0: reasons.append("⚠️ Whale Trap History Detected")
-
-        # --- 2. Technical Indicators (تكملة بدم بارد) ---
-        macd_diff = analysis_data.get('macd_diff', 0)
-        volume_ratio = analysis_data.get('volume_ratio', 1.0)
-        ema_crossover = analysis_data.get('ema_crossover', 0)
-
-        # 🚨 تجنب الأفخاخ والقمم الوهمية: لو السعر محلياً أعلى بكثير من السعر العالمي (Local Pump)
-        if temp_conf < 40 and analysis_data.get('liquidity_trap'):
-            return {
-                'action': 'DISPLAY',
-                'reason': '🚫 Trap Avoidance: Liquidity Trap Detected',
-                'confidence': 0
-            }
-
-        if rsi <= 35:
-            temp_conf += 25
-            reasons.append(f"RSI Low ({rsi:.0f})")
-        elif 35 < rsi <= 45:          # ✅ متوسط: أضفنا نطاق 35-45 منفصل
-            temp_conf += 20
-            reasons.append(f"RSI Oversold ({rsi:.0f})")
-        elif 45 < rsi < 55:
-            temp_conf += 12
-            reasons.append(f"RSI OK ({rsi:.0f})")
-        elif 55 <= rsi <= 65:
-            temp_conf += 5             # ✅ متوسط: نطاق 55-65 يضيف نقاط خفيفة
-            reasons.append(f"RSI Neutral ({rsi:.0f})")
-        # RSI 65-85: لا يضيف ولا يمنع
-
-        # MACD: متوسط - نطاقات متدرجة
-        if macd_diff > 1.0:
-            temp_conf += 18
-            reasons.append("MACD Strong Bullish")
-        elif macd_diff > 0.3:         # ✅ خففنا من 0.5 إلى 0.3
-            temp_conf += 12
-            reasons.append("MACD Bullish")
-        elif macd_diff > 0:
-            temp_conf += 5            # ✅ حتى MACD موجب بسيط يضيف نقاط
-            reasons.append("MACD Positive")
-
-        if volume_ratio > 2.0:
-            temp_conf += 22
-            reasons.append(f"Vol Very High ({volume_ratio:.1f}x)")
-        elif volume_ratio > 1.3:      # ✅ خففنا من 1.5 إلى 1.3
-            temp_conf += 15
-            reasons.append(f"Vol Up ({volume_ratio:.1f}x)")
-        elif volume_ratio > 1.0:      # ✅ حتى حجم طبيعي يضيف نقاط خفيفة
-            temp_conf += 7
-            reasons.append(f"Vol Normal ({volume_ratio:.1f}x)")
-
-        if ema_crossover > 0:
-            temp_conf += 15
-            reasons.append("EMA Cross")
-
-        # --- 3. كشف القاع بالشموع (نظام الثقة الجديد) ---
-        reversal = analysis_data.get('reversal', {})
-        reversal_confidence = reversal.get('confidence', 0)
-        reversal_reasons = reversal.get('reasons', [])
-
-        if reversal_confidence > 0:
-            temp_conf += reversal_confidence
-            reasons.extend(reversal_reasons)
-
-        # --- 📰 4. تعديل الثقة بالأخبار (مُعدِّل فقط، لا يحكم) ---
-        news_boost, news_summary = self._get_news_confidence_modifier(symbol)
-        if news_boost != 0:
-            temp_conf += news_boost
-            direction = f"+{news_boost}" if news_boost > 0 else str(news_boost)
-            reasons.append(f"News({direction})")
-
-        # --- 📊 5. كشف الذعر/الجشع النفسي (أقل صرامة) ---
-        panic_greed = analysis.get('panic_greed', {})
-        panic_score = panic_greed.get('panic_score', 0)
-        greed_score = panic_greed.get('greed_score', 0)
-
-        if panic_score > 10:  # أقل صرامة (تأثير خفيف)
-            temp_conf -= panic_score * 0.5  # تقليل الثقة قليلاً عند الذعر
-        if greed_score > 10:
-            temp_conf += greed_score * 0.3  # زيادة الثقة قليلاً عند الجشع
-
-        # --- 📊 6. فيبوناتشي (مستويات الدعم/المقاومة) ---
-        fib_score = 0
-        fib_level = None
-        try:
-            # 🚨 لا تستخدم Fibonacci إذا RSI عالي (>70)
-            if rsi <= 70:
-                fib_analyzer = self.advisor_manager.get('FibonacciAnalyzer') if self.advisor_manager else None
-                if fib_analyzer:
-                    is_at_support, support_boost = fib_analyzer.is_at_support(
-                        current_price=analysis_data.get('close', 0),
-                        analysis=analysis_data,
-                        volume_ratio=volume_ratio,
-                        symbol=symbol
-                    )
-                    if is_at_support:
-                        fib_score = support_boost
-                        temp_conf += support_boost
-                        support_info = fib_analyzer.get_support_level(
-                            analysis_data.get('close', 0), 
-                            analysis_data
-                        )
-                        if support_info:
-                            fib_level = support_info['level']
-                            reasons.append(f"Fib {fib_level}% (+{support_boost})")
-        except Exception as e:
-            print(f"⚠️ Fibonacci error: {e}")
-
-        # =========================================================
-        # 🧠 الذاكرة الذكية — تضيف ثقة بدون تعديل نسب التصويت
-        # =========================================================
-
-        # 💪 1. الجرأة الديناميكية
-        courage_boost = self._get_courage_boost(symbol, rsi, volume_ratio)
-        if courage_boost > 0:
-            temp_conf += courage_boost
-            reasons.append(f"CourageBoost(+{courage_boost:.0f})")
-
-        # ⏰ 2. ذاكرة الوقت
-        time_mod, time_label = self._get_time_memory_modifier(symbol)
-        if time_mod != 0:
-            temp_conf += time_mod
-            reasons.append(time_label)
-
-        # 🔁 3. ذاكرة الأنماط
-        pattern_boost, pattern_label = self._get_symbol_pattern_score(symbol, rsi, macd_diff, volume_ratio)
-        if pattern_boost > 0:
-            temp_conf += pattern_boost
-            reasons.append(pattern_label)
-
-        # 🏆 4. معدل نجاح العملة
-        win_boost, win_label = self._get_symbol_win_rate_boost(symbol)
-        if win_boost != 0:
-            temp_conf += win_boost
-            reasons.append(win_label)
-
-        # 🌐 5. تأثير البيانات الخارجية (External Impact)
-        external_score = analysis_data.get('external_score', 50)
-        if external_score != 50:
-            ext_mod = (external_score - 50) * 0.5 # تأثير بحد أقصى ±25 نقطة
-            temp_conf += ext_mod
-            reasons.append(f"External({ext_mod:+.1f})")
-
-        # =========================================================
-        temp_conf = min(max(temp_conf, 0), 99)  # نضمن النطاق 0-99
-
-        # --- نهاية الكود الحساس ---
-
-        # --- 5. تصويت المستشارين ---
-        buy_vote_count = 0
-        total_advisors = 0
-        vote_breakdown = {}
-        
-        try:
-            dl_client = self.advisor_manager.get('dl_client') if self.advisor_manager else None
-            # ✅ تم اعادة تشغيل نظام تصويت المستشارين بعد اصلاح النماذج
-            # بناء candle_analysis من تحليل القاع والقمة
-            reversal = analysis_data.get('reversal', {})
-            peak = analysis_data.get('peak', {})
-            candle_analysis = {
-                'is_reversal': reversal.get('candle_signal', False),
-                'is_bottom':   reversal.get('candle_signal', False),
-                'is_peak':     peak.get('candle_signal', False),
-                'is_rejection': peak.get('candle_signal', False),
-                'reversal_confidence': reversal.get('confidence', 0),
-                'peak_confidence':     peak.get('confidence', 0),
-            }
-
-            # جلب النصائح من كل مستشار
-            market_sentiment = analysis_data.get('market_sentiment', None)
-            advisors_advice = dl_client.get_advice(
-                rsi=rsi, macd=macd_diff, volume_ratio=volume_ratio,
-                price_momentum=analysis_data.get('price_momentum', 0),
-                confidence=temp_conf,
-                liquidity_metrics=analysis_data.get('liquidity_metrics'),
-                market_sentiment=market_sentiment,
-                candle_analysis=candle_analysis,
-                analysis_data=analysis_data
-            )
-
-            # حساب الأصوات الإيجابية فقط التي تدعم الشراء (Keywords Check)
-            pos_keywords = ['Bullish']
-
-            buy_vote_count = 0
-            for name, adv_text in advisors_advice.items():
-                is_offline = "N/A" in str(adv_text)
-                has_voted = any(k in str(adv_text) for k in pos_keywords)
-                
-                if has_voted:
-                    buy_vote_count += 1
-
-            total_advisors = 10
-            vote_breakdown = advisors_advice
-
-            # إزالة التصويت الثابت، ميتا يقرر مباشرة بناءً على النصائح
-        except Exception as e:
-            print(f"⚠️ Buy voting error [{symbol}]: {e}")
-
-        # 🔄 Fallback: إذا فشل التصويت، الملك يقرر بناءً على الثقة وحده
-        if total_advisors == 0:
-            buy_vote_count = 0
-            total_advisors = 10
-            vote_breakdown = {'king_fallback': 0}
-
-        # =========================================================
-        # 👑 6. الملك يقرر أولاً (Independent Decision)
-        # =========================================================
-        # نقاط الشموع من تحليل القاع
-        candle_score = reversal.get('confidence', 0)
-        
-        # ✅ قرار الملك: يعتمد على إشارات القاع الحقيقية فقط
-        king_wants_to_buy = False
-
-        # حارس الماكرو: Wave Rider يحتاج اتجاه صاعد قوي
-        if not is_macro_bullish and candle_score < MACRO_CANDLE_THRESHOLD:
-            return {
-                'action': 'DISPLAY',
-                'reason': f'⏳ Wave Rider Block: Macro Bearish | King:{temp_conf}/{MIN_CONFIDENCE}',
-                'confidence': temp_conf
-            }
-
-        # الشرط 1: إشارة شمعية انعكاسية قوية من القاع
-        if reversal.get('candle_signal', False) and candle_score >= MIN_CANDLE_SCORE:
-            king_wants_to_buy = True
-            king_reason = f"King: Strong Wave Start ({candle_score}/110)"
-
-        # الشرط 2: نقاط القاع عالية جدا
-        elif candle_score >= MIN_CONFIDENCE:
-            king_wants_to_buy = True
-            king_reason = f"King: Wave Bottom ({candle_score}/110)"
-
-        # الشرط 3: انفجار حجم قوي مع بداية ارتداد
-        elif volume_ratio >= MIN_VOLUME_RATIO and reversal.get('is_reversing', False):
-            king_wants_to_buy = True
-            king_reason = f"King: Volume Wave Start ({volume_ratio:.1f}x)"
-        
-        # =========================================================
-        # 🗳️ 7. التصويت الفوري بعد قرار الملك
-        # =========================================================
-        if king_wants_to_buy:
-            # ✅ القرار للملك فقط، النصائح للعرض فقط
-            action = "BUY"
-            market_emoji = "🟢" if market_mood == "Bullish" else "🔴" if market_mood == "Bearish" else "⚪"
-            reason = f"BUY ✅ | King:{temp_conf} | Advices:{buy_vote_count}/{total_advisors} | {market_emoji} {market_mood}"
-        else:
-            market_emoji = "🟢" if market_mood == "Bullish" else "🔴" if market_mood == "Bearish" else "⚪"
-            reason = f"King:{temp_conf}/{MIN_CONFIDENCE} | Advices:{buy_vote_count}/{total_advisors} | {market_emoji} {market_mood}"
-
-        decision = {
-            'action': action,
-            'reason': reason,
-            'confidence': temp_conf,
-            'news_summary': news_summary,
-            'buy_vote_count': buy_vote_count,
-            'total_consultants': total_advisors,
-            'buy_vote_percentage': int((buy_vote_count / total_advisors * 100)) if total_advisors > 0 else 0,
-            'buy_votes': vote_breakdown,  # للأرشفة والتعلم
-            'fib_score': fib_score,  # فيبوناتشي score
-            'fib_level': fib_level,   # فيبوناتشي مستوى
-            'market_regime': regime,  # حالة السوق
-            'market_regime_multiplier': regime_position_multiplier,  # مضاعف الحجم
-            'flash_crash_risk': flash_risk_score  # خطر السقوط المفاجئ
-        }
-
-        if action == 'BUY':
-            try:
-                amount = self._calculate_smart_amount(symbol, temp_conf, analysis_data)
-                decision['amount'] = amount
-            except Exception as e:
-                print(f"⚠️ Error calculating smart amount: {e}")
-                decision['action'] = 'DISPLAY'
-                decision['reason'] = 'Amount calc failed'
-                decision['confidence'] = 40
-
-        return decision
 
     def should_sell(self, symbol, position, current_price, analysis, mtf, candles=None, preloaded_advisors=None):
         """🔴 قرار البيع مع استشارة المستشارين عن القمة"""
