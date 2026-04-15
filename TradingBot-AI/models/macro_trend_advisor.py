@@ -60,7 +60,6 @@ class MacroTrendAdvisor:
                 
             elif available_days >= 10:
                 sma_10 = df['c'].rolling(10).mean().iloc[-1]
-                print(f"\n⚠️ [Macro] BTC: ${current_price:,.2f} | SMA10 (Fallback): ${sma_10:,.2f}")
                 
                 if current_price > sma_10 * 1.05:
                     status = "STRONG_BULL_MARKET"
