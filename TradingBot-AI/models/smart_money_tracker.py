@@ -84,38 +84,80 @@ class SmartMoneyTracker:
             return {'detected': False, 'confidence_boost': 0}
 
     def _analyze_order_book(self, symbol):
-        """تحليل Order Book لكشف جدران الطلبات الكبيرة"""
+        """تحليل Order Book المتقدم - كشف جدران + Imbalance + Iceberg"""
         try:
-            # جلب Order Book من الـ Exchange
-            order_book = self.exchange.fetch_order_book(symbol, limit=20)  # أول 20 طلب
-
-            bids = order_book['bids']  # طلبات الشراء
-            asks = order_book['asks']  # طلبات البيع
-
-            # حساب حجم الجدران الكبيرة
-            big_bid_volume = sum(qty for price, qty in bids[:5] if qty > 10)  # أكبر 5 طلبات شراء >10
-            big_ask_volume = sum(qty for price, qty in asks[:5] if qty > 10)  # أكبر 5 طلبات بيع >10
-
-            # نسبة الجدران
-            total_bid_volume = sum(qty for price, qty in bids)
-            total_ask_volume = sum(qty for price, qty in asks)
-
-            if total_bid_volume > 0 and total_ask_volume > 0:
-                bid_wall_ratio = big_bid_volume / total_bid_volume
-                ask_wall_ratio = big_ask_volume / total_ask_volume
-
-                # إذا جدران الشراء قوية
-                if bid_wall_ratio > 0.3:  # 30% من الحجم في جدران كبيرة
-                    return 10  # إشارة إيجابية
-
-                # إذا جدران البيع قوية
-                if ask_wall_ratio > 0.3:
-                    return -10  # إشارة سلبية
-
-            return 0
-
+            order_book = self.exchange.fetch_order_book(symbol, limit=50)
+            bids = order_book['bids']
+            asks = order_book['asks']
+            
+            if not bids or not asks:
+                return 0
+            
+            # 1. Order Book Imbalance (عدم التوازن)
+            total_bid_volume = sum(qty for price, qty in bids[:20])
+            total_ask_volume = sum(qty for price, qty in asks[:20])
+            
+            if total_bid_volume + total_ask_volume == 0:
+                return 0
+            
+            imbalance = (total_bid_volume - total_ask_volume) / (total_bid_volume + total_ask_volume)
+            imbalance_score = imbalance * 15  # -15 to +15
+            
+            # 2. كشف الجدران الكبيرة (Walls)
+            avg_bid = total_bid_volume / len(bids[:20]) if bids else 0
+            avg_ask = total_ask_volume / len(asks[:20]) if asks else 0
+            
+            big_bid_walls = sum(1 for price, qty in bids[:10] if qty > avg_bid * 3)
+            big_ask_walls = sum(1 for price, qty in asks[:10] if qty > avg_ask * 3)
+            
+            wall_score = (big_bid_walls - big_ask_walls) * 3
+            
+            # 3. كشف Iceberg Orders (أوامر مخفية)
+            # الحيتان يخفون أوامرهم بتقسيمها لأوامر صغيرة متعددة بنفس السعر
+            iceberg_score = self._detect_iceberg_orders(bids, asks)
+            
+            # 4. Bid-Ask Spread Analysis
+            spread = ((asks[0][0] - bids[0][0]) / bids[0][0]) * 100 if bids and asks else 0
+            spread_score = -5 if spread > 0.1 else 5  # Spread واسع = ضعف
+            
+            total_score = imbalance_score + wall_score + iceberg_score + spread_score
+            return max(-20, min(20, total_score))
+            
         except Exception as e:
             return 0
+    
+    def _detect_iceberg_orders(self, bids, asks):
+        """كشف أوامر Iceberg المخفية"""
+        try:
+            # فحص أوامر متعددة بنفس الحجم تقريباً (علامة Iceberg)
+            bid_sizes = [qty for price, qty in bids[:15]]
+            ask_sizes = [qty for price, qty in asks[:15]]
+            
+            # حساب التكرار (كم أمر بنفس الحجم تقريباً)
+            bid_clusters = self._count_size_clusters(bid_sizes)
+            ask_clusters = self._count_size_clusters(ask_sizes)
+            
+            if bid_clusters > ask_clusters:
+                return 8  # Iceberg شراء = حيتان تشتري بهدوء
+            elif ask_clusters > bid_clusters:
+                return -8  # Iceberg بيع = حيتان تبيع بهدوء
+            
+            return 0
+        except:
+            return 0
+    
+    def _count_size_clusters(self, sizes):
+        """عد الأوامر المتشابهة في الحجم"""
+        if not sizes or len(sizes) < 3:
+            return 0
+        
+        clusters = 0
+        for i in range(len(sizes) - 2):
+            # إذا 3 أوامر متتالية بنفس الحجم تقريباً (±10%)
+            if abs(sizes[i] - sizes[i+1]) / sizes[i] < 0.1 and abs(sizes[i+1] - sizes[i+2]) / sizes[i+1] < 0.1:
+                clusters += 1
+        
+        return clusters
 
     def _get_whale_alerts(self, symbol):
         """جلب تنبيهات الحيتان من API خارجي (Whale Alert)"""
