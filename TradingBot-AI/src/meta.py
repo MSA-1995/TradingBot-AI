@@ -227,16 +227,328 @@ class Meta:
         return 0, ""
 
     def should_buy(self, symbol, analysis, models_scores=None, candles=None, preloaded_advisors=None):
-        """القرار - كشف القاع بالشموع + مؤشرات + تصويت المستشارين"""
+        """القرار - الملك يجمع ذكاء المستشارين ويقرر بحرية كاملة"""
 
         analysis_data = analysis
-        temp_conf = 20
-        action = "DISPLAY"
         reasons = []
 
-        # --- بداية الكود الحساس ---
         if not analysis_data or not isinstance(analysis_data, dict):
             return {'action': 'DISPLAY', 'reason': 'Invalid analysis data', 'confidence': 0}
+        
+        # =====================================================================
+        # 🧠 جمع الذكاء من المستشارين الـ14 (مصادر معلومات قوية)
+        # =====================================================================
+        advisors_intelligence = {}
+        
+        try:
+            # 1. Smart Money Tracker - نشاط الحيتان
+            smart_money = self.advisor_manager.get('SmartMoneyTracker') if self.advisor_manager else None
+            if smart_money:
+                whale_score = analysis_data.get('whale_confidence', 0)
+                advisors_intelligence['whale_activity'] = abs(whale_score) * 4  # 0-100
+                advisors_intelligence['whale_direction'] = 'buy' if whale_score > 0 else 'sell'
+        except: pass
+        
+        try:
+            # 2. Trend Early Detector - قوة الاتجاه
+            trend_detector = self.advisor_manager.get('TrendEarlyDetector') if self.advisor_manager else None
+            if trend_detector:
+                candles_data = analysis_data.get('candles', [])
+                if len(candles_data) >= 30:
+                    import pandas as pd
+                    df = pd.DataFrame(candles_data)
+                    order_book = analysis_data.get('order_book')
+                    trend_data = trend_detector.detect_trend_birth(df, order_book)
+                    
+                    if trend_data['trend'] == 'BULLISH' and trend_data['stage'] == 'BIRTH':
+                        advisors_intelligence['trend_birth'] = 95
+                        reasons.append(f"🎯 Trend Birth: {trend_data['strength']}")
+                    elif trend_data['trend'] == 'BULLISH' and trend_data['stage'] == 'GROWTH':
+                        advisors_intelligence['trend_birth'] = 75
+                    else:
+                        advisors_intelligence['trend_birth'] = 30
+        except: pass
+        
+        try:
+            # 3. Volume Forecast Engine - زخم الحجم
+            volume_engine = self.advisor_manager.get('VolumeForecastEngine') if self.advisor_manager else None
+            if volume_engine:
+                candles_data = analysis_data.get('candles', [])
+                if len(candles_data) >= 20:
+                    volumes = [c.get('volume', 0) for c in candles_data[-20:]]
+                    current_hour = datetime.now().hour
+                    prediction = volume_engine.predict_next_volume(symbol, volumes, current_hour)
+                    breakout = volume_engine.detect_volume_breakout(symbol, volumes, prediction)
+                    
+                    if breakout['breakout_imminent']:
+                        advisors_intelligence['volume_momentum'] = breakout['probability']
+                        reasons.append(f"💥 Volume Breakout: {breakout['probability']}%")
+                    else:
+                        advisors_intelligence['volume_momentum'] = 40
+        except: pass
+        
+        try:
+            # 4. Liquidation Shield - أمان المنطقة
+            liq_shield = self.advisor_manager.get('LiquidationShield') if self.advisor_manager else None
+            if liq_shield:
+                current_price = analysis_data.get('close', 0)
+                order_book = analysis_data.get('order_book')
+                if order_book:
+                    liq_analysis = liq_shield.analyze_liquidation_risk(symbol, current_price, order_book)
+                    advisors_intelligence['liquidation_safety'] = 100 - liq_analysis.get('risk_score', 50)
+        except: pass
+        
+        try:
+            # 5. Pattern Recognition - أنماط الشموع
+            reversal = analysis_data.get('reversal', {})
+            advisors_intelligence['pattern_confidence'] = reversal.get('confidence', 0)
+        except: pass
+        
+        try:
+            # 6. Fibonacci Analyzer - مستويات الدعم
+            fib_analyzer = self.advisor_manager.get('FibonacciAnalyzer') if self.advisor_manager else None
+            if fib_analyzer:
+                rsi = analysis_data.get('rsi', 50)
+                volume_ratio = analysis_data.get('volume_ratio', 1.0)
+                if rsi <= 70:
+                    is_at_support, support_boost = fib_analyzer.is_at_support(
+                        current_price=analysis_data.get('close', 0),
+                        analysis=analysis_data,
+                        volume_ratio=volume_ratio,
+                        symbol=symbol
+                    )
+                    advisors_intelligence['support_strength'] = support_boost * 2 if is_at_support else 30
+        except: pass
+        
+        try:
+            # 7. Sentiment Analyzer - مشاعر السوق
+            sentiment_data = analysis_data.get('sentiment_score', 0)
+            advisors_intelligence['sentiment_score'] = sentiment_data  # -10 to +10
+        except: pass
+        
+        try:
+            # 8. News Analyzer - تأثير الأخبار
+            news_analyzer = self.advisor_manager.get('NewsAnalyzer') if self.advisor_manager else None
+            if news_analyzer:
+                news_boost = news_analyzer.get_news_confidence_boost(symbol)
+                advisors_intelligence['news_impact'] = news_boost  # -15 to +15
+        except: pass
+        
+        try:
+            # 9. Adaptive Intelligence - الذاكرة التاريخية
+            adaptive_ai = self.advisor_manager.get('AdaptiveIntelligence') if self.advisor_manager else None
+            if adaptive_ai:
+                profile = adaptive_ai.get_symbol_profile(symbol)
+                advisors_intelligence['historical_success'] = profile.get('success_rate', 50)
+        except: pass
+        
+        try:
+            # 10. Liquidity Analyzer - سيولة السوق
+            liquidity_metrics = analysis_data.get('liquidity_metrics', {})
+            advisors_intelligence['liquidity_score'] = liquidity_metrics.get('liquidity_score', 50)
+        except: pass
+        
+        try:
+            # 11. Anomaly Detector - كشف الفخاخ
+            anomaly_score = analysis_data.get('anomaly_score', 0)
+            advisors_intelligence['trap_detection'] = 100 - min(anomaly_score * 10, 100)
+        except: pass
+        
+        try:
+            # 12. Risk Manager - تقييم المخاطر
+            risk_score = analysis_data.get('volatility_risk_score', 2.0)
+            advisors_intelligence['risk_level'] = max(0, 100 - risk_score * 10)
+        except: pass
+        
+        try:
+            # 13. Macro Trend Advisor - اتجاه السوق الكلي
+            macro_advisor = self.advisor_manager.get('MacroTrendAdvisor') if self.advisor_manager else None
+            if macro_advisor:
+                macro_status = macro_advisor.get_macro_status()
+                if macro_status in ["STRONG_BULL_MARKET", "BULL_MARKET"]:
+                    advisors_intelligence['macro_trend'] = 85
+                elif macro_status == "BEAR_MARKET":
+                    advisors_intelligence['macro_trend'] = 20
+                else:
+                    advisors_intelligence['macro_trend'] = 50
+        except: pass
+        
+        try:
+            # 14. Exit Strategy - توقيت الدخول
+            # (يستخدم في البيع أكثر، لكن نأخذ رأيه)
+            advisors_intelligence['entry_timing'] = 60  # محايد للشراء
+        except: pass
+        
+        # =====================================================================
+        # 👑 الملك يحلل كل الذكاء المجموع
+        # =====================================================================
+        
+        # Layer 1: التحليل الفني الأساسي
+        rsi = analysis_data.get('rsi', 50)
+        macd_diff = analysis_data.get('macd_diff', 0)
+        volume_ratio = analysis_data.get('volume_ratio', 1.0)
+        
+        technical_score = 0
+        if rsi <= 35:
+            technical_score += 30
+        elif rsi <= 45:
+            technical_score += 20
+        elif rsi < 55:
+            technical_score += 10
+        
+        if macd_diff > 1.0:
+            technical_score += 20
+        elif macd_diff > 0.3:
+            technical_score += 12
+        elif macd_diff > 0:
+            technical_score += 5
+        
+        if volume_ratio > 2.0:
+            technical_score += 25
+        elif volume_ratio > 1.3:
+            technical_score += 15
+        elif volume_ratio > 1.0:
+            technical_score += 7
+        
+        # Layer 2: ذكاء المستشارين (الملك يأخذهم على محمل الجد)
+        whale_activity = advisors_intelligence.get('whale_activity', 0)
+        trend_birth = advisors_intelligence.get('trend_birth', 0)
+        volume_momentum = advisors_intelligence.get('volume_momentum', 0)
+        liquidation_safety = advisors_intelligence.get('liquidation_safety', 50)
+        pattern_confidence = advisors_intelligence.get('pattern_confidence', 0)
+        support_strength = advisors_intelligence.get('support_strength', 0)
+        sentiment_score = advisors_intelligence.get('sentiment_score', 0)
+        news_impact = advisors_intelligence.get('news_impact', 0)
+        historical_success = advisors_intelligence.get('historical_success', 50)
+        liquidity_score = advisors_intelligence.get('liquidity_score', 50)
+        trap_detection = advisors_intelligence.get('trap_detection', 50)
+        risk_level = advisors_intelligence.get('risk_level', 50)
+        macro_trend = advisors_intelligence.get('macro_trend', 50)
+        
+        # Layer 3: الذكاء الكلي (الملك يجمع كل شيء بأوزان ذكية)
+        total_intelligence = (
+            technical_score * 0.25 +           # 25% التحليل الفني
+            whale_activity * 0.12 +            # 12% نشاط الحيتان
+            trend_birth * 0.12 +               # 12% بداية الاتجاه
+            volume_momentum * 0.10 +           # 10% زخم الحجم
+            pattern_confidence * 0.08 +        # 8% أنماط الشموع
+            support_strength * 0.08 +          # 8% قوة الدعم
+            (sentiment_score + 10) * 0.05 +    # 5% المشاعر
+            (news_impact + 15) * 0.03 +        # 3% الأخبار
+            historical_success * 0.05 +        # 5% الذاكرة
+            liquidity_score * 0.04 +           # 4% السيولة
+            trap_detection * 0.03 +            # 3% كشف الفخاخ
+            risk_level * 0.03 +                # 3% المخاطر
+            macro_trend * 0.02                 # 2% الاتجاه الكلي
+        )
+        
+        # Layer 4: الجرأة من الذاكرة
+        courage_boost = self._get_courage_boost(symbol, rsi, volume_ratio)
+        time_mod, _ = self._get_time_memory_modifier(symbol)
+        pattern_boost, _ = self._get_symbol_pattern_score(symbol, rsi, macd_diff, volume_ratio)
+        win_boost, _ = self._get_symbol_win_rate_boost(symbol)
+        
+        memory_intelligence = courage_boost + time_mod + pattern_boost + win_boost
+        total_intelligence += memory_intelligence
+        
+        # Layer 5: الحماية من المخاطر الحرجة
+        flash_crash = analysis_data.get('flash_crash_protection', {})
+        flash_risk = flash_crash.get('risk_score', 0)
+        
+        if flash_risk >= 70:
+            return {
+                'action': 'DISPLAY',
+                'reason': f'🚨 Flash Crash Risk ({flash_risk}%)',
+                'confidence': 0
+            }
+        
+        if liquidation_safety < 30:
+            return {
+                'action': 'DISPLAY',
+                'reason': f'🛡️ High Liquidation Risk',
+                'confidence': 0
+            }
+        
+        # =====================================================================
+        # 👑 القرار النهائي (الملك يقرر بحرية بناءً على الذكاء المجموع)
+        # =====================================================================
+        
+        king_wants_to_buy = False
+        buy_reason = ""
+        
+        # السيناريو 1: ذكاء عالي جداً (ثقة قوية من المستشارين)
+        if total_intelligence >= 85:
+            king_wants_to_buy = True
+            buy_reason = f"ثقة عالية جداً: {total_intelligence:.0f}/100"
+        
+        # السيناريو 2: حيتان تشتري بقوة + ذكاء جيد
+        elif whale_activity > 75 and total_intelligence >= 70:
+            king_wants_to_buy = True
+            buy_reason = f"حيتان تشتري + ثقة: {total_intelligence:.0f}/100"
+        
+        # السيناريو 3: بداية اتجاه قوي + ذكاء جيد
+        elif trend_birth > 85 and total_intelligence >= 70:
+            king_wants_to_buy = True
+            buy_reason = f"بداية موجة قوية: {total_intelligence:.0f}/100"
+        
+        # السيناريو 4: انفجار حجم متوقع + ذكاء جيد
+        elif volume_momentum > 80 and total_intelligence >= 70:
+            king_wants_to_buy = True
+            buy_reason = f"انفجار حجم قادم: {total_intelligence:.0f}/100"
+        
+        # السيناريو 5: نمط انعكاس قوي + دعم قوي + ذكاء جيد
+        elif pattern_confidence >= 70 and support_strength >= 70 and total_intelligence >= 65:
+            king_wants_to_buy = True
+            buy_reason = f"نمط قوي + دعم: {total_intelligence:.0f}/100"
+        
+        # السيناريو 6: ذاكرة قوية (نجح هنا قبل) + ذكاء جيد
+        elif historical_success > 80 and total_intelligence >= 65:
+            king_wants_to_buy = True
+            buy_reason = f"ذاكرة قوية: {total_intelligence:.0f}/100"
+        
+        # السيناريو 7: ذكاء متوسط لكن عدة مستشارين يؤكدون
+        elif total_intelligence >= 75:
+            # فحص: كم مستشار يعطي إشارة قوية؟
+            strong_signals = 0
+            if whale_activity > 70: strong_signals += 1
+            if trend_birth > 70: strong_signals += 1
+            if volume_momentum > 70: strong_signals += 1
+            if pattern_confidence > 70: strong_signals += 1
+            if support_strength > 70: strong_signals += 1
+            if historical_success > 75: strong_signals += 1
+            
+            if strong_signals >= 3:
+                king_wants_to_buy = True
+                buy_reason = f"{strong_signals} مستشارين يؤكدون: {total_intelligence:.0f}/100"
+        
+        # =====================================================================
+        # 📊 النتيجة النهائية
+        # =====================================================================
+        
+        if king_wants_to_buy:
+            action = "BUY"
+            reason = f"BUY ✅ | {buy_reason}"
+            
+            try:
+                amount = self._calculate_smart_amount(symbol, total_intelligence, analysis_data)
+            except:
+                amount = MIN_TRADE_AMOUNT
+            
+            return {
+                'action': action,
+                'reason': reason,
+                'confidence': min(total_intelligence, 99),
+                'amount': amount,
+                'advisors_intelligence': advisors_intelligence,
+                'total_intelligence': total_intelligence
+            }
+        else:
+            return {
+                'action': 'DISPLAY',
+                'reason': f"ذكاء: {total_intelligence:.0f}/100 - انتظار قاع أفضل",
+                'confidence': min(total_intelligence, 99),
+                'advisors_intelligence': advisors_intelligence
+            }
         
         # =====================================================================
         # 🌟 الأنظمة الحصرية الـ 5 - تعمل قبل أي شيء
