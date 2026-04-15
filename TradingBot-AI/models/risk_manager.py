@@ -382,30 +382,29 @@ class RiskManager:
         try:
             # جلب الصفقات المفتوحة
             open_positions = self.storage.get_open_positions()
-            
+
             if not open_positions:
                 return 0.0
-            
+
             total_risk = 0
-            for pos in open_positions:
+            for symbol, pos in open_positions.items():
                 # حساب المخاطرة لكل صفقة (بناءً على ATR)
-                symbol = pos.get('symbol')
                 amount = pos.get('amount', 0)
                 buy_price = pos.get('buy_price', 0)
-                
+
                 # تقدير المخاطرة = المبلغ * ATR%
                 position_value = amount * buy_price
                 atr_percent = pos.get('atr_percent', 2.5)
                 position_risk = position_value * (atr_percent / 100)
-                
+
                 total_risk += position_risk
-            
+
             # Portfolio Heat = إجمالي المخاطر / رأس المال
             total_capital = 1000  # افتراضي
             heat = total_risk / total_capital
-            
+
             return round(heat, 3)
-            
+
         except Exception as e:
             print(f"⚠️ Portfolio heat error: {e}")
             return 0.0
