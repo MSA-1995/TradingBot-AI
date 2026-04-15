@@ -249,7 +249,7 @@ def analyze_reversal(df, rsi):
     - Market Structure: 15 نقطة (مساعد)
     - MTF Alignment: 5 نقاط
     """
-    from config import BOTTOM_BOUNCE_THRESHOLD, REVERSAL_CANDLES, MIN_CONFIDENCE
+    from config import BOTTOM_BOUNCE_THRESHOLD, REVERSAL_CANDLES, MIN_BUY_CONFIDENCE
 
     base_result = {
         'confidence': 0,
@@ -578,15 +578,15 @@ def analyze_reversal(df, rsi):
         # 🎯 القرار النهائي (المجموع = 110 نقطة)
         # =========================================================
         confidence_percent = min(total_score, 110)
-        is_candle_signal = confidence_percent >= MIN_CONFIDENCE
+        is_candle_signal = confidence_percent >= MIN_BUY_CONFIDENCE
         
         if trap_is_filter and is_candle_signal:
             is_candle_signal = False
             reasons.append("🚫 Signal Blocked by Trap")
         
-        if total_score >= MIN_CONFIDENCE + 10:
+        if total_score >= MIN_BUY_CONFIDENCE + 10:
             reasons.append(f"✅ STRONG ({total_score}/110)")
-        elif total_score >= MIN_CONFIDENCE:
+        elif total_score >= MIN_BUY_CONFIDENCE:
             reasons.append(f"✅ SIGNAL ({total_score}/110)")
         elif total_score >= 40:
             reasons.append(f"⏳ WEAK ({total_score}/110)")
@@ -619,7 +619,7 @@ def analyze_peak(df, rsi):
     - MTF Confirmation: 10 نقاط
     - Volume + Divergence: 15 نقطة (مهم)
     """
-    from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES, MIN_SELL_CONFIDENCE, MIN_CONFIDENCE
+    from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES, MIN_SELL_CONFIDENCE, MIN_BUY_CONFIDENCE
 
     base_result = {
         'confidence': 0,
@@ -939,9 +939,9 @@ def analyze_peak(df, rsi):
             is_candle_signal = False
             reasons.append("🚫 Signal Blocked by Trap")
         
-        if total_score >= MIN_CONFIDENCE + 10:
+        if total_score >= MIN_BUY_CONFIDENCE + 10:
             reasons.append(f"✅ STRONG ({total_score}/110)")
-        elif total_score >= MIN_CONFIDENCE:
+        elif total_score >= MIN_BUY_CONFIDENCE:
             reasons.append(f"✅ SIGNAL ({total_score}/110)")
         elif total_score >= 40:
             reasons.append(f"⏳ WEAK ({total_score}/110)")
