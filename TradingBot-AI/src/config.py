@@ -5,10 +5,10 @@ All bot settings and constants
 
 # Trading Parameters
 
-MIN_CONFIDENCE = 82  # كان 75 - رفع لتحسين Win Rate وتقليل الفخاخ
+MIN_CONFIDENCE = 75  # تم تقليله للسماح بمزيد من الصفقات
 MIN_SELL_CONFIDENCE = 85  # Wave Rider: خروج عند قمة الموجة 50-80% (تم التخفيف من 90)
-MIN_CANDLE_SCORE = 82  # كان 75 - رفع لتحسين جودة الصفقات
-MIN_VOLUME_RATIO = 2.0  # كان 1.8 - رفع لتقليل الفخاخ
+MIN_CANDLE_SCORE = 75  # تم تقليله لجعل الدخول أسرع
+MIN_VOLUME_RATIO = 1.5  # تم تقليله لاكتشاف بداية الموجات مبكراً
 MACRO_CANDLE_THRESHOLD = 85  # حد الشموع لتجاوز حارس الماكرو (تم التخفيف من 95)
 MAX_POSITIONS = 10  # صفقتين كحد أقصى لكل مجموعة (5+5)
 TOTAL_COINS_TO_SCAN = 10
