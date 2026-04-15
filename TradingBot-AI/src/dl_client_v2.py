@@ -258,9 +258,12 @@ class DeepLearningClientV2:
         return self._model_accuracy.get(model_name, 0)
 
     def get_advice(self, rsi, macd, volume_ratio, price_momentum, confidence=50,
-                   liquidity_metrics=None, market_sentiment=None, candle_analysis=None, analysis_data=None):
+                   liquidity_metrics=None, market_sentiment=None, candle_analysis=None, analysis_data=None, action='BUY'):
         advice = {}
         analysis = analysis_data if analysis_data else {}
+        
+        # تحديد نوع القرار (شراء أو بيع)
+        is_sell_mode = (action == 'SELL')
         
         full_data = {
             'rsi': rsi,
@@ -290,20 +293,35 @@ class DeepLearningClientV2:
         base_features = [f for f, n in zip(all_43, all_names) if n not in leaky]
         base_names = [n for n in all_names if n not in leaky]
 
-        def _predict(model, features, names):
+        def _predict(model, features, names, is_sell=False):
             try:
                 X = pd.DataFrame([features], columns=names)
                 proba = model.predict_proba(X)[0][1]
-                if proba > 0.7:
-                    return "Strong-Bullish"
-                elif proba > 0.55:
-                    return "Bullish"
-                elif proba < 0.3:
-                    return "Strong-Bearish"
-                elif proba < 0.45:
-                    return "Bearish"
+                
+                # في وضع البيع، نعكس المنطق (نبحث عن إشارات هبوط)
+                if is_sell:
+                    if proba < 0.3:
+                        return "Strong-Bearish"  # قمة قوية - بيع
+                    elif proba < 0.45:
+                        return "Bearish"  # قمة متوسطة
+                    elif proba > 0.7:
+                        return "Strong-Bullish"  # لا تبيع - استمر
+                    elif proba > 0.55:
+                        return "Bullish"  # لا تبيع
+                    else:
+                        return "Neutral"
                 else:
-                    return "Neutral"
+                    # وضع الشراء (المنطق الأصلي)
+                    if proba > 0.7:
+                        return "Strong-Bullish"
+                    elif proba > 0.55:
+                        return "Bullish"
+                    elif proba < 0.3:
+                        return "Strong-Bearish"
+                    elif proba < 0.45:
+                        return "Bearish"
+                    else:
+                        return "Neutral"
             except Exception as e:
                 return "N/A"
         
@@ -314,7 +332,7 @@ class DeepLearningClientV2:
             inflow = analysis.get('exchange_inflow', 0)
             features = base_features + [whale, inflow, 0.5, 0.5]
             names = base_names + ['whale_activity', 'exchange_inflow', 'tp_accuracy', 'sell_accuracy']
-            advice['smart_money'] = _predict(model, features, names)
+            advice['smart_money'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['smart_money'] = "N/A"
         
@@ -323,7 +341,7 @@ class DeepLearningClientV2:
         if model:
             features = base_features + [rsi, analysis.get('atr', 1), 0.5, 0.5]
             names = base_names + ['risk_rsi', 'risk_atr', 'tp_accuracy', 'sell_accuracy']
-            advice['risk'] = _predict(model, features, names)
+            advice['risk'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['risk'] = "N/A"
         
@@ -332,7 +350,7 @@ class DeepLearningClientV2:
         if model:
             features = base_features + [analysis.get('anomaly_score', 0), 0.5, 0.5]
             names = base_names + ['anomaly_score', 'tp_accuracy', 'sell_accuracy']
-            advice['anomaly'] = _predict(model, features, names)
+            advice['anomaly'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['anomaly'] = "N/A"
         
@@ -341,7 +359,7 @@ class DeepLearningClientV2:
         if model:
             features = base_features + [24, 0.5, 0.5]
             names = base_names + ['hours_held', 'tp_accuracy', 'sell_accuracy']
-            advice['exit'] = _predict(model, features, names)
+            advice['exit'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['exit'] = "N/A"
         
@@ -350,7 +368,7 @@ class DeepLearningClientV2:
         if model:
             features = base_features + [price_momentum, 0.5, 0.5]
             names = base_names + ['pattern_momentum', 'tp_accuracy', 'sell_accuracy']
-            advice['pattern'] = _predict(model, features, names)
+            advice['pattern'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['pattern'] = "N/A"
         
@@ -377,7 +395,7 @@ class DeepLearningClientV2:
                 'good_liquidity', 'low_impact', 'consistent_vol',
                 'tp_accuracy', 'sell_accuracy'
             ]
-            advice['liquidity'] = _predict(model, features, names)
+            advice['liquidity'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['liquidity'] = "N/A"
         
@@ -389,7 +407,7 @@ class DeepLearningClientV2:
             neutral = 1 if (40 <= rsi <= 60) else 0
             features = base_features + [bullish, bearish, neutral, 0.5, 0.5]
             names = base_names + ['bullish_chart', 'bearish_chart', 'neutral_chart', 'tp_accuracy', 'sell_accuracy']
-            advice['chart_cnn'] = _predict(model, features, names)
+            advice['chart_cnn'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['chart_cnn'] = "N/A"
         
@@ -425,7 +443,7 @@ class DeepLearningClientV2:
                 'volume_ma_ratio', 'volume_std', 'price_volume_corr',
                 'volume_breakout', 'volume_trend_strength', 'volume_consistency'
             ]
-            advice['volume_pred'] = _predict(model, features, names)
+            advice['volume_pred'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['volume_pred'] = "N/A"
         
@@ -462,7 +480,7 @@ class DeepLearningClientV2:
                 'fear_greed_norm', 'is_fearful', 'is_greedy',
                 'high_social', 'strong_positive', 'strong_negative'
             ]
-            advice['sentiment'] = _predict(model, features, names)
+            advice['sentiment'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['sentiment'] = "N/A"
         
@@ -489,7 +507,7 @@ class DeepLearningClientV2:
                 'news_score', 'news_positive', 'news_negative', 'news_total', 'news_ratio',
                 'has_news', 'strong_pos_news', 'strong_neg_news', 'balanced_news', 'high_volume_news'
             ]
-            advice['crypto_news'] = _predict(model, features, names)
+            advice['crypto_news'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['crypto_news'] = "N/A"
 
