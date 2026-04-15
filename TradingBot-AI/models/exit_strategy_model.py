@@ -33,7 +33,8 @@ CONFIDENCE_BONUS = 15
 class ExitStrategyModel:
     def __init__(self, storage):
         self.storage = storage
-        self.news_analyzer = NewsAnalyzer()  # إنشاء مرة واحدة للأداء
+        self.news_analyzer = NewsAnalyzer()
+        self.profit_history = {}  # {symbol: [(timestamp, profit), ...]}
         print("🎯 Exit Strategy Model initialized")
     
     def should_exit(self, symbol, position, current_price, analysis, mtf):
@@ -106,16 +107,54 @@ class ExitStrategyModel:
             return {'action': 'HOLD', 'reason': 'Error in analysis'}
     
     def _check_smart_tp(self, symbol, profit_percent, position, analysis, mtf, history):
-        """فحص TP الذكي - محسّن للسرعة"""
+        """فحص TP الذكي - محسّن للسرعة + Peak Detection"""
         try:
             peak_analysis = analysis.get('peak', {})
             peak_score = peak_analysis.get('confidence', 0)
             rsi = analysis.get('rsi', 50)
-            
-            # الخروج عند تأكيد "ضعف الاتجاه" (Divergence/Exhaustion)
-            # إذا كان هناك ربح، وأعطى البوت إشارة قمة قوية أو تشبع شرائي مع ضعف حجم
             volume_ratio = analysis.get('volume_ratio', 1.0)
             
+            # ✅ 1. Peak Detection المتقدم - بيع عند القمة مباشرة!
+            if profit_percent > 10:  # ربح جيد - ابحث عن القمة
+                peak_signals = 0
+                reasons = []
+                
+                # Signal 1: RSI Extreme Overbought
+                if rsi > 80:
+                    peak_signals += 1
+                    reasons.append(f'RSI={rsi:.0f} (extreme overbought)')
+                
+                # Signal 2: Volume Collapse
+                if volume_ratio < 0.5:
+                    peak_signals += 1
+                    reasons.append(f'Volume collapsed ({volume_ratio:.1f}x)')
+                
+                # Signal 3: Peak Score High
+                if peak_score > 85:
+                    peak_signals += 1
+                    reasons.append(f'Peak score={peak_score}')
+                
+                # Signal 4: Momentum Slowdown
+                momentum = analysis.get('price_momentum', 0)
+                if momentum < 0.3:  # الزخم توقف
+                    peak_signals += 1
+                    reasons.append(f'Momentum slowed ({momentum:.2f}%)')
+                
+                # Signal 5: Smart Money Exit
+                if analysis.get('whale_dumping', False):
+                    peak_signals += 2  # إشارة قوية جداً!
+                    reasons.append('Whales dumping detected')
+                
+                # القرار: إذا 3+ إشارات = بيع فوري!
+                if peak_signals >= 3:
+                    return {
+                        'action': 'SELL',
+                        'reason': f'PEAK DETECTED: {" | ".join(reasons)}',
+                        'profit': profit_percent,
+                        'confidence': 95
+                    }
+            
+            # ✅ 2. Peak Exhaustion (النظام القديم)
             if profit_percent > MIN_PROFIT_FOR_HOLD and (peak_score > PEAK_SCORE_THRESHOLD or (rsi > RSI_OVERBOUGHT and volume_ratio < VOLUME_RATIO_NEUTRAL)):
                 return {
                     'action': 'SELL',
