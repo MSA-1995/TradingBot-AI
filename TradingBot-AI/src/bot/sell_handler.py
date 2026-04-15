@@ -236,7 +236,7 @@ def process_sell(result, exchange, ctx):
             extra_data = {
                 'sentiment': real_sentiment_score,
                 'panic': real_panic_score,
-                'whale_conf': result.get('whale_confidence', 0),
+                'whale_confidence': result.get('whale_confidence', 0),
                 'volume_trend': analysis.get('volume_trend_strength', 0),
                 'optimism': result.get('optimism_penalty', 0)
             }
