@@ -212,5 +212,50 @@ class LiquidityAnalyzer:
 
         except Exception as e:
             return {'low_liquidity': False, 'avg_score': 0}
-
-  # افتراضي إذا فشل
+    
+    def detect_liquidity_pools(self, symbol):
+        """كشف Liquidity Pools - تجمعات السيولة"""
+        try:
+            order_book = self.get_order_book_depth(symbol)
+            if not order_book:
+                return {'detected': False, 'pools': []}
+            
+            # جلب Order Book كامل
+            full_order_book = self.exchange.fetch_order_book(symbol, limit=50)
+            bids = full_order_book['bids']
+            asks = full_order_book['asks']
+            
+            # كشف التجمعات (مستويات بسيولة عالية)
+            avg_bid_size = sum(b[1] for b in bids) / len(bids) if bids else 0
+            avg_ask_size = sum(a[1] for a in asks) / len(asks) if asks else 0
+            
+            pools = []
+            
+            # Bid Pools
+            for price, size in bids:
+                if size > avg_bid_size * 3:  # 3x المتوسط
+                    pools.append({
+                        'type': 'BID_POOL',
+                        'price': price,
+                        'size': size,
+                        'strength': size / avg_bid_size
+                    })
+            
+            # Ask Pools
+            for price, size in asks:
+                if size > avg_ask_size * 3:
+                    pools.append({
+                        'type': 'ASK_POOL',
+                        'price': price,
+                        'size': size,
+                        'strength': size / avg_ask_size
+                    })
+            
+            return {
+                'detected': len(pools) > 0,
+                'pools': pools,
+                'count': len(pools)
+            }
+            
+        except:
+            return {'detected': False, 'pools': []}
