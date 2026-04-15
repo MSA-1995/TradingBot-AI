@@ -548,3 +548,61 @@ class ExitStrategyModel:
             print(f"⚠️ Reversal detection error: {e}")
             return {'detected': False, 'pattern': 'Error', 'confidence': 0}
     
+
+    def _detect_profit_spike(self, symbol, current_profit):
+        """🚀 كشف القفزات المفاجئة في الربح"""
+        try:
+            now = datetime.now()
+            
+            # حفظ الربح الحالي
+            if symbol not in self.profit_history:
+                self.profit_history[symbol] = []
+            
+            self.profit_history[symbol].append((now, current_profit))
+            
+            # الاحتفاظ بآخر 60 ثانية فقط
+            self.profit_history[symbol] = [
+                (t, p) for t, p in self.profit_history[symbol]
+                if (now - t).total_seconds() <= 60
+            ]
+            
+            history = self.profit_history[symbol]
+            
+            if len(history) < 2:
+                return {'should_sell': False}
+            
+            # فحص آخر 30 ثانية
+            recent_30s = [(t, p) for t, p in history if (now - t).total_seconds() <= 30]
+            
+            if len(recent_30s) < 2:
+                return {'should_sell': False}
+            
+            # حساب القفزة
+            oldest_profit = recent_30s[0][1]
+            profit_jump = current_profit - oldest_profit
+            
+            # ✅ القرار: إذا قفز +8% خلال 30 ثانية = بيع فوري!
+            if profit_jump >= 8 and current_profit >= 10:
+                return {
+                    'should_sell': True,
+                    'reason': f'PROFIT SPIKE: +{profit_jump:.1f}% in 30s (from {oldest_profit:.1f}% to {current_profit:.1f}%)'
+                }
+            
+            # ✅ فحص الهبوط السريع بعد القفزة
+            if len(history) >= 3:
+                # آخر 3 قراءات
+                last_3 = history[-3:]
+                peak_profit = max(p for t, p in last_3)
+                
+                # إذا وصل قمة عالية ثم هبط بسرعة
+                if peak_profit >= 12 and current_profit < peak_profit - 3:
+                    return {
+                        'should_sell': True,
+                        'reason': f'PROFIT CRASH: Dropped from {peak_profit:.1f}% to {current_profit:.1f}% in seconds'
+                    }
+            
+            return {'should_sell': False}
+            
+        except Exception as e:
+            print(f"⚠️ Profit spike detection error: {e}")
+            return {'should_sell': False}
