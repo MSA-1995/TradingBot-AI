@@ -84,9 +84,108 @@ class AdaptiveIntelligence:
         if not memory:
             return True
         
-        # تحليل أفضل أوقات التداول لهذه العملة
-        # (يمكن توسيعه لاحقاً بتخزين best_hours في الداتابيز)
+        # تحليل أفضل أوقات التداول
+        best_hours = memory.get('best_trading_hours', [])
+        if best_hours and current_hour not in best_hours:
+            return False
+        
         return True
+    
+    def detect_market_regime(self, df):
+        """كشف نظام السوق (Bull/Bear/Sideways)"""
+        try:
+            if df is None or len(df) < 50:
+                return 'UNKNOWN'
+            
+            # حساب الاتجاه من 50 شمعة
+            closes = df['close'].tail(50).tolist()
+            
+            # مقارنة أول 10 مع آخر 10
+            first_10_avg = sum(closes[:10]) / 10
+            last_10_avg = sum(closes[-10:]) / 10
+            
+            change = ((last_10_avg - first_10_avg) / first_10_avg) * 100
+            
+            # حساب التقلب (Volatility)
+            import numpy as np
+            volatility = np.std(closes) / np.mean(closes) * 100
+            
+            # تحديد النظام
+            if change > 5 and volatility > 3:
+                return 'BULL_VOLATILE'
+            elif change > 5:
+                return 'BULL_STABLE'
+            elif change < -5 and volatility > 3:
+                return 'BEAR_VOLATILE'
+            elif change < -5:
+                return 'BEAR_STABLE'
+            elif volatility > 4:
+                return 'SIDEWAYS_VOLATILE'
+            else:
+                return 'SIDEWAYS_STABLE'
+        except:
+            return 'UNKNOWN'
+    
+    def learn_from_mistake(self, symbol, trade_data):
+        """التعلم من الأخطاء"""
+        try:
+            profit = trade_data.get('profit_percent', 0)
+            
+            # إذا كانت صفقة خاسرة
+            if profit < 0:
+                # حفظ النمط الفاشل
+                mistake_pattern = {
+                    'rsi': trade_data.get('entry_rsi'),
+                    'volume_ratio': trade_data.get('entry_volume_ratio'),
+                    'trend': trade_data.get('entry_trend'),
+                    'reason': trade_data.get('exit_reason'),
+                    'loss': abs(profit)
+                }
+                
+                # حفظ في الذاكرة
+                memory = self.storage.get_symbol_memory(symbol) or {}
+                mistakes = memory.get('mistakes', [])
+                mistakes.append(mistake_pattern)
+                
+                # الاحتفاظ بآخر 10 أخطاء فقط
+                memory['mistakes'] = mistakes[-10:]
+                
+                self.storage.save_symbol_memory(symbol, memory)
+                
+                return True
+            
+            return False
+        except:
+            return False
+    
+    def should_avoid_pattern(self, symbol, current_analysis):
+        """هل يجب تجنب هذا النمط؟"""
+        try:
+            memory = self.storage.get_symbol_memory(symbol)
+            if not memory or 'mistakes' not in memory:
+                return False
+            
+            mistakes = memory['mistakes']
+            current_rsi = current_analysis.get('rsi', 50)
+            current_volume = current_analysis.get('volume_ratio', 1.0)
+            current_trend = current_analysis.get('trend', 'neutral')
+            
+            # فحص إذا كان النمط الحالي يشبه أخطاء سابقة
+            similar_mistakes = 0
+            for mistake in mistakes:
+                rsi_diff = abs(current_rsi - mistake.get('rsi', 50))
+                volume_diff = abs(current_volume - mistake.get('volume_ratio', 1.0))
+                
+                if rsi_diff < 10 and volume_diff < 0.5 and current_trend == mistake.get('trend'):
+                    similar_mistakes += 1
+            
+            # إذا كان هناك 3+ أخطاء مشابهة = تجنب
+            if similar_mistakes >= 3:
+                return True
+            
+            return False
+        except:
+            return False
     
     def get_optimal_position_size(self, symbol, base_amount):
         """حساب حجم الصفقة الأمثل لهذه العملة"""
