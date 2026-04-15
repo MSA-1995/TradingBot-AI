@@ -37,15 +37,31 @@ class ExitStrategyModel:
         print("🎯 Exit Strategy Model initialized")
     
     def should_exit(self, symbol, position, current_price, analysis, mtf):
-        """قرار البيع الذكي"""
+        """قرار البيع الذكي + Minimum Hold Time"""
         try:
             buy_price = position['buy_price']
             profit_percent = ((current_price - buy_price) / buy_price) * 100
             
-            # جلب تاريخ العملة
+            # ✅ Minimum Hold Time - لا تبيع قبل 5 دقائق على الأقل!
+            buy_time = datetime.fromisoformat(position['buy_time'])
+            minutes_held = (datetime.now() - buy_time).total_seconds() / 60
+            
+            if minutes_held < 5:
+                if profit_percent < -10:
+                    return {
+                        'action': 'SELL',
+                        'reason': f'EMERGENCY EXIT: {profit_percent:.1f}% loss',
+                        'profit': profit_percent,
+                        'confidence': 95
+                    }
+                return {
+                    'action': 'HOLD',
+                    'reason': f'Minimum hold time not met ({minutes_held:.1f}/5 min)',
+                    'confidence': 100
+                }
+            
             coin_history = self._get_coin_exit_history(symbol)
             
-            # 1. فحص TP الذكي
             tp_decision = self._check_smart_tp(
                 symbol, profit_percent, position, 
                 analysis, mtf, coin_history
@@ -53,7 +69,6 @@ class ExitStrategyModel:
             if tp_decision['action'] == 'SELL':
                 return tp_decision
             
-            # 2. فحص Trailing Stop الذكي
             trailing_decision = self._check_smart_trailing(
                 symbol, current_price, position, 
                 analysis, coin_history
@@ -61,7 +76,6 @@ class ExitStrategyModel:
             if trailing_decision['action'] == 'SELL':
                 return trailing_decision
             
-            # 3. فحص Bearish Exit الذكي
             bearish_decision = self._check_smart_bearish(
                 symbol, profit_percent, mtf, 
                 analysis, coin_history
@@ -69,19 +83,16 @@ class ExitStrategyModel:
             if bearish_decision['action'] == 'SELL':
                 return bearish_decision
             
-            # 4. فحص Time-based Exit
             time_decision = self._check_time_exit(
                 symbol, position, profit_percent, coin_history
             )
             if time_decision['action'] == 'SELL':
                 return time_decision
 
-            # 5. فحص Exit بسبب الأخبار السلبية
             news_exit_decision = self._check_news_exit(symbol, profit_percent, analysis)
             if news_exit_decision['action'] == 'SELL':
                 return news_exit_decision
 
-            # 6. Hold
             return {
                 'action': 'HOLD',
                 'reason': 'Waiting for better exit',
@@ -159,12 +170,12 @@ class ExitStrategyModel:
             return {'action': 'HOLD'}
     
     def _calculate_dynamic_wave_protection(self, profit_percent, analysis, history, drop_from_peak):
-        """حساب Wave Protection الديناميكي المتقدم"""
+        """حساب Wave Protection الديناميكي المتقدم + Minimum Hold Time"""
         try:
             atr_p = analysis.get('atr_percent', 2.5)
             
-            # 1. الحد الأساسي
-            base_threshold = max(3.0, atr_p * 1.0)
+            # 1. الحد الأساسي (مرفوع من 3% إلى 8%)
+            base_threshold = max(8.0, atr_p * 2.5)  # ✅ حد أدنى 8% بدلاً من 3%
             
             # 2. تعديل حسب الربح الحالي
             if profit_percent > 50:  # ربح عالي جداً - اصبر أكثر
@@ -175,8 +186,8 @@ class ExitStrategyModel:
                 threshold = base_threshold * 1.2
             elif profit_percent > 2:  # ربح بسيط
                 threshold = base_threshold * 1.0
-            else:  # ربح ضعيف - احمي بسرعة
-                threshold = base_threshold * 0.7
+            else:  # ربح ضعيف أو خسارة - اصبر أكثر!
+                threshold = base_threshold * 1.5  # ✅ لا تبيع بسرعة إذا خسران
             
             # 3. تعديل حسب التاريخ
             if history:
