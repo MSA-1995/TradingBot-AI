@@ -875,9 +875,6 @@ class Meta:
                         sell_votes[name] = 0
 
                 total_advisors = 10
-                
-                print(f"🗣️ Advisors Sell Votes: {sell_vote_count}/{total_advisors} ({int(sell_vote_count/total_advisors*100)}%)")
-                
         except Exception as e:
             print(f"⚠️ Sell voting error [{symbol}]: {e}")
             sell_vote_count = 0
@@ -897,20 +894,20 @@ class Meta:
         king_wants_to_sell = False
         sell_reason = ""
         
-        # الشرط 1: المستشارون يؤكدون القمة (60%+ أصوات)
-        if sell_vote_count >= 6 and profit_percent > 1.0:
+        # الشرط 1: المستشارون يؤكدون القمة (60%+ أصوات) + ربح معقول
+        if sell_vote_count >= 6 and profit_percent > 5.0:  # ✅ رفعنا من 1% إلى 5%
             king_wants_to_sell = True
-            sell_reason = f"Advisors Confirm Peak: {sell_vote_count}/{total_advisors} votes"
+            sell_reason = f"Advisors Confirm Peak: {sell_vote_count}/{total_advisors} votes (+{profit_percent:.1f}%)"
         
-        # الشرط 2: نقاط القمة عالية جداً (مع المستشارين الجدد)
-        elif peak_score >= MIN_SELL_CONFIDENCE and profit_percent > 0.5:
+        # الشرط 2: نقاط القمة عالية جداً + ربح معقول
+        elif peak_score >= MIN_SELL_CONFIDENCE and profit_percent > 3.0:  # ✅ رفعنا من 0.5% إلى 3%
             king_wants_to_sell = True
-            sell_reason = f"Strong Peak Signal: {peak_score}/110 points"
+            sell_reason = f"Strong Peak Signal: {peak_score}/110 points (+{profit_percent:.1f}%)"
         
-        # الشرط 3: RSI مرتفع + MACD هابط + مستشارين يحذرون
-        elif rsi > 70 and macd_diff < -1 and sell_vote_count >= 4 and profit_percent > 1.5:
+        # الشرط 3: RSI مرتفع + MACD هابط + مستشارين يحذرون + ربح معقول
+        elif rsi > 75 and macd_diff < -1 and sell_vote_count >= 5 and profit_percent > 3.0:  # ✅ رفعنا RSI من 70 إلى 75
             king_wants_to_sell = True
-            sell_reason = f"Technical Peak: RSI {rsi:.0f} + MACD {macd_diff:.1f} + {sell_vote_count} votes"
+            sell_reason = f"Technical Peak: RSI {rsi:.0f} + MACD {macd_diff:.1f} + {sell_vote_count} votes (+{profit_percent:.1f}%)"
         
         # الشرط 4: ربح عالي (50%+) مع إشارات قمة متوسطة
         elif profit_percent >= 50 and (peak_score >= 70 or sell_vote_count >= 5):
@@ -922,10 +919,10 @@ class Meta:
             king_wants_to_sell = True
             sell_reason = f"Strong Reversal at {profit_percent:.1f}% (Peak: {peak_score})"
         
-        # الشرط 6: المستشارين الجدد يكتشفون إنهاك + انهيار حجم
-        elif peak_confidence >= 40 and profit_percent > 3.0:
+        # الشرط 6: المستشارين الجدد يكتشفون إنهاك + انهيار حجم + ربح معقول
+        elif peak_confidence >= 40 and profit_percent > 5.0:  # ✅ رفعنا من 3% إلى 5%
             king_wants_to_sell = True
-            sell_reason = f"New Advisors Alert: {', '.join(peak_reasons)}"
+            sell_reason = f"New Advisors Alert: {', '.join(peak_reasons)} (+{profit_percent:.1f}%)"
         
         # =========================================================
         # 👑 6. القرار النهائي
