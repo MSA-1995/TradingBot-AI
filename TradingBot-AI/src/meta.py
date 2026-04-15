@@ -476,45 +476,45 @@ class Meta:
         buy_reason = ""
         
         # السيناريو 1: ذكاء عالي جداً (ثقة قوية من المستشارين)
-        if total_intelligence >= 85:
+        if total_intelligence >= 55:
             king_wants_to_buy = True
             buy_reason = f"ثقة عالية جداً: {total_intelligence:.0f}/100"
         
         # السيناريو 2: حيتان تشتري بقوة + ذكاء جيد
-        elif whale_activity > 75 and total_intelligence >= 70:
+        elif whale_activity > 45 and total_intelligence >= 55:
             king_wants_to_buy = True
             buy_reason = f"حيتان تشتري + ثقة: {total_intelligence:.0f}/100"
         
         # السيناريو 3: بداية اتجاه قوي + ذكاء جيد
-        elif trend_birth > 85 and total_intelligence >= 70:
+        elif trend_birth > 55 and total_intelligence >= 55:
             king_wants_to_buy = True
             buy_reason = f"بداية موجة قوية: {total_intelligence:.0f}/100"
         
         # السيناريو 4: انفجار حجم متوقع + ذكاء جيد
-        elif volume_momentum > 80 and total_intelligence >= 70:
+        elif volume_momentum > 45 and total_intelligence >= 55:
             king_wants_to_buy = True
             buy_reason = f"انفجار حجم قادم: {total_intelligence:.0f}/100"
         
         # السيناريو 5: نمط انعكاس قوي + دعم قوي + ذكاء جيد
-        elif pattern_confidence >= 70 and support_strength >= 70 and total_intelligence >= 65:
+        elif pattern_confidence >= 45 and support_strength >= 45 and total_intelligence >= 55:
             king_wants_to_buy = True
             buy_reason = f"نمط قوي + دعم: {total_intelligence:.0f}/100"
         
         # السيناريو 6: ذاكرة قوية (نجح هنا قبل) + ذكاء جيد
-        elif historical_success > 80 and total_intelligence >= 65:
+        elif historical_success > 55 and total_intelligence >= 55:
             king_wants_to_buy = True
             buy_reason = f"ذاكرة قوية: {total_intelligence:.0f}/100"
         
         # السيناريو 7: ذكاء متوسط لكن عدة مستشارين يؤكدون
-        elif total_intelligence >= 75:
+        elif total_intelligence >= 50:
             # فحص: كم مستشار يعطي إشارة قوية؟
             strong_signals = 0
-            if whale_activity > 70: strong_signals += 1
-            if trend_birth > 70: strong_signals += 1
-            if volume_momentum > 70: strong_signals += 1
-            if pattern_confidence > 70: strong_signals += 1
-            if support_strength > 70: strong_signals += 1
-            if historical_success > 75: strong_signals += 1
+            if whale_activity > 45: strong_signals += 1
+            if trend_birth > 55: strong_signals += 1
+            if volume_momentum > 45: strong_signals += 1
+            if pattern_confidence > 45: strong_signals += 1
+            if support_strength > 45: strong_signals += 1
+            if historical_success > 55: strong_signals += 1
             
             if strong_signals >= 3:
                 king_wants_to_buy = True
