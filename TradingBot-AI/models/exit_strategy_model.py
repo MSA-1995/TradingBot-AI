@@ -120,7 +120,7 @@ class ExitStrategyModel:
             return {'action': 'HOLD'}
     
     def _check_smart_trailing(self, symbol, current_price, position, analysis, history):
-        """فحص Trailing Stop الذكي - تنفيذ الخيار A (حماية رأس المال)"""
+        """فحص Trailing Stop الذكي - مع تحليل الشموع الانعكاسية"""
         try:
             buy_price = position.get('buy_price', 0)
             highest_price = position.get('highest_price', buy_price)
@@ -128,20 +128,33 @@ class ExitStrategyModel:
             profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
             drop_from_peak = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
 
-            # الوقف الزاحف السلوكي: يتنفس مع تقلب العملة
+            # 🕯️ تحليل الشموع الانعكاسية عند القمة
+            reversal_signal = self._detect_reversal_candles(analysis, profit_percent)
+            
+            # 🚨 بيع فوري إذا اكتشفنا شمعة انعكاسية قوية عند القمة
+            if reversal_signal['detected'] and profit_percent > 0.5:
+                return {
+                    'action': 'SELL',
+                    'reason': f'REVERSAL DETECTED: {reversal_signal["pattern"]} at peak',
+                    'profit': profit_percent,
+                    'confidence': reversal_signal['confidence']
+                }
+            
+            # الوقف الزاحف السلوكي: مخفض من 11.1% إلى 5-7%
             atr_p = analysis.get('atr_percent', 2.5)
-            threshold = max(MIN_ATR_THRESHOLD, atr_p * ATR_MULTIPLIER) # ديناميكي بالكامل
+            # تخفيض المضاعف من 1.5 إلى 1.0 للبيع الأسرع
+            threshold = max(3.0, atr_p * 1.0)  # حد أدنى 3% بدلاً من 11.1%
 
             if drop_from_peak >= threshold:
                 return {
                     'action': 'SELL',
-                    'reason': f'TRAILING EXIT (A): -{drop_from_peak:.1f}% from peak',
+                    'reason': f'WAVE PROTECTION: -{drop_from_peak:.1f}% from peak',
                     'profit': profit_percent,
                     'confidence': 90
                 }
             return {'action': 'HOLD'}
         except Exception as e:
-            print(f"⚠️ Smart TP error {symbol}: {e}")
+            print(f"⚠️ Smart Trailing error {symbol}: {e}")
             return {'action': 'HOLD'}
     
     def _check_smart_bearish(self, symbol, profit_percent, mtf, analysis, history):
@@ -296,4 +309,138 @@ class ExitStrategyModel:
 
         except Exception as e:
             return {'action': 'HOLD'}
+    
+    def _detect_reversal_candles(self, analysis, profit_percent):
+        """🕯️ كشف الشموع الانعكاسية عند القمة"""
+        try:
+            # جلب بيانات الشموع من التحليل
+            candles = analysis.get('candles', [])
+            if not candles or len(candles) < 3:
+                return {'detected': False, 'pattern': 'None', 'confidence': 0}
+            
+            # آخر 3 شموع للتحليل
+            prev2 = candles[-3] if len(candles) >= 3 else None
+            prev1 = candles[-2]
+            current = candles[-1]
+            
+            # التحقق من البيانات
+            required_keys = ['open', 'close', 'high', 'low', 'volume']
+            if not all(key in current and key in prev1 for key in required_keys):
+                return {'detected': False, 'pattern': 'Incomplete data', 'confidence': 0}
+            
+            # حساب خصائص الشمعة الحالية
+            body = abs(current['close'] - current['open'])
+            candle_range = current['high'] - current['low']
+            if candle_range == 0:
+                return {'detected': False, 'pattern': 'Doji', 'confidence': 0}
+            
+            upper_wick = current['high'] - max(current['open'], current['close'])
+            lower_wick = min(current['open'], current['close']) - current['low']
+            
+            is_red = current['close'] < current['open']
+            is_green = current['close'] > current['open']
+            
+            # حجم التداول
+            volume_spike = current['volume'] > prev1['volume'] * 1.5
+            
+            # RSI و MACD للتأكيد
+            rsi = analysis.get('rsi', 50)
+            macd_diff = analysis.get('macd_diff', 0)
+            
+            # 1. Shooting Star (نجمة هابطة) - قمة حقيقية
+            if (upper_wick > body * 2 and 
+                lower_wick < body * 0.5 and 
+                rsi > 65 and 
+                volume_spike and
+                profit_percent > 1.0):
+                return {
+                    'detected': True,
+                    'pattern': 'Shooting Star',
+                    'confidence': 95
+                }
+            
+            # 2. Bearish Engulfing (ابتلاع هبوطي)
+            if (prev1['close'] > prev1['open'] and  # شمعة خضراء سابقة
+                is_red and  # شمعة حمراء حالية
+                current['open'] > prev1['close'] and  # فتحت فوق إغلاق السابقة
+                current['close'] < prev1['open'] and  # أغلقت تحت فتح السابقة
+                volume_spike and
+                profit_percent > 0.8):
+                return {
+                    'detected': True,
+                    'pattern': 'Bearish Engulfing',
+                    'confidence': 92
+                }
+            
+            # 3. Evening Star (نجمة المساء) - 3 شموع
+            if (prev2 and
+                prev2['close'] > prev2['open'] and  # شمعة 1: خضراء قوية
+                abs(prev1['close'] - prev1['open']) < body * 0.3 and  # شمعة 2: doji صغيرة
+                is_red and  # شمعة 3: حمراء قوية
+                current['close'] < prev2['close'] and
+                rsi > 70 and
+                profit_percent > 1.5):
+                return {
+                    'detected': True,
+                    'pattern': 'Evening Star',
+                    'confidence': 93
+                }
+            
+            # 4. Dark Cloud Cover (غطاء سحابة مظلمة)
+            if (prev1['close'] > prev1['open'] and  # شمعة خضراء سابقة
+                is_red and  # شمعة حمراء حالية
+                current['open'] > prev1['high'] and  # فتحت فوق قمة السابقة
+                current['close'] < (prev1['open'] + prev1['close']) / 2 and  # أغلقت تحت منتصف السابقة
+                volume_spike and
+                profit_percent > 1.0):
+                return {
+                    'detected': True,
+                    'pattern': 'Dark Cloud Cover',
+                    'confidence': 90
+                }
+            
+            # 5. Three Black Crows (3 غربان سوداء) - هبوط قوي
+            if (prev2 and
+                prev2['close'] < prev2['open'] and  # 3 شموع حمراء متتالية
+                prev1['close'] < prev1['open'] and
+                is_red and
+                current['close'] < prev1['close'] < prev2['close'] and
+                macd_diff < -2 and
+                profit_percent > 0.5):
+                return {
+                    'detected': True,
+                    'pattern': 'Three Black Crows',
+                    'confidence': 94
+                }
+            
+            # 6. Hanging Man (الرجل المعلق) - تحذير من انعكاس
+            if (lower_wick > body * 2 and
+                upper_wick < body * 0.5 and
+                rsi > 68 and
+                profit_percent > 1.2):
+                return {
+                    'detected': True,
+                    'pattern': 'Hanging Man',
+                    'confidence': 88
+                }
+            
+            # 7. Bearish Harami (حامل هبوطي)
+            if (prev1['close'] > prev1['open'] and  # شمعة خضراء كبيرة سابقة
+                is_red and  # شمعة حمراء صغيرة حالية
+                current['open'] < prev1['close'] and
+                current['close'] > prev1['open'] and
+                body < abs(prev1['close'] - prev1['open']) * 0.5 and
+                rsi > 72 and
+                profit_percent > 1.0):
+                return {
+                    'detected': True,
+                    'pattern': 'Bearish Harami',
+                    'confidence': 87
+                }
+            
+            return {'detected': False, 'pattern': 'No reversal', 'confidence': 0}
+            
+        except Exception as e:
+            print(f"⚠️ Reversal detection error: {e}")
+            return {'detected': False, 'pattern': 'Error', 'confidence': 0}
     
