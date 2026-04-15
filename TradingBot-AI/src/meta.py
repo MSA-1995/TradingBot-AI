@@ -432,13 +432,13 @@ class Meta:
             volume_momentum * 0.10 +           # 10% زخم الحجم
             pattern_confidence * 0.08 +        # 8% أنماط الشموع
             support_strength * 0.08 +          # 8% قوة الدعم
-            (sentiment_score + 10) * 0.05 +    # 5% المشاعر
-            (news_impact + 15) * 0.03 +        # 3% الأخبار
             historical_success * 0.05 +        # 5% الذاكرة
-            liquidity_score * 0.04 +           # 4% السيولة
-            trap_detection * 0.03 +            # 3% كشف الفخاخ
-            risk_level * 0.03 +                # 3% المخاطر
-            macro_trend * 0.02                 # 2% الاتجاه الكلي
+            trap_detection * 0.05 +            # 5% كشف الفخاخ
+            risk_level * 0.05 +                # 5% المخاطر
+            (sentiment_score + 10) * 0.04 +    # 4% المشاعر
+            liquidity_score * 0.03 +           # 3% السيولة
+            (news_impact + 15) * 0.02 +        # 2% الأخبار
+            macro_trend * 0.01                 # 1% الاتجاه الكلي
         )
         
         # Layer 4: الجرأة من الذاكرة
@@ -780,35 +780,6 @@ class Meta:
         except Exception:
             pass
         return 0
-
-    def _get_market_mood(self, analysis):
-        """Analyzes BTC, ETH, BNB changes to determine the overall market mood and required consensus."""
-        btc_change = analysis.get('btc_change_1h', 0) if analysis else 0
-        eth_change = analysis.get('eth_change_1h', 0) if analysis else 0
-        bnb_change = analysis.get('bnb_change_1h', 0) if analysis else 0
-
-        up_count = 0
-        down_count = 0
-        threshold = 0.5
-
-        if btc_change > threshold: up_count += 1
-        elif btc_change < -threshold: down_count += 1
-
-        if eth_change > threshold: up_count += 1
-        elif eth_change < -threshold: down_count += 1
-
-        if bnb_change > threshold: up_count += 1
-        elif bnb_change < -threshold: down_count += 1
-
-        mood_details = {}
-        if up_count >= 2:
-            mood_details['mood'] = "Bullish"
-        elif down_count >= 2:
-            mood_details['mood'] = "Bearish"
-        else:
-            mood_details['mood'] = "Neutral"
-        
-        return mood_details
 
     def _calculate_smart_amount(self, symbol, confidence, analysis):
         """Wave Rider: حساب المبلغ للموجات الطويلة"""
