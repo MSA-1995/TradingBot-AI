@@ -348,11 +348,17 @@ class RiskManager:
             max_dd_30d = self.calculate_max_drawdown(days=30)
             daily_loss = self._calculate_daily_loss()
             
+            # Portfolio Heat
+            portfolio_heat = self.calculate_portfolio_heat()
+            
+            # Value at Risk
+            var_95 = self.calculate_var(confidence_level=0.95)
+            
             # تقييم المخاطر
             risk_level = 'LOW'
-            if max_dd_7d > 7 or daily_loss > 3:
+            if max_dd_7d > 7 or daily_loss > 3 or portfolio_heat > 0.7:
                 risk_level = 'HIGH'
-            elif max_dd_7d > 5 or daily_loss > 2:
+            elif max_dd_7d > 5 or daily_loss > 2 or portfolio_heat > 0.5:
                 risk_level = 'MEDIUM'
             
             return {
@@ -361,6 +367,8 @@ class RiskManager:
                 'max_drawdown_7d': max_dd_7d,
                 'max_drawdown_30d': max_dd_30d,
                 'daily_loss': daily_loss,
+                'portfolio_heat': portfolio_heat,
+                'var_95': var_95,
                 'risk_level': risk_level,
                 'timestamp': datetime.now().isoformat(),
             }
@@ -368,3 +376,92 @@ class RiskManager:
         except Exception as e:
             print(f"⚠️ Risk report error: {e}")
             return None
+    
+    def calculate_portfolio_heat(self):
+        """حساب Portfolio Heat - مخاطر المحفظة الكلية"""
+        try:
+            # جلب الصفقات المفتوحة
+            open_positions = self.storage.get_open_positions()
+            
+            if not open_positions:
+                return 0.0
+            
+            total_risk = 0
+            for pos in open_positions:
+                # حساب المخاطرة لكل صفقة (بناءً على ATR)
+                symbol = pos.get('symbol')
+                amount = pos.get('amount', 0)
+                buy_price = pos.get('buy_price', 0)
+                
+                # تقدير المخاطرة = المبلغ * ATR%
+                position_value = amount * buy_price
+                atr_percent = pos.get('atr_percent', 2.5)
+                position_risk = position_value * (atr_percent / 100)
+                
+                total_risk += position_risk
+            
+            # Portfolio Heat = إجمالي المخاطر / رأس المال
+            total_capital = 1000  # افتراضي
+            heat = total_risk / total_capital
+            
+            return round(heat, 3)
+            
+        except Exception as e:
+            print(f"⚠️ Portfolio heat error: {e}")
+            return 0.0
+    
+    def calculate_var(self, confidence_level=0.95, days=30):
+        """حساب Value at Risk (VaR)"""
+        try:
+            trades = self._get_recent_trades(None, days)
+            
+            if len(trades) < 10:
+                return 0
+            
+            # جمع العوائد
+            returns = sorted([t['profit_percent'] for t in trades])
+            
+            # حساب VaR عند مستوى ثقة 95%
+            index = int((1 - confidence_level) * len(returns))
+            var = abs(returns[index]) if index < len(returns) else 0
+            
+            return round(var, 2)
+            
+        except Exception as e:
+            print(f"⚠️ VaR calculation error: {e}")
+            return 0
+    
+    def calculate_correlation(self, symbol1, symbol2, days=30):
+        """حساب الارتباط بين عملتين"""
+        try:
+            trades1 = self._get_recent_trades(symbol1, days)
+            trades2 = self._get_recent_trades(symbol2, days)
+            
+            if len(trades1) < 5 or len(trades2) < 5:
+                return 0
+            
+            returns1 = [t['profit_percent'] for t in trades1]
+            returns2 = [t['profit_percent'] for t in trades2]
+            
+            # حساب Correlation
+            n = min(len(returns1), len(returns2))
+            returns1 = returns1[:n]
+            returns2 = returns2[:n]
+            
+            mean1 = sum(returns1) / n
+            mean2 = sum(returns2) / n
+            
+            numerator = sum((returns1[i] - mean1) * (returns2[i] - mean2) for i in range(n))
+            denominator1 = sum((returns1[i] - mean1) ** 2 for i in range(n)) ** 0.5
+            denominator2 = sum((returns2[i] - mean2) ** 2 for i in range(n)) ** 0.5
+            
+            if denominator1 == 0 or denominator2 == 0:
+                return 0
+            
+            correlation = numerator / (denominator1 * denominator2)
+            
+            return round(correlation, 3)
+            
+        except Exception as e:
+            print(f"⚠️ Correlation error: {e}")
+            return 0
