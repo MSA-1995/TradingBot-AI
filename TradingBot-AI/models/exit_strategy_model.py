@@ -53,11 +53,13 @@ class ExitStrategyModel:
                     'confidence': 98
                 }
             
-            # ✅ Minimum Hold Time
+            # ✅ Minimum Hold Time (لكن يسمح بالبيع عند القفزات)
             buy_time = datetime.fromisoformat(position['buy_time'])
             minutes_held = (datetime.now() - buy_time).total_seconds() / 60
             
             if minutes_held < 5:
+                # استثناءات البيع الفوري:
+                # 1. خسارة كارثية
                 if profit_percent < -10:
                     return {
                         'action': 'SELL',
@@ -65,6 +67,8 @@ class ExitStrategyModel:
                         'profit': profit_percent,
                         'confidence': 95
                     }
+                # 2. ربح ضخم مفاجئ (تم فحصه في Profit Spike أعلاه)
+                # وإلا انتظر!
                 return {
                     'action': 'HOLD',
                     'reason': f'Minimum hold time not met ({minutes_held:.1f}/5 min)',
