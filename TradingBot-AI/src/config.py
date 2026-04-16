@@ -59,8 +59,8 @@ CROSS_CHECK_TOLERANCE = 0.8  # أقصى انحراف مسموح به بين ال
 WHALE_FINGERPRINT_LIMIT = 100 # عدد أحداث الحيتان التي يتذكرها الملك لكل عملة
 
 # Memory Management
-MEMORY_CLEANUP_INTERVAL = 120  # Interval in seconds to run the memory cleaner (e.g., 120 = 2 minutes)
-MEMORY_USAGE_THRESHOLD = 80    # Percentage of RAM usage that triggers an aggressive cleanup
+MEMORY_CLEANUP_INTERVAL = 60  # Interval in seconds to run the memory cleaner (e.g., 120 = 2 minutes)
+MEMORY_USAGE_THRESHOLD = 70    # Percentage of RAM usage that triggers an aggressive cleanup
 
 # Timing
 LOOP_SLEEP = 2
