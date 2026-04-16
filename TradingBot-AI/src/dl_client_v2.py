@@ -13,6 +13,15 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from urllib.parse import urlparse, unquote
 
+# إضافة مسار memory للكاش المضغوط
+try:
+    memory_path = os.path.join(os.path.dirname(parent_dir), 'memory')
+    if os.path.exists(memory_path) and memory_path not in sys.path:
+        sys.path.insert(0, memory_path)
+    from memory_cache import MemoryCache
+except Exception:
+    MemoryCache = None
+
 # إضافة مسار MSA-DeepLearning-Trainer إلى sys.path
 try:
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +38,7 @@ class DeepLearningClientV2:
         self.conn = None
         self._db_params = None
         self._pool = None
-        self._models = {}
+        self._models = MemoryCache(max_items=20) if MemoryCache else {}
         self._model_accuracy = {}
         self._model_trained_at = {}
         self._feature_names = {}
@@ -163,7 +172,14 @@ class DeepLearningClientV2:
                             model_obj = pickle.loads(gzip.decompress(raw_data))
                         else:
                             model_obj = pickle.loads(raw_data)
-                        self._models[name] = model_obj
+                        if MemoryCache:
+                            self._models.set(name, model_obj, expiry_seconds=3600)  # كاش مضغوط لساعة
+                        else:
+                            self._models[name] = model_obj
+
+                        # تنظيف الذاكرة فوري بعد التحميل لتوفير المساحة
+                        import gc
+                        gc.collect()
                         try:
                             from MSA_DeepLearning_Trainer.core.features import get_feature_names
                             self._feature_names[name] = get_feature_names()
@@ -328,7 +344,7 @@ class DeepLearningClientV2:
                 return "N/A"
         
         # Smart Money (38 + 4 = 42)
-        model = self._models.get('smart_money')
+        model = self._models.get('smart_money') if MemoryCache else self._models.get('smart_money')
         if model:
             whale = analysis.get('whale_confidence', 0)
             inflow = analysis.get('exchange_inflow', 0)
@@ -567,6 +583,10 @@ class DeepLearningClientV2:
             advice['crypto_news'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['crypto_news'] = "N/A"
+
+        # تنظيف الذاكرة بعد الانتهاء من استخدام المودلات
+        import gc
+        gc.collect()
 
         return advice
 
