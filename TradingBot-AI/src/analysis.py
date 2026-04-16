@@ -20,14 +20,7 @@ def get_market_data(exchange, ttl_hash=None):
     new_market_data = {}
     for market_coin in ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']:
         try:
-            import time
-            start_time = time.time()
             m_ohlcv = exchange.fetch_ohlcv(market_coin, '5m', limit=13)
-            # فحص إذا استغرقت أكثر من 3 ثوانٍ
-            if time.time() - start_time > 3:
-                print(f"⚠️ Market data fetch slow for {market_coin}: {time.time() - start_time:.1f}s")
-                new_market_data[market_coin] = 0
-                continue
             if len(m_ohlcv) >= 13:
                 m_current = m_ohlcv[-1][4]
                 m_1h_ago = m_ohlcv[-13][4]
@@ -1018,22 +1011,7 @@ def get_liquidity_metrics(exchange, symbol, df_5m=None, order_book=None):
     """
     try:
         if not order_book:
-            # إضافة timeout إضافي للـ liquidity
-            import time
-            start_time = time.time()
             order_book = exchange.fetch_order_book(symbol, limit=20)
-            # إذا استغرقت أكثر من 5 ثوانٍ، استخدم قيم افتراضية
-            if time.time() - start_time > 5:
-                print(f"⚠️ Liquidity fetch slow for {symbol}: {time.time() - start_time:.1f}s")
-                return {
-                    'depth_ratio': 1.0,
-                    'spread_percent': 0.1,
-                    'bid_depth': 0,
-                    'ask_depth': 0,
-                    'liquidity_score': 50,
-                    'price_impact': 0.5,
-                    'volume_consistency': 50
-                }
         
         if not order_book or not order_book.get('bids') or not order_book.get('asks'):
             return {
