@@ -35,11 +35,18 @@ def run_main_loop(exchange, ctx):
               memory_optimizer, analyze_fn, get_dynamic_symbols_fn, advisor_manager
     """
     # طباعة تشخيصية عند بدء الدورة
-    import psutil
-    import time
-    start_time = time.time()
-    memory_usage = psutil.virtual_memory().percent
-    print(f"🔍 [DIAGNOSTIC] Loop start - Memory: {memory_usage:.1f}% - Time: {time.strftime('%H:%M:%S')}")
+    try:
+        import psutil
+        import time
+        start_time = time.time()
+        memory_usage = psutil.virtual_memory().percent
+        print(f"🔍 [DIAGNOSTIC] Loop start - Memory: {memory_usage:.1f}% - Time: {time.strftime('%H:%M:%S')}")
+    except ImportError:
+        import time
+        start_time = time.time()
+        print(f"🔍 [DIAGNOSTIC] Loop start - No psutil - Time: {time.strftime('%H:%M:%S')}")
+    except Exception as e:
+        print(f"⚠️ Diagnostic error: {e}")
     SYMBOLS_DATA       = ctx['SYMBOLS_DATA']
     symbols_data_lock  = ctx['symbols_data_lock']
     balance_lock       = ctx['balance_lock']
