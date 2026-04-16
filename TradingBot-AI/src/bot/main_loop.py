@@ -99,13 +99,12 @@ def run_main_loop(exchange, ctx):
                 macro_advisor = advisor_manager.get('MacroTrendAdvisor')
                 if macro_advisor:
                     macro_status = macro_advisor.get_macro_status()
-                    macro_emoji = "🟢" if "BULL" in macro_status else "🔴" if "BEAR" in macro_status else "⚪"
             except Exception:
                 pass
 
             print(f"\n{Fore.CYAN}{Style.BRIGHT}{'█' * 60}")
             print(f"  💼 Balance: ${available:.2f} | Invested: ${invested:.2f} | Active: {active_count}/{MAX_POSITIONS}")
-            print(f"  🌐 Macro Trend: {macro_emoji} {macro_status}")
+            print(f"  🌐 Macro Trend: {macro_status}")
             if locked_profit > 0:
                 print(f"  🔒 Locked Profit: ${locked_profit:.2f} | ✅ Tradable: ${tradable_balance:.2f}")
             else:
