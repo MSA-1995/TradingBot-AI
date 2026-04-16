@@ -397,7 +397,46 @@ class Meta:
             news_analyzer = self.advisor_manager.get('NewsAnalyzer') if self.advisor_manager else None
             if news_analyzer:
                 news_boost = news_analyzer.get_news_confidence_boost(symbol)
-                advisors_intelligence['news_impact'] = news_boost  # -15 to +15
+                advisors_intelligence['news_impact'] = news_boost
+                advisors_intelligence['historical_success'] = 50  # متوسط
+        except: pass
+
+        try:
+            # 9. Anomaly Detector - كشف الشذوذ والفخاخ
+            anomaly_detector = self.advisor_manager.get('AnomalyDetector') if self.advisor_manager else None
+            if anomaly_detector:
+                anomaly_score = analysis_data.get('anomaly_score', 0)
+                if anomaly_score > 70:  # شذوذ عالي = خطر
+                    advisors_intelligence['anomaly_risk'] = 10  # يقلل الثقة
+                else:
+                    advisors_intelligence['anomaly_risk'] = 80  # طبيعي
+        except: pass
+
+        try:
+            # 10. Liquidity Analyzer - تحليل السيولة
+            liquidity_analyzer = self.advisor_manager.get('LiquidityAnalyzer') if self.advisor_manager else None
+            if liquidity_analyzer:
+                liquidity_score = analysis_data.get('liquidity_score', 50)
+                advisors_intelligence['liquidity_score'] = liquidity_score  # 0-100
+        except: pass
+
+        try:
+            # 11. Whale Tracking - تتبع الحيتان
+            whale_tracking = self.advisor_manager.get('WhaleTracking') if self.advisor_manager else None
+            if whale_tracking:
+                whale_activity = analysis_data.get('whale_activity', 0)
+                advisors_intelligence['whale_tracking_score'] = whale_activity * 5  # 0-100
+        except: pass
+
+        try:
+            # 12. Cross-Exchange - مقارنة الأسعار
+            cross_exchange = self.advisor_manager.get('CrossExchange') if self.advisor_manager else None
+            if cross_exchange:
+                price_diff = analysis_data.get('price_diff_pct', 0)
+                if abs(price_diff) < 0.5:  # أسعار متسقة = إشارة إيجابية
+                    advisors_intelligence['cross_exchange_score'] = 90
+                else:
+                    advisors_intelligence['cross_exchange_score'] = 40
         except: pass
         
         try:
@@ -500,7 +539,12 @@ class Meta:
         trap_detection = advisors_intelligence.get('trap_detection', 50)
         risk_level = advisors_intelligence.get('risk_level', 50)
         macro_trend = advisors_intelligence.get('macro_trend', 50)
-        
+
+        # الإضافات الجديدة
+        anomaly_risk = advisors_intelligence.get('anomaly_risk', 50)
+        whale_tracking_score = advisors_intelligence.get('whale_tracking_score', 0)
+        cross_exchange_score = advisors_intelligence.get('cross_exchange_score', 50)
+
         # 🔍 طباعة ذكاء المستشارين (موقفة مؤقتاً)
         # print(f"\n🧠 ADVISORS INTELLIGENCE:")
         # print(f"   Whale Activity: {whale_activity:.1f}/100")
@@ -527,7 +571,10 @@ class Meta:
             (sentiment_score + 10) * 0.04 +    # 4% المشاعر
             liquidity_score * 0.03 +           # 3% السيولة
             (news_impact + 15) * 0.02 +        # 2% الأخبار
-            macro_trend * 0.01                 # 1% الاتجاه الكلي
+            macro_trend * 0.01 +               # 1% الاتجاه الكلي
+            anomaly_risk * 0.04 +              # 4% كشف الشذوذ
+            whale_tracking_score * 0.06 +      # 6% تتبع الحيتان
+            cross_exchange_score * 0.03        # 3% مقارنة الأسعار
         )
         
         # 🔍 طباعة حساب الذكاء الكلي (موقفة مؤقتاً)
@@ -821,10 +868,49 @@ class Meta:
                         sell_votes[name] = 0
 
                 total_advisors = 12  # ✅ 12 مستشار (بما فيهم candle_expert)
+
+                # إضافة أصوات المستشارين الجديدة
+                try:
+                    anomaly_detector = self.advisor_manager.get('AnomalyDetector') if self.advisor_manager else None
+                    if anomaly_detector and analysis.get('anomaly_score', 0) > 70:
+                        sell_vote_count += 1  # يصوت للبيع عند شذوذ عالي
+                        sell_votes['AnomalyDetector'] = 1
+                    else:
+                        sell_votes['AnomalyDetector'] = 0
+                except: sell_votes['AnomalyDetector'] = 0
+
+                try:
+                    liquidity_analyzer = self.advisor_manager.get('LiquidityAnalyzer') if self.advisor_manager else None
+                    if liquidity_analyzer and analysis.get('liquidity_score', 50) < 30:
+                        sell_vote_count += 1  # يصوت للبيع عند سيولة منخفضة
+                        sell_votes['LiquidityAnalyzer'] = 1
+                    else:
+                        sell_votes['LiquidityAnalyzer'] = 0
+                except: sell_votes['LiquidityAnalyzer'] = 0
+
+                try:
+                    whale_tracking = self.advisor_manager.get('WhaleTracking') if self.advisor_manager else None
+                    if whale_tracking and analysis.get('whale_dumping', False):
+                        sell_vote_count += 1  # يصوت للبيع عند بيع الحيتان
+                        sell_votes['WhaleTracking'] = 1
+                    else:
+                        sell_votes['WhaleTracking'] = 0
+                except: sell_votes['WhaleTracking'] = 0
+
+                try:
+                    cross_exchange = self.advisor_manager.get('CrossExchange') if self.advisor_manager else None
+                    if cross_exchange and abs(analysis.get('price_diff_pct', 0)) > 1.0:
+                        sell_vote_count += 1  # يصوت للبيع عند فروقات أسعار كبيرة
+                        sell_votes['CrossExchange'] = 1
+                    else:
+                        sell_votes['CrossExchange'] = 0
+                except: sell_votes['CrossExchange'] = 0
+
+                total_advisors = 16  # رفع من 12 إلى 16
         except Exception as e:
             print(f"⚠️ Sell voting error [{symbol}]: {e}")
             sell_vote_count = 0
-            total_advisors = 12
+            total_advisors = 16
 
         # =========================================================
         # 👑 5. الملك يقرر بناءً على القمة + المستشارين
@@ -839,43 +925,69 @@ class Meta:
         
         king_wants_to_sell = False
         sell_reason = ""
-        
-        # الشرط 1: المستشارون يؤكدون القمة (50%+ أصوات) + ربح معقول
-        if sell_vote_count >= 6 and profit_percent > 5.0:  # ✅ 6 من 12 = 50%
+
+        # فحص التفاؤل والأمل - إذا كان التفاؤل منخفض جداً، يساعد في تأكيد القمة
+        sentiment_confirmed = False
+        try:
+            sentiment = analysis.get('sentiment', {})
+            if sentiment.get('score', 0) < -1:  # تفاؤل منخفض = تأكيد قمة
+                sentiment_confirmed = True
+        except:
+            sentiment_confirmed = False
+
+        # الشرط 1: المستشارون يؤكدون القمة (60%+ أصوات) مع تأكيد الشموع والزخم والتفاؤل
+        if sell_vote_count >= 8 and peak_confidence >= 70 and sentiment_confirmed:  # ✅ 8/12 + قمة 70+ + تفاؤل منخفض
             king_wants_to_sell = True
-            sell_reason = f"Advisors Confirm Peak: {sell_vote_count}/{total_advisors} votes (+{profit_percent:.1f}%)"
-        
-        # الشرط 2: نقاط القمة عالية جداً + ربح معقول
-        elif peak_score >= MIN_SELL_CONFIDENCE and profit_percent > 3.0:  # ✅ رفعنا من 0.5% إلى 3%
+            sell_reason = f"Ultimate Peak: {sell_vote_count}/{total_advisors} votes + Candles/Volume/Sentiment confirm (+{profit_percent:.1f}%)"
+
+        # الشرط 2: نقاط القمة عالية - إزالة شرط الربح
+        elif peak_score >= 70:  # ✅ خفضنا من MIN_SELL_CONFIDENCE إلى 70
             king_wants_to_sell = True
             sell_reason = f"Strong Peak Signal: {peak_score}/110 points (+{profit_percent:.1f}%)"
-        
-        # الشرط 3: RSI مرتفع + MACD هابط + مستشارين يحذرون + ربح معقول
-        elif rsi > 75 and macd_diff < -1 and sell_vote_count >= 5 and profit_percent > 3.0:  # ✅ رفعنا RSI من 70 إلى 75
+
+        # الشرط 3: RSI مرتفع + MACD هابط + مستشارين يحذرون - إزالة شرط الربح
+        elif rsi > 70 and macd_diff < -1 and sell_vote_count >= 3:  # ✅ خفضنا RSI من 75 إلى 70، أصوات من 5 إلى 3
             king_wants_to_sell = True
             sell_reason = f"Technical Peak: RSI {rsi:.0f} + MACD {macd_diff:.1f} + {sell_vote_count} votes (+{profit_percent:.1f}%)"
         
-        # الشرط 4: ربح عالي (50%+) مع إشارات قمة متوسطة
-        elif profit_percent >= 50 and (peak_score >= 70 or sell_vote_count >= 5):
+        # الشرط 4: ربح عالي (30%+) مع إشارات قمة متوسطة - إزالة شرط الربح العالي
+        elif profit_percent >= 15 and (peak_score >= 60 or sell_vote_count >= 3):  # ✅ خفضنا الربح من 50% إلى 15%
             king_wants_to_sell = True
-            sell_reason = f"Wave Target Hit: {profit_percent:.1f}% (Peak: {peak_score}, Votes: {sell_vote_count})"
-        
-        # الشرط 5: ربح متوسط (30%+) مع إشارات قمة قوية جداً
-        elif profit_percent >= 30 and peak_score >= 95:
+            sell_reason = f"Profit Target: {profit_percent:.1f}% (Peak: {peak_score}, Votes: {sell_vote_count})"
+
+        # الشرط 5: إشارات قمة قوية جداً - إزالة شرط الربح
+        elif peak_score >= 90:  # ✅ خفضنا من 95 إلى 90
             king_wants_to_sell = True
-            sell_reason = f"Strong Reversal at {profit_percent:.1f}% (Peak: {peak_score})"
-        
-        # الشرط 6: المستشارين الجدد يكتشفون إنهاك + انهيار حجم + ربح معقول
-        elif peak_confidence >= 40 and profit_percent > 5.0:  # ✅ رفعنا من 3% إلى 5%
+            sell_reason = f"Strong Reversal (Peak: {peak_score})"
+
+        # الشرط 6: المستشارين الجدد يكتشفون إنهاك + انهيار حجم - إزالة شرط الربح
+        elif peak_confidence >= 30:  # ✅ خفضنا من 40 إلى 30
             king_wants_to_sell = True
-            sell_reason = f"New Advisors Alert: {', '.join(peak_reasons)} (+{profit_percent:.1f}%)"
+            sell_reason = f"New Advisors Alert: {', '.join(peak_reasons)}"
         
         # =========================================================
-        # 👑 6. القرار النهائي
+        # 👑 6. القرار النهائي - البيع عند القمة الحقيقية بغض النظر عن الربح (طالما فوق 0.5%)
         # =========================================================
+
+        # حساب نسبة الأصوات
+        sell_vote_percentage = (sell_vote_count / total_advisors * 100) if total_advisors > 0 else 0
+
+        # فحص القمة الحقيقية - إذا كانت هناك قمة قوية مع تأكيد الشموع والزخم والتفاؤل، بيع بغض النظر عن حجم الربح
+        if peak_confidence >= 60 and len(peak_reasons) >= 2 and sentiment_confirmed:  # قمة حقيقية + تفاؤل منخفض
+            return {
+                'action': 'SELL',
+                'reason': f'REAL PEAK DETECTED: {", ".join(peak_reasons)} (Confidence: {peak_confidence} + Sentiment)',
+                'profit': profit_percent,
+                'optimism_penalty': 0,
+                'sell_votes': sell_votes,
+                'peak_score': peak_score,
+                'sell_vote_percentage': sell_vote_percentage,
+                'sell_vote_count': sell_vote_count,
+                'total_advisors': total_advisors
+            }
+
         if king_wants_to_sell:
             optimism_penalty = round((profit_percent - 50) * 0.3, 2) if profit_percent > 50 else 0
-            sell_vote_percentage = (sell_vote_count / total_advisors * 100) if total_advisors > 0 else 0
             return {
                 'action': 'SELL',
                 'reason': sell_reason,
