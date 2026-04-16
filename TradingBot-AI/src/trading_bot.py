@@ -489,7 +489,15 @@ print("=" * 60 + "\n")
 while True:
     try:
         run_main_loop(exchange, ctx)
+    except KeyboardInterrupt:
+        print("⏹️ Bot stopped by user")
+        break
+    except SystemExit as e:
+        print(f"🔚 System exit: {e}")
+        break
     except Exception as e:
+        import traceback
         print(f"❌ Critical error: {e}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
         print(f"🔄 Restarting in 5 seconds...")
         time.sleep(5)
