@@ -1006,14 +1006,20 @@ class Meta:
         highest_price = position.get('highest_price', buy_price)
         drop_from_peak = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
 
-        # حساب ديناميكي بناءً على المستشارين والمؤشرات
+        # حساب ديناميكي بناءً على المستشارين والمؤشرات - لا أرقام ثابتة!
         atr_p = analysis.get('atr_percent', 2.5)
         risk_level = advisors_intelligence.get('risk_level', 50)  # من Risk Manager
         whale_tracking_score = advisors_intelligence.get('whale_tracking_score', 0)  # من Whale Tracking
         sentiment_score = advisors_intelligence.get('sentiment_score', 0)  # من Sentiment
+        volume_ratio = analysis.get('volume_ratio', 1.0)  # حجم التداول
+        peak_score = advisors_intelligence.get('peak_score', 50)  # نقاط القمة
 
-        # العتبة الأساسية من ATR
-        base_threshold = max(2.0, atr_p * 1.5)  # مرن من 2% إلى أعلى
+        # العتبة الأساسية من ATR فقط (ديناميكية كاملة)
+        base_threshold = atr_p * 2.0  # يبدأ من ATR × 2
+
+        # حد أدنى ديناميكي بناءً على المخاطر (ليس ثابت)
+        min_threshold = risk_level / 20  # مخاطر 100 = 5% حد أدنى
+        base_threshold = max(min_threshold, base_threshold)
 
         # تعديل بناءً على المخاطر: مخاطر عالية = حماية أسرع
         risk_modifier = (risk_level - 50) / 100  # من -0.5 إلى +0.5
