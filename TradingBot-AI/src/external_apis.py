@@ -6,15 +6,46 @@ import os
 import requests
 from datetime import datetime, timedelta
 
+# إضافة كاش مضغوط لنتائج external APIs
+try:
+    import sys
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    memory_path = os.path.join(parent_dir, 'memory')
+    if os.path.exists(memory_path) and memory_path not in sys.path:
+        sys.path.insert(0, memory_path)
+    from memory_cache import MemoryCache
+except Exception:
+    MemoryCache = None
+
 class ExternalAPIClient:
     def __init__(self):
         self.news_key = os.getenv("NEWS_API_KEY")
         self.whale_key = os.getenv("WHALE_ALERT_API_KEY")
         self.alpha_key = os.getenv("ALPHA_VANTAGE_API_KEY")
+        self.api_cache = MemoryCache(max_items=30) if MemoryCache else {}
 
     def get_whale_activity(self, min_value=500000):
         """جلب تحركات الحيتان الكبيرة في آخر ساعة"""
         if not self.whale_key:
+            return []
+
+        cache_key = f"whale_{min_value}"
+        cached_result = self.api_cache.get(cache_key) if MemoryCache else None
+        if cached_result:
+            return cached_result
+
+        url = f"https://api.whale-alert.io/v1/transactions?api_key={self.whale_key}&min_value={min_value}"
+        try:
+            response = requests.get(url, timeout=(5, 10))
+            if response.status_code == 200:
+                result = response.json().get('transactions', [])
+                if MemoryCache:
+                    self.api_cache.set(cache_key, result, expiry_seconds=300)  # 5 دقائق
+                return result
+            return []
+        except Exception as e:
+            print(f"⚠️ Whale Alert Error: {e}")
             return []
         
         url = f"https://api.whale-alert.io/v1/transactions?api_key={self.whale_key}&min_value={min_value}"
