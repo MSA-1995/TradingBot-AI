@@ -377,10 +377,10 @@ def run_main_loop(exchange, ctx):
                     try:
                         risk_report = risk_manager.get_risk_report()
                         if risk_report:
-                            print(f"\n🛡️ Risk Report:")
-                            print(f"  Sharpe Ratio (7d): {risk_report['sharpe_ratio_7d']}")
-                            print(f"  Max Drawdown (7d): {risk_report['max_drawdown_7d']}%")
-                            print(f"  Risk Level: {risk_report['risk_level']}")
+                            # print(f"\n🛡️ Risk Report:")
+                            # print(f"  Sharpe Ratio (7d): {risk_report['sharpe_ratio_7d']}")
+                            # print(f"  Max Drawdown (7d): {risk_report['max_drawdown_7d']}%")
+                            # print(f"  Risk Level: {risk_report['risk_level']}")
 
                             stop_check = risk_manager.should_stop_trading()
                             if stop_check['stop']:
@@ -397,10 +397,10 @@ def run_main_loop(exchange, ctx):
                     try:
                         anomaly_report = anomaly_detector.get_anomaly_report()
                         if anomaly_report and anomaly_report['total_anomalies'] > 0:
-                            print(f"\n🚨 Anomaly Report (24h):")
-                            print(f"  Total: {anomaly_report['total_anomalies']}")
-                            print(f"  Critical: {anomaly_report['critical']}")
-                            print(f"  High: {anomaly_report['high']}")
+                            # print(f"\n🚨 Anomaly Report (24h):")
+                            # print(f"  Total: {anomaly_report['total_anomalies']}")
+                            # print(f"  Critical: {anomaly_report['critical']}")
+                            # print(f"  High: {anomaly_report['high']}")
                     except Exception as e:
                         print(f"⚠️ Anomaly report error: {e}")
 
@@ -409,11 +409,11 @@ def run_main_loop(exchange, ctx):
                     try:
                         pattern_stats = pattern_recognizer.get_pattern_statistics()
                         if pattern_stats:
-                            print(f"\n🧠 Pattern Statistics:")
-                            print(f"  Total Patterns: {pattern_stats['total_patterns']}")
-                            print(f"  Success: {pattern_stats['success_patterns']}")
-                            print(f"  Traps: {pattern_stats['trap_patterns']}")
-                            print(f"  Success Rate: {pattern_stats['success_rate']:.1f}%")
+                            # print(f"\n🧠 Pattern Statistics:")
+                            # print(f"  Total Patterns: {pattern_stats['total_patterns']}")
+                            # print(f"  Success: {pattern_stats['success_patterns']}")
+                            # print(f"  Traps: {pattern_stats['trap_patterns']}")
+                            # print(f"  Success Rate: {pattern_stats['success_rate']:.1f}%")
                     except Exception as e:
                         print(f"⚠️ Pattern stats error: {e}")
 
