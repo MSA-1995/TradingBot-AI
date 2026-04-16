@@ -37,32 +37,36 @@ def get_sentiment_data(symbol=None, analysis=None):
         'optimism_penalty': 0.0
     }
 
-    # ========== 1. Fear & Greed Index ==========
-    try:
-        now = time.time()
-        # كاش لمدة 10 دقائق - يحفظ على الـ Egress
-        if _fear_greed_cache['value'] is None or (now - _fear_greed_cache['timestamp']) > 600:
-            response = requests.get(
-                'https://api.alternative.me/fng/?limit=1',
-                timeout=5
-            )
-            if response.status_code == 200:
-                data = response.json()
-                fg_value = int(data['data'][0]['value'])  # 0-100
-                _fear_greed_cache['previous_value'] = _fear_greed_cache['value']
-                # تحويل من 0-100 إلى -10 إلى +10
-                sentiment_score = (fg_value - 50) / 5.0  # -10 إلى +10
-                _fear_greed_cache['value'] = round(sentiment_score, 2)
-                _fear_greed_cache['timestamp'] = now
+# ========== 1. Fear & Greed Index ==========
+try:
+    now = time.time()
+    # كاش لمدة 10 دقائق - يحفظ على الـ Egress
+    if _fear_greed_cache['value'] is None or (now - _fear_greed_cache['timestamp']) > 600:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        response = requests.get(
+            'https://api.alternative.me/fng/?limit=1',
+            timeout=10,
+            verify=False  # ✅ يحل مشكلة SSL على Koyeb
+        )
+        if response.status_code == 200:
+            data = response.json()
+            fg_value = int(data['data'][0]['value'])  # 0-100
+            _fear_greed_cache['previous_value'] = _fear_greed_cache['value']
+            # تحويل من 0-100 إلى -10 إلى +10
+            sentiment_score = (fg_value - 50) / 5.0  # -10 إلى +10
+            _fear_greed_cache['value'] = round(sentiment_score, 2)
+            _fear_greed_cache['timestamp'] = now
 
-        result['sentiment_score'] = _fear_greed_cache['value'] or 0.0
-        if _fear_greed_cache['previous_value'] is not None:
-            # حساب سرعة التغير
-            result['sentiment_velocity'] = result['sentiment_score'] - _fear_greed_cache['previous_value']
+    result['sentiment_score'] = _fear_greed_cache['value'] or 0.0
+    if _fear_greed_cache['previous_value'] is not None:
+        # حساب سرعة التغير
+        result['sentiment_velocity'] = result['sentiment_score'] - _fear_greed_cache['previous_value']
 
-    except Exception as e:
-        print(f"⚠️ Fear & Greed API error: {e}")
-        result['sentiment_score'] = 0.0
+except Exception as e:
+    print(f"⚠️ Fear & Greed API error: {e}")
+    result['sentiment_score'] = 0.0
 
     # ========== 2. Panic Score من التحليل التقني ==========
     if analysis:
