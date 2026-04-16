@@ -42,13 +42,11 @@ def get_sentiment_data(symbol=None, analysis=None):
         now = time.time()
         # كاش لمدة 10 دقائق - يحفظ على الـ Egress
         if _fear_greed_cache['value'] is None or (now - _fear_greed_cache['timestamp']) > 600:
-            import urllib3
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
             response = requests.get(
                 'https://api.alternative.me/fng/?limit=1',
-                timeout=10,
-                verify=False  # ✅ يحل مشكلة SSL على Koyeb
+                timeout=(5, 10)  # connect=5s, read=10s
             )
             if response.status_code == 200:
                 data = response.json()
