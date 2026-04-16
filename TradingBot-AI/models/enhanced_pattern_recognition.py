@@ -7,20 +7,51 @@ from datetime import datetime, timedelta
 import statistics
 from src.config import VOLUME_SPIKE_FACTOR
 
+# إضافة كاش مضغوط
+try:
+    import sys
+    import os
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    memory_path = os.path.join(parent_dir, 'memory')
+    if os.path.exists(memory_path) and memory_path not in sys.path:
+        sys.path.insert(0, memory_path)
+    from memory_cache import MemoryCache
+except Exception:
+    MemoryCache = None
+
 class EnhancedPatternRecognition:
     def __init__(self, storage):
         self.storage = storage
         self.all_patterns = []
         self.success_patterns = []
         self.trap_patterns = []
+        self.patterns_cache = MemoryCache(max_items=50) if MemoryCache else {}
         self.load_patterns_from_db()
         print(f"🧠 Enhanced Pattern Recognition initialized with {len(self.all_patterns)} patterns cached.")
 
     def load_patterns_from_db(self):
-        """Loads all patterns from the database and caches them."""
-        self.all_patterns = self.storage.load_all_patterns()
-        self.success_patterns = [p for p in self.all_patterns if p.get('pattern_type') == 'SUCCESS']
-        self.trap_patterns = [p for p in self.all_patterns if p.get('pattern_type') == 'TRAP']
+        """Loads all patterns from the database and caches them with compression."""
+        patterns = self.storage.load_all_patterns()
+
+        # ضغط وحفظ في الكاش
+        if MemoryCache:
+            self.patterns_cache.set('all_patterns', patterns, expiry_seconds=1800)  # 30 دقيقة
+            self.patterns_cache.set('success_patterns', [p for p in patterns if p.get('pattern_type') == 'SUCCESS'], expiry_seconds=1800)
+            self.patterns_cache.set('trap_patterns', [p for p in patterns if p.get('pattern_type') == 'TRAP'], expiry_seconds=1800)
+        else:
+            self.all_patterns = patterns
+            self.success_patterns = [p for p in patterns if p.get('pattern_type') == 'SUCCESS']
+            self.trap_patterns = [p for p in patterns if p.get('pattern_type') == 'TRAP']
+
+        # تنظيف الذاكرة فوري بعد التحميل
+        import gc
+        gc.collect()
+
+        # جلب من الكاش للاستخدام
+        self.all_patterns = self.patterns_cache.get('all_patterns') if MemoryCache else self.all_patterns
+        self.success_patterns = self.patterns_cache.get('success_patterns') if MemoryCache else self.success_patterns
+        self.trap_patterns = self.patterns_cache.get('trap_patterns') if MemoryCache else self.trap_patterns
 
     
     def analyze_entry_pattern(self, symbol, analysis, mtf, price_drop):
@@ -68,7 +99,11 @@ class EnhancedPatternRecognition:
                 ),
                 'features': features
             }
-            
+
+            # تنظيف الذاكرة عند الانتهاء
+            import gc
+            gc.collect()
+
         except Exception as e:
             print(f"⚠️ Pattern stats error: {e}")
             return None
