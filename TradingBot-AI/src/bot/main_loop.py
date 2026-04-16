@@ -40,7 +40,7 @@ def run_main_loop(exchange, ctx):
         import time
         start_time = time.time()
         memory_usage = psutil.virtual_memory().percent
-        print(f"🔍 [DIAGNOSTIC] Loop start - Memory: {memory_usage:.1f}% - Time: {time.strftime('%H:%M:%S')}")
+        print(f"🔍 Loop start - Memory: {memory_usage:.1f}% - Time: {time.strftime('%H:%M:%S')}")
     except ImportError:
         import time
         start_time = time.time()
