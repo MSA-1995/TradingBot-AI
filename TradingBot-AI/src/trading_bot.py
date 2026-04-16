@@ -112,6 +112,7 @@ DISCORD_WEBHOOK = get_discord_webhook()
 exchange_config = {
     'apiKey': API_KEY,
     'secret': SECRET_KEY,
+    'timeout': 5000,  # 5 seconds timeout for API calls
     'enableRateLimit': True,
     'options': {'defaultType': 'spot', 'adjustForTimeDifference': True}
 }
