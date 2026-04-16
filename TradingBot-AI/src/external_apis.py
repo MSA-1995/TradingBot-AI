@@ -19,7 +19,7 @@ class ExternalAPIClient:
         
         url = f"https://api.whale-alert.io/v1/transactions?api_key={self.whale_key}&min_value={min_value}"
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=(5, 10))  # connect=5s, read=10s
             if response.status_code == 200:
                 return response.json().get('transactions', [])
             return []
@@ -37,7 +37,7 @@ class ExternalAPIClient:
         url = f"https://newsapi.org/v2/everything?q={query}&from={yesterday}&sortBy=publishedAt&apiKey={self.news_key}"
         
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=(5, 10))  # connect=5s, read=10s
             if response.status_code == 200:
                 articles = response.json().get('articles', [])
                 # نأخذ العناوين فقط لتقليل استهلاك الرام
@@ -51,7 +51,7 @@ class ExternalAPIClient:
         """جلب مؤشر الخوف والطمع (Fear & Greed Index)"""
         url = "https://api.alternative.me/fng/"
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=(5, 10))  # connect=5s, read=10s
             if response.status_code == 200:
                 data = response.json().get('data', [{}])[0]
                 return {
@@ -84,7 +84,7 @@ class ExternalAPIClient:
         """جلب القيمة السوقية الإجمالية وسيطرة البيتكوين عبر CoinGecko"""
         url = "https://api.coingecko.com/api/v3/global"
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=(5, 10))  # connect=5s, read=10s
             if response.status_code == 200:
                 data = response.json().get('data', {})
                 return {
@@ -128,7 +128,7 @@ class ExternalAPIClient:
         base_symbol = symbol.split('/')[0]
         url = f"https://www.alphavantage.co/query?function=ATR&symbol={base_symbol}&interval=daily&time_period=14&apikey={self.alpha_key}"
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=(5, 10))  # connect=5s, read=10s
             data = response.json()
             atr_data = data.get("Technical Analysis: ATR", {})
             if atr_data:
