@@ -688,7 +688,7 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
         df['macd_histogram'] = df['macd_diff']  # alias لـ analyze_peak و analyze_reversal
         
         df['volume_sma'] = df['volume'].rolling(window=20).mean()
-        df['volume_ratio'] = (df['volume'] / df['volume_sma'].replace(0, 1)).fillna(1.0)
+        df['volume_ratio'] = (df['volume'] / df['volume_sma'].replace(0, 1)).fillna(1.0).clip(upper=100)
         
         # 🛡️ Testnet Fix: إذا الحجم صفر (Binance Testnet لا يوفر حجم حقيقي)
         # نستخدم 1.0 كقيمة افتراضية محايدة بدل 0.0 التي تعطل التحليل
