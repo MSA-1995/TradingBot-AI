@@ -1001,14 +1001,34 @@ class Meta:
             }
         
         # =========================================================
-        # 🛡️ 7. Wave Protection (الحماية من الهبوط الحاد)
+        # 🛡️ 7. Wave Protection الذكي (يتحكم بناءً على المستشارين - لا أرقام ثابتة)
         # =========================================================
         highest_price = position.get('highest_price', buy_price)
         drop_from_peak = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
-        
-        # تخفيض Wave Protection من 11.1% إلى 3-7%
-        atr_p = analysis.get('atr_percent', 2.5) 
-        trailing_threshold = max(3.0, atr_p * 1.0)  # حد أدنى 3% بدلاً من 11.1%
+
+        # حساب ديناميكي بناءً على المستشارين والمؤشرات
+        atr_p = analysis.get('atr_percent', 2.5)
+        risk_level = advisors_intelligence.get('risk_level', 50)  # من Risk Manager
+        whale_tracking_score = advisors_intelligence.get('whale_tracking_score', 0)  # من Whale Tracking
+        sentiment_score = advisors_intelligence.get('sentiment_score', 0)  # من Sentiment
+
+        # العتبة الأساسية من ATR
+        base_threshold = max(2.0, atr_p * 1.5)  # مرن من 2% إلى أعلى
+
+        # تعديل بناءً على المخاطر: مخاطر عالية = حماية أسرع
+        risk_modifier = (risk_level - 50) / 100  # من -0.5 إلى +0.5
+        base_threshold += risk_modifier * 3  # يضيف أو ينقص 3%
+
+        # تعديل بناءً على الحيتان: حيتان تشتري = حماية أقل
+        whale_modifier = whale_tracking_score / 200  # من 0 إلى 0.5
+        base_threshold -= whale_modifier * 2  # يقلل الحماية إذا الحيتان إيجابية
+
+        # تعديل بناءً على المشاعر: مشاعر سلبية = حماية أسرع
+        sentiment_modifier = max(-10, min(10, sentiment_score)) / 100  # من -0.1 إلى +0.1
+        base_threshold += sentiment_modifier * 2  # يزيد أو يقلل قليلاً
+
+        # الحدود الآمنة
+        trailing_threshold = max(1.0, min(15.0, base_threshold))  # من 1% إلى 15%
 
         if drop_from_peak >= trailing_threshold:
             return {
