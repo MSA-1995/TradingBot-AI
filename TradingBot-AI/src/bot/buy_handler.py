@@ -43,7 +43,7 @@ def process_buy(result, exchange, ctx):
         if buy_vote_percentage is not None:
             voting_display = f" | 🗳️ Buy:{buy_vote_percentage:.0f}% Amount:${result['amount']:.0f}"
 
-    print(f"{Fore.GREEN}🟢 BUY {symbol} | Meta Confidence:{result['confidence']}{voting_display}{news_display}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}🟢 BUY {symbol} | Meta Confidence:{result['confidence']:.1f}{voting_display}{news_display}{Style.RESET_ALL}")
 
     buy_result = execute_buy(exchange, symbol, result['amount'], result['price'], result['confidence'])
     if not buy_result['success']:
