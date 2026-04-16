@@ -8,8 +8,8 @@ All bot settings and constants
 MIN_SELL_CONFIDENCE = 85  # Peak/Valley Catcher: خروج عند قمة مكتشفة
 MIN_BUY_CONFIDENCE = 55   # حد الثقة للشراء (reversal analysis)
 MACRO_CANDLE_THRESHOLD = 85  # حد الشموع لتجاوز حارس الماكرو
-MAX_POSITIONS = 10  # صفقتين كحد أقصى لكل مجموعة (5+5)
-TOTAL_COINS_TO_SCAN = 10
+MAX_POSITIONS = 20  # صفقتين كحد أقصى لكل مجموعة (5+5)
+TOTAL_COINS_TO_SCAN = 20
 
 # =====================================================================
 # 👑 Meta Decision Thresholds (الأرقام المعتدلة - النظام الجديد)
