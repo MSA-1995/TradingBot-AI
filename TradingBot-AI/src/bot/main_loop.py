@@ -397,6 +397,7 @@ def run_main_loop(exchange, ctx):
                     try:
                         anomaly_report = anomaly_detector.get_anomaly_report()
                         if anomaly_report and anomaly_report['total_anomalies'] > 0:
+                            pass
                             # print(f"\n🚨 Anomaly Report (24h):")
                             # print(f"  Total: {anomaly_report['total_anomalies']}")
                             # print(f"  Critical: {anomaly_report['critical']}")
@@ -409,6 +410,7 @@ def run_main_loop(exchange, ctx):
                     try:
                         pattern_stats = pattern_recognizer.get_pattern_statistics()
                         if pattern_stats:
+                            pass
                             # print(f"\n🧠 Pattern Statistics:")
                             # print(f"  Total Patterns: {pattern_stats['total_patterns']}")
                             # print(f"  Success: {pattern_stats['success_patterns']}")
