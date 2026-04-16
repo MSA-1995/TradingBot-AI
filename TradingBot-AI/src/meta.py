@@ -738,8 +738,36 @@ class Meta:
 
     def should_sell(self, symbol, position, current_price, analysis, mtf, candles=None, preloaded_advisors=None):
         """🔴 قرار البيع مع استشارة المستشارين عن القمة"""
+
+        # حساب advisors_intelligence للبيع (مبسط)
+        advisors_intelligence = {}
+        # إضافة القيم الأساسية المطلوبة للستوب لوس
+        risk_level = 50  # افتراضي
+        whale_tracking_score = 0  # افتراضي
+        sentiment_score = 0  # افتراضي
+
+        # محاولة الحصول من المستشارين إذا متوفرة
+        try:
+            # من Risk Manager
+            risk_level = analysis.get('risk_level', 50)
+        except: pass
+
+        try:
+            # من Whale Tracking
+            whale_tracking_score = analysis.get('whale_score', 0)
+        except: pass
+
+        try:
+            # من Sentiment Analyzer
+            sentiment_score = analysis.get('sentiment_score', 0)
+        except: pass
+
+        advisors_intelligence['risk_level'] = risk_level
+        advisors_intelligence['whale_tracking_score'] = whale_tracking_score
+        advisors_intelligence['sentiment_score'] = sentiment_score
+
         from config import MIN_SELL_CONFIDENCE
-        
+
         buy_price = position['buy_price']
         profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
         rsi = analysis.get('rsi', 50)
@@ -749,9 +777,45 @@ class Meta:
         # فحص الحد الأدنى للربح قبل البيع
         from config import MIN_SELL_PROFIT
         if profit_percent < MIN_SELL_PROFIT:
+            reason = f'Minimum profit not reached: {profit_percent:.2f}% < {MIN_SELL_PROFIT}%'
+
+            # للخسائر أكثر من 1%: أضف معلومات الستوب لوس المتوقع
+            if profit_percent < -1.0:
+                # حساب الستوب لوس المتوقع من المستشارين والمؤشرات (دون أرقام ثابتة)
+                atr_p = analysis.get('atr_percent', 2.5)
+                risk_level = advisors_intelligence.get('risk_level', 50)
+                whale_tracking_score = advisors_intelligence.get('whale_tracking_score', 0)
+                sentiment_score = advisors_intelligence.get('sentiment_score', 0)
+                volume_ratio = analysis.get('volume_ratio', 1.0)
+                rsi = analysis.get('rsi', 50)
+
+                # العتبة الأساسية من ATR والمخاطر فقط
+                base_threshold = atr_p * (1 + risk_level / 100)  # يزيد مع المخاطر
+
+                # تعديل بناءً على الحجم (مؤشر سوق)
+                volume_modifier = (volume_ratio - 1.0) * 0.5  # حجم عالي = حماية أكثر
+                base_threshold += volume_modifier
+
+                # تعديل بناءً على RSI (مؤشر فني)
+                rsi_modifier = (50 - rsi) / 100  # RSI منخفض = حماية أسرع
+                base_threshold += rsi_modifier
+
+                # تعديل بناءً على الحيتان (مستشار)
+                whale_modifier = whale_tracking_score / 500  # حيتان إيجابية تقلل الحماية
+                base_threshold -= whale_modifier
+
+                # تعديل بناءً على المشاعر (مستشار)
+                sentiment_modifier = sentiment_score / 200  # مشاعر سلبية تزيد الحماية
+                base_threshold += sentiment_modifier
+
+                # حدود مرنة بناءً على ATR
+                final_threshold = max(atr_p * 0.5, min(atr_p * 3.0, base_threshold))
+
+                reason += f' | Stop Loss Threshold: {final_threshold:.1f}% (ATR:{atr_p:.1f}%, Risk:{risk_level}, Whales:{whale_tracking_score}, Sentiment:{sentiment_score})'
+
             return {
                 'action': 'HOLD',
-                'reason': f'Minimum profit not reached: {profit_percent:.2f}% < {MIN_SELL_PROFIT}%',
+                'reason': reason,
                 'profit': profit_percent
             }
 
@@ -1015,10 +1079,10 @@ class Meta:
         peak_score = advisors_intelligence.get('peak_score', 50)  # نقاط القمة
 
         # العتبة الأساسية من ATR فقط (ديناميكية كاملة)
-        base_threshold = atr_p * 2.0  # يبدأ من ATR × 2
+        base_threshold = atr_p * 2.5  # يبدأ من ATR × 2.5 ليكون أكثر مرونة
 
         # حد أدنى ديناميكي بناءً على المخاطر (ليس ثابت)
-        min_threshold = risk_level / 20  # مخاطر 100 = 5% حد أدنى
+        min_threshold = risk_level / 25  # مخاطر 100 = 4% حد أدنى (أصغر)
         base_threshold = max(min_threshold, base_threshold)
 
         # تعديل بناءً على المخاطر: مخاطر عالية = حماية أسرع
