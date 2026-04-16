@@ -252,7 +252,7 @@ def run_main_loop(exchange, ctx):
                 if action == 'STRONG':
                     vol_status   = "🟢" if result['volume'] > 0.8 else "🔴"
                     news_display = f" | {result['news_summary']}" if result.get('news_summary') else ""
-                    print(f"{Fore.GREEN}💪 {result['symbol']:12} {format_price(result['price'])} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {result['volume']:.0f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']:.0f}/100{news_display} | {result.get('reason', '')}{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN}💪 {result['symbol']:12} {format_price(result['price'])} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {min(result['volume'], 100):.0f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']:.0f}/100{news_display} | {result.get('reason', '')}{Style.RESET_ALL}")
                     continue
 
                 # Display only
@@ -260,7 +260,7 @@ def run_main_loop(exchange, ctx):
                     if result.get('confidence', 0) >= META_DISPLAY_THRESHOLD:
                         vol_status   = "🟢" if result['volume'] > 0.8 else "🔴"
                         news_display = f" | {result['news_summary']}" if result.get('news_summary') else ""
-                        print(f"📊 {symbol:12} ${result['price']:>8.2f} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {result['volume']:.0f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']:.0f}/100{news_display} | {result.get('reason', '')}")
+                        print(f"📊 {symbol:12} ${result['price']:>8.2f} | RSI:{result['rsi']:>5.1f} | Vol:{vol_status} {min(result['volume'], 100):.0f}x | MACD:{result['macd']:>+6.1f} | Conf:{result['confidence']:.0f}/100{news_display} | {result.get('reason', '')}")
                     continue
             
             # طباعة ملخص المسح إذا لم يتم عرض أي عملة جديدة
