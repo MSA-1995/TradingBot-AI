@@ -34,6 +34,12 @@ def run_main_loop(exchange, ctx):
               exit_strategy, pattern_recognizer, smart_money_tracker, liquidity_analyzer,
               memory_optimizer, analyze_fn, get_dynamic_symbols_fn, advisor_manager
     """
+    # طباعة تشخيصية عند بدء الدورة
+    import psutil
+    import time
+    start_time = time.time()
+    memory_usage = psutil.virtual_memory().percent
+    print(f"🔍 [DIAGNOSTIC] Loop start - Memory: {memory_usage:.1f}% - Time: {time.strftime('%H:%M:%S')}")
     SYMBOLS_DATA       = ctx['SYMBOLS_DATA']
     symbols_data_lock  = ctx['symbols_data_lock']
     balance_lock       = ctx['balance_lock']
