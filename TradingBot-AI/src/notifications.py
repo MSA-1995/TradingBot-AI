@@ -97,9 +97,9 @@ def send_buy_notification(symbol, amount, price, value, confidence, tp_target=No
     # Discord - احترافي
     fields = [
         {"name": "Pair", "value": symbol, "inline": True},
-        {"name": "Amount", "value": f"{amount:.6f}", "inline": True},
+        {"name": "Amount", "value": f"${value:.2f}", "inline": True},
         {"name": "Price", "value": f"${price:.4f}", "inline": True},
-        {"name": "Value", "value": f"${value:.2f}", "inline": True},
+        {"name": "Quantity", "value": f"{amount:.6f}", "inline": True},
         {"name": "Confidence", "value": f"{confidence:.1f}/100", "inline": True}
     ]
     
