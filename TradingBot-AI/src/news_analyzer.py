@@ -12,12 +12,27 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from urllib.parse import urlparse, unquote
 
+# إضافة كاش مضغوط للأخبار
+try:
+    import sys
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    memory_path = os.path.join(parent_dir, 'memory')
+    if os.path.exists(memory_path) and memory_path not in sys.path:
+        sys.path.insert(0, memory_path)
+    from memory_cache import MemoryCache
+except Exception:
+    MemoryCache = None
+
 # ================================================================
 # ✅ دمج sentiment_fix.py - بيانات sentiment حقيقية من API
 # ================================================================
 
 # [تحسين الذاكرة] كاش لـ Fear & Greed Index
 _fear_greed_cache = {'value': None, 'timestamp': 0, 'previous_value': None}
+
+# [تحسين الذاكرة] كاش مضغوط للأخبار
+_news_cache = MemoryCache(max_items=20) if MemoryCache else {}
 
 def get_sentiment_data(symbol=None, analysis=None):
     """
@@ -98,6 +113,13 @@ def get_sentiment_data(symbol=None, analysis=None):
 @lru_cache(maxsize=32) # تخزين آخر 32 نتيجة فقط
 def get_news_sentiment_cached(database_url, symbol, hours, ttl_hash=None):
     del ttl_hash # يستخدم فقط لتحديث الكاش
+
+    # فحص الكاش المضغوط أولاً
+    cache_key = f"news_{symbol}_{hours}"
+    cached_result = _news_cache.get(cache_key) if MemoryCache else None
+    if cached_result:
+        return cached_result
+
     try:
         parsed = urlparse(database_url)
         conn = psycopg2.connect(
@@ -130,7 +152,7 @@ def get_news_sentiment_cached(database_url, symbol, hours, ttl_hash=None):
             pos_ratio = positive / total
             neg_ratio = negative / total
             news_score = (pos_ratio - neg_ratio) * 10
-        return {
+        result = {
             'positive': positive,
             'negative': negative,
             'neutral': neutral,
@@ -138,6 +160,16 @@ def get_news_sentiment_cached(database_url, symbol, hours, ttl_hash=None):
             'news_score': news_score,
             'latest_news': news[:3]
         }
+
+        # حفظ مضغوط في الكاش لـ 15 دقيقة
+        if MemoryCache:
+            _news_cache.set(cache_key, result, expiry_seconds=900)
+
+        # تنظيف الذاكرة فوري بعد التحميل
+        import gc
+        gc.collect()
+
+        return result
     except Exception as e:
         # print(f"❌ News DB query error: {e}") # Debug
         return None
@@ -216,6 +248,11 @@ class NewsAnalyzer:
         else:
             emoji = "⚪"
             status = "Neutral"
+
+        # تنظيف الذاكرة عند الانتهاء
+        import gc
+        gc.collect()
+
         return f"{emoji} {status}"
 
     # ================================================================
