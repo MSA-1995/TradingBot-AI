@@ -68,14 +68,20 @@ class AdaptiveIntelligence:
     
     def adjust_confidence(self, symbol, base_confidence):
         """تعديل الثقة بناءً على ملف العملة"""
-        profile = self.get_symbol_profile(symbol)
-        
-        # إذا العملة ناجحة تاريخياً، نضيف بونص
-        if profile.get('win_rate', 0) >= 0.75:
-            return base_confidence + 10
-        elif profile.get('win_rate', 0) < 0.4:
-            return base_confidence - 15
-        
+        try:
+            profile = self.get_symbol_profile(symbol)
+            if not profile:
+                return base_confidence
+
+            # إذا العملة ناجحة تاريخياً، نضيف بونص
+            win_rate = profile.get('win_rate') or 0
+            if win_rate >= 0.75:
+                return base_confidence + 10
+            elif win_rate < 0.4:
+                return base_confidence - 15
+        except Exception as e:
+            print(f"⚠️ Adaptive AI confidence error: {e}")
+
         return base_confidence
     
     def should_trade_now(self, symbol, current_hour):
@@ -189,13 +195,19 @@ class AdaptiveIntelligence:
     
     def get_optimal_position_size(self, symbol, base_amount):
         """حساب حجم الصفقة الأمثل لهذه العملة"""
-        profile = self.get_symbol_profile(symbol)
-        
-        # عملات ذات ربح عالي = حجم أكبر
-        avg_profit = profile.get('avg_profit') or 0
-        if avg_profit > 5:
-            return base_amount * 1.2
-        elif avg_profit < 1:
-            return base_amount * 0.7
-        
+        try:
+            profile = self.get_symbol_profile(symbol)
+            if not profile:
+                return base_amount
+
+            # عملات ذات ربح عالي = حجم أكبر
+            avg_profit = profile.get('avg_profit') or 0
+            if avg_profit > 5:
+                return base_amount * 1.2
+            elif avg_profit < 1:
+                return base_amount * 0.7
+        except Exception as e:
+            print(f"⚠️ Adaptive AI position size error: {e}")
+            return base_amount
+
         return base_amount
