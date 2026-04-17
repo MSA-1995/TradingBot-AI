@@ -192,7 +192,7 @@ def process_sell(result, exchange, ctx):
             'sell_votes': sell_votes,
             'buy_votes': buy_votes,
             'data': {
-                'buy_price': position.get('buy_price'),
+                'buy_price': position.get('buy_price', 0),
                 'sell_price': result.get('price'),
                 'candles': candles_data,  # ✅ حفظ الشموع الحقيقية
                 'ai_data': position.get('ai_data', {}),
