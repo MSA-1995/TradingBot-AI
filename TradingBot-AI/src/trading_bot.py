@@ -280,7 +280,7 @@ sell_cooldown_lock = threading.Lock()
 COOLDOWN_MINUTES = 15
 
 # ========== PARALLEL ANALYSIS FUNCTION ==========
-def analyze_single_symbol(symbol, exchange_instance, active_count, available, invested, meta, preloaded_advisors, external_client=None):
+def analyze_single_symbol(symbol, exchange_instance, active_count, available, invested, meta, preloaded_advisors, storage=None, external_client=None):
     """تحليل عملة واحدة - يعمل في thread منفصل"""
     start_time = time.time()
     timing_data = {}
@@ -305,6 +305,38 @@ def analyze_single_symbol(symbol, exchange_instance, active_count, available, in
 
         # ========== SELL LOGIC (Delegated to Meta) ==========
         if position:
+            # Special exception for profit spike: sell immediately without meta or voting
+            if storage:
+                try:
+                    import sys, os
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+                    from models.exit_strategy_model import ExitStrategyModel
+                    exit_advisor = ExitStrategyModel(storage)
+                    exit_decision = exit_advisor.should_exit(symbol, position, current_price, analysis, analysis.get('mtf', {}))
+                    if exit_decision['action'] == 'SELL' and 'SPIKE' in exit_decision['reason'].upper():
+                        # Sell immediately due to spike
+                        amount = position['amount']
+                        sell_value = calculate_sell_value(amount, current_price)
+                        if sell_value < 9.99:
+                            return {'symbol': symbol, 'action': 'SELL_WAIT', 'reason': exit_decision['reason'], 'value': sell_value}
+                        else:
+                            return {
+                                'symbol': symbol,
+                                'action': 'SELL',
+                                'amount': amount,
+                                'profit_percent': calculate_profit_percent(current_price, position['buy_price']),
+                                'rsi': analysis.get('rsi', 50),
+                                'volume_ratio': analysis.get('volume_ratio', 1.0),
+                                'price': current_price,
+                                'profit': calculate_profit_percent(current_price, position['buy_price']),
+                                'reason': exit_decision['reason'],
+                                'position': position,
+                                'analysis': analysis,
+                                **analysis
+                            }
+                except Exception as e:
+                    print(f"⚠️ Spike check error for {symbol}: {e}")
+
             sell_logic_start = time.time()
             if meta:
                 decision = meta.should_sell(symbol, position, current_price, analysis, analysis.get('mtf', {}), preloaded_advisors=preloaded_advisors)
