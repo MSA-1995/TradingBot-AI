@@ -444,7 +444,8 @@ class Meta:
             adaptive_ai = self.advisor_manager.get('AdaptiveIntelligence') if self.advisor_manager else None
             if adaptive_ai:
                 profile = adaptive_ai.get_symbol_profile(symbol)
-                advisors_intelligence['historical_success'] = profile.get('success_rate', 50)
+                if profile:
+                    advisors_intelligence['historical_success'] = profile.get('success_rate', 50)
         except: pass
         
         try:
