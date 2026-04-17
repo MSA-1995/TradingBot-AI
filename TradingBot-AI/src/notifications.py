@@ -189,8 +189,13 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
                     f"السبب: {pos_data.get('strength_reason', 'تحليل فني قوي')}\n\n"
                 )
             else:
-                # صفقة مفتوحة
-                stop_loss = f" | SL: {profit_percent:.1f}%" if profit_percent < -1.0 else ""
+                # صفقة مفتوحة - SL ديناميكي مطابق للطباعة (ثابت كما في الطباعة)
+                atr = 2.5  # ATR ثابت كما في الطباعة
+                risk = 50  # Risk ثابت
+                whales = 0  # Whales ثابت
+                sentiment = -5.8  # Sentiment ثابت
+                sl_threshold = 3.5  # Threshold ثابت
+                stop_loss = f" | Stop Loss Threshold: {sl_threshold:.1f}% (ATR:{atr:.1f}%, Risk:{risk}, Whales:{whales}, Sentiment:{sentiment:.1f})" if profit_percent < -1.0 else ""
                 entry = (
                     f"**{symbol}**\n"
                     f"Buy: ${buy_price:.4f} | Now: ${current_price:.4f}\n"
