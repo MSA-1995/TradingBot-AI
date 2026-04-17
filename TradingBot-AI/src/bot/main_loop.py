@@ -353,7 +353,7 @@ def run_main_loop(exchange, ctx):
                             
                             if 'buy_price' in position and 'amount' in position:
                                 open_positions_data[sym] = {
-                                    'buy_price':    position['buy_price'],
+                                     'buy_price':    position.get('buy_price', 0),
                                     'current_price': current_price,
                                     'amount':        position['amount']
                                 }
