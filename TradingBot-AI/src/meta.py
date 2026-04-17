@@ -876,12 +876,12 @@ class Meta:
             adaptive_ai = self.advisor_manager.get('AdaptiveIntelligence') if self.advisor_manager else None
             if adaptive_ai:
                 profile = adaptive_ai.get_symbol_profile(symbol)
-                
-                # إذا العملة تاريخياً تنهار بسرعة، نبيع أسرع
-                if (profile.get('avg_profit') or 0) < 2.0 and profit_percent > 5.0:
-                    peak_confidence += 15
-                    peak_reasons.append(f"Adaptive: Quick Exit for {symbol} (+15)")
-                    print(f"🧬 Adaptive: {symbol} tends to crash fast, exit now!")
+                if profile:
+                    # إذا العملة تاريخياً تنهار بسرعة، نبيع أسرع
+                    if (profile.get('avg_profit') or 0) < 2.0 and profit_percent > 5.0:
+                        peak_confidence += 15
+                        peak_reasons.append(f"Adaptive: Quick Exit for {symbol} (+15)")
+                        print(f"🧬 Adaptive: {symbol} tends to crash fast, exit now!")
         except Exception as e:
             print(f"⚠️ Adaptive AI error: {e}")
 
