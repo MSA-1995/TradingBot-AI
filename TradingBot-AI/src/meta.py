@@ -768,7 +768,8 @@ class Meta:
 
         from config import MIN_SELL_CONFIDENCE
 
-        buy_price = position['buy_price']
+        buy_price = float(position.get('buy_price', 0) or 0)
+        current_price = float(analysis.get('close', 0) or 0)
         profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
         rsi = analysis.get('rsi', 50)
         macd_diff = analysis.get('macd_diff', 0)
