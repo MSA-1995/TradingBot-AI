@@ -35,7 +35,7 @@ class ExitStrategyModel:
         self.storage = storage
         self.news_analyzer = NewsAnalyzer()
         self.profit_history = {}  # {symbol: [(timestamp, profit), ...]}
-        print("🎯 Exit Strategy Model initialized")
+        # print("🎯 Exit Strategy Model initialized")
     
     def should_exit(self, symbol, position, current_price, analysis, mtf):
         """قرار البيع الذكي + Minimum Hold Time + Profit Spike Detection"""
@@ -363,8 +363,9 @@ class ExitStrategyModel:
     def _get_coin_exit_history(self, symbol):
         """جلب تاريخ البيع للعملة"""
         try:
-            # Directly query the storage for historical trades of the symbol
-            coin_trades = self.storage.get_trades_for_symbol(symbol, limit=50) # Fetch last 50 trades
+            # Load all trades and filter by symbol
+            all_trades = self.storage.load_trades(limit=1000)
+            coin_trades = [t for t in all_trades if t.get('symbol') == symbol][-50:]  # Last 50 for the symbol
             
             if not coin_trades or len(coin_trades) < 3:
                 return None
@@ -579,7 +580,7 @@ class ExitStrategyModel:
                             'should_sell': True,
                             'reason': f'PROFIT SPIKE: +{profit_jump:.1f}% in {time_diff:.0f}s (from {last_profit:.1f}% to {current_profit:.1f}%)'
                         }
-                    
+
                     # ✅ قفزة ضخمة: +8% بين دورتين
                     if profit_jump >= 8 and current_profit >= 10:
                         return {
