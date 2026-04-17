@@ -133,7 +133,7 @@ def run_main_loop(exchange, ctx):
             for symbol_batch in chunker(current_symbols, BATCH_SIZE):
                 with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
                     future_to_symbol = {
-                        executor.submit(analyze_fn, symbol, exchange, active_count, available, invested, meta, preloaded_advisors): symbol
+                        executor.submit(analyze_fn, symbol, exchange, active_count, available, invested, meta, preloaded_advisors, ctx['storage'])
                         for symbol in symbol_batch
                     }
 
