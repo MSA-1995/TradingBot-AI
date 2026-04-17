@@ -889,11 +889,12 @@ class Meta:
             print(f"⚠️ Adaptive AI error: {e}")
 
         # =========================================================
-        # 🗣️ 4. استشارة المستشارين الـ 12 عن القمة (بما فيهم candle_expert)
+        # 🗣️ 4. استشارة المستشارين الـ 12 عن القمة (بما فيهم candle_expert - أهم واحد)
         # =========================================================
         sell_vote_count = 0
         total_advisors = 12  # ✅ زدنا من 10 إلى 12 (أضفنا candle_expert)
         sell_votes = {}
+        candle_confirmed = False  # تأكيد من Candle Expert
         
         try:
             dl_client = self.advisor_manager.get('dl_client') if self.advisor_manager else None
@@ -926,6 +927,7 @@ class Meta:
                 bearish_keywords = ['Bearish', 'Sell', 'Overbought', 'Peak', 'Reversal']
 
                 sell_vote_count = 0
+
                 for name, adv_text in advisors_advice.items():
                     has_voted = any(k in str(adv_text) for k in bearish_keywords)
                     if has_voted:
@@ -933,6 +935,11 @@ class Meta:
                         sell_votes[name] = 1
                     else:
                         sell_votes[name] = 0
+
+                # ✅ التركيز على Candle Expert كأهم واحد لتأكيد القمة الصحيحة
+                if 'candle_expert' in advisors_advice and any(k in str(advisors_advice['candle_expert']) for k in bearish_keywords):
+                    candle_confirmed = True
+                    peak_confidence += 5  # زيادة إضافية لتأكيد الشموع
 
                 total_advisors = 12  # ✅ 12 مستشار (بما فيهم candle_expert)
 
@@ -1038,6 +1045,14 @@ class Meta:
 
         # حساب نسبة الأصوات
         sell_vote_percentage = (sell_vote_count / total_advisors * 100) if total_advisors > 0 else 0
+
+        # ✅ دمج مع Risk وAnomaly للتمييز بين التقلبات الطبيعية والانهيار
+        if candle_confirmed and sell_vote_count >= 6:
+            # تحقق من Risk وAnomaly للتأكيد على عدم كونها تقلباً طبيعياً
+            risk_vote = sell_votes.get('risk', 0)
+            anomaly_vote = sell_votes.get('anomaly', 0)
+            if risk_vote or anomaly_vote:  # إذا أكد أحدهما على المخاطر
+                peak_confidence += 10  # زيادة لتجنب القمم الوهمية
 
         # فحص القمة الحقيقية - إذا كانت هناك قمة قوية مع تأكيد الشموع والزخم والتفاؤل، بيع بغض النظر عن حجم الربح
         if peak_confidence >= 60 and len(peak_reasons) >= 2 and sentiment_confirmed:  # قمة حقيقية + تفاؤل منخفض
