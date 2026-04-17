@@ -183,9 +183,11 @@ class NewsAnalyzer:
         self.database_url = os.getenv("DATABASE_URL")
         self.enabled = bool(self.database_url)
         if self.enabled:
-            print("📰 News Analyzer: ACTIVE (with LRU Cache)")
+            # print("📰 News Analyzer: ACTIVE (with LRU Cache)")
+            pass
         else:
-            print("News Analyzer: DISABLED (No DATABASE_URL)")
+            # print("News Analyzer: DISABLED (No DATABASE_URL)")
+            pass
 
     def get_news_sentiment(self, symbol, hours=24):
         if not self.enabled:
