@@ -40,8 +40,9 @@ class ExitStrategyModel:
     def should_exit(self, symbol, position, current_price, analysis, mtf):
         """قرار البيع الذكي + Minimum Hold Time + Profit Spike Detection"""
         try:
-            buy_price = position['buy_price']
-            profit_percent = ((current_price - buy_price) / buy_price) * 100
+            buy_price = float(position.get('buy_price', 0) or 0)
+            current_price = float(current_price or 0)
+            profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
             
             # ✅ Profit Spike Detection - كشف القفزات المفاجئة!
             spike_detected = self._detect_profit_spike(symbol, profit_percent)
@@ -186,8 +187,8 @@ class ExitStrategyModel:
     def _check_smart_trailing(self, symbol, current_price, position, analysis, history):
         """فحص Trailing Stop الذكي المتقدم - مع تحليل الشموع الانعكاسية"""
         try:
-            buy_price = position.get('buy_price', 0)
-            highest_price = position.get('highest_price', buy_price)
+            buy_price = float(position.get('buy_price', 0) or 0)
+            highest_price = float(position.get('highest_price', buy_price) or buy_price)
             
             profit_percent = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
             drop_from_peak = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
