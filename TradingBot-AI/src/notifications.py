@@ -193,10 +193,10 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
                 atr = 2.5  # ATR ثابت كما في الطباعة
                 risk = 50  # Risk ثابت
                 # حساب Whales من ai_data
-                whales = position.get('ai_data', {}).get('whale_confidence', 0)
+                whales = pos_data.get('ai_data', {}).get('whale_confidence', 0)
                 sentiment = -4.8  # Sentiment محدث
-                volume_ratio = position.get('ai_data', {}).get('volume_ratio', 1.0)
-                rsi = position.get('ai_data', {}).get('rsi', 50)
+                volume_ratio = pos_data.get('ai_data', {}).get('volume_ratio', 1.0)
+                rsi = pos_data.get('ai_data', {}).get('rsi', 50)
 
                 # حساب threshold ديناميكي كما في meta.py و exit_strategy
                 base_threshold = atr * (1 + risk / 100)
