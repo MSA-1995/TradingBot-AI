@@ -30,7 +30,6 @@ from adaptive_intelligence import AdaptiveIntelligence
 from liquidation_shield import LiquidationShield
 from volume_forecast_engine import VolumeForecastEngine
 from trend_early_detector import TrendEarlyDetector
-from self_analysis_dashboard import SelfAnalysisDashboard
 
 class AdvisorManager:
     _lock = Lock()
