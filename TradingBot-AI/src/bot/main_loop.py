@@ -77,7 +77,7 @@ def run_main_loop(exchange, ctx):
         loop_count = 0
         available  = 0
         last_report_time = datetime.now()
-        last_performance_report_time = datetime.now()  # ⏰ مؤقت منفصل لتقرير الأداء (24 ساعة)
+
 
         # ⏰ مؤقت فحص تحديثات النماذج كل 7 ساعات
         _last_model_check = datetime.now()
