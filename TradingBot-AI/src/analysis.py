@@ -242,15 +242,287 @@ def analyze_mtf_confirmation(df):
 
 def analyze_reversal(df, rsi):
     """
-    تحليل قاع الدورة (بدون كود شموع ثابت - يعتمد على candle_expert)
-    - RSI + MACD: 35 نقطة
-    - Market Structure: 25 نقطة
-    - Support/Resistance: 20 نقطة
-    - MTF Confirmation: 15 نقطة
-    - Volume + Divergence: 45 نقطة
-    - Bottom Confirmation: 10 نقطة
+    كشف القاع الحقيقي — يراقب انعكاس المؤشرات من هبوط لصعود
+    المنطق: المؤشرات كانت هابطة → بدأت تنعكس معاً → قاع حقيقي
+    لا يشتري على أي ارتداد طبيعي، يشترط انعكاس واضح ومتعدد المؤشرات
     """
     from config import BOTTOM_BOUNCE_THRESHOLD, REVERSAL_CANDLES, MIN_BUY_CONFIDENCE
+
+    base_result = {
+        'confidence': 0,
+        'candle_signal': False,
+        'reasons': [],
+        'bounce_percent': 0,
+        'is_reversing': False,
+        'trend': 'neutral',
+        'momentum': 0,
+        'score_breakdown': {},
+        'reversal_signals': 0
+    }
+
+    if df is None or len(df) < 10:
+        return base_result
+
+    if rsi > 80:
+        base_result['reasons'].append(f'RSI Overbought ({rsi:.0f}) — not a bottom')
+        return base_result
+
+    try:
+        total_score = 0
+        reasons = []
+        score_breakdown = {}
+        reversal_signals = 0
+
+        # =========================================================
+        # 1. RSI — هل كان منخفضاً وبدأ يرتفع؟ (30 نقطة)
+        # =========================================================
+        rsi_score = 0
+        rsi_reversal = False
+        if len(df) >= 5 and 'rsi' in df.columns:
+            rsi_values = df['rsi'].tail(5).tolist()
+            rsi_bottom = min(rsi_values[:-1])  # أدنى RSI في الشموع السابقة
+            rsi_now = rsi_values[-1]
+            rsi_prev = rsi_values[-2]
+
+            # RSI كان منخفضاً وبدأ يصعد (انعكاس)
+            if rsi_bottom < 45 and rsi_now > rsi_prev:
+                rsi_rise = rsi_now - rsi_bottom
+                if rsi_rise >= 5 and rsi_bottom < 30:
+                    rsi_score = 30
+                    reasons.append(f"RSI Reversal: {rsi_bottom:.0f}→{rsi_now:.0f} (+{rsi_rise:.0f}) (+30)")
+                    rsi_reversal = True
+                    reversal_signals += 1
+                elif rsi_rise >= 3 and rsi_bottom < 40:
+                    rsi_score = 20
+                    reasons.append(f"RSI Recovering: {rsi_bottom:.0f}→{rsi_now:.0f} (+20)")
+                    rsi_reversal = True
+                    reversal_signals += 1
+                elif rsi_rise >= 2 and rsi_bottom < 45:
+                    rsi_score = 10
+                    reasons.append(f"RSI Bouncing: {rsi_bottom:.0f}→{rsi_now:.0f} (+10)")
+            elif rsi < 30:
+                rsi_score = 8
+                reasons.append(f"RSI Oversold ({rsi:.0f}) (+8)")
+
+        total_score += rsi_score
+        score_breakdown['rsi_reversal'] = rsi_score
+
+        # =========================================================
+        # 2. MACD — هل كان سالباً وبدأ يتعافى؟ (25 نقطة)
+        # =========================================================
+        macd_score = 0
+        macd_reversal = False
+        if 'macd_histogram' in df.columns and len(df) >= 6:
+            hist = df['macd_histogram'].tail(6).tolist()
+            hist_bottom = min(hist[:-2])
+            hist_now = hist[-1]
+            hist_prev = hist[-2]
+
+            if hist_bottom < 0 and hist_now > hist_prev:
+                recovery = (hist_now - hist_bottom) / abs(hist_bottom) if hist_bottom != 0 else 0
+                if recovery > 0.5 and hist_now < 0:
+                    macd_score = 25
+                    reasons.append(f"MACD Strong Recovery ({hist_bottom:.3f}→{hist_now:.3f}) (+25)")
+                    macd_reversal = True
+                    reversal_signals += 1
+                elif recovery > 0.3 and hist_now < 0:
+                    macd_score = 15
+                    reasons.append(f"MACD Recovering (+15)")
+                    macd_reversal = True
+                    reversal_signals += 1
+                elif hist_now > 0 and hist_prev < 0:
+                    macd_score = 20
+                    reasons.append(f"MACD Crossed Above Zero (+20)")
+                    macd_reversal = True
+                    reversal_signals += 1
+                elif recovery > 0.15:
+                    macd_score = 8
+                    reasons.append(f"MACD Improving (+8)")
+
+        total_score += macd_score
+        score_breakdown['macd_reversal'] = macd_score
+
+        # =========================================================
+        # 3. الزخم — هل تباطأ الهبوط وبدأ يعكس؟ (20 نقطة)
+        # =========================================================
+        momentum_score = 0
+        momentum_reversal = False
+        if len(df) >= 6:
+            closes = df['close'].tail(6).tolist()
+            momentum_recent = (closes[-1] - closes[-3]) / closes[-3] * 100 if closes[-3] > 0 else 0
+            momentum_prev = (closes[-3] - closes[-6]) / closes[-6] * 100 if closes[-6] > 0 else 0
+
+            if momentum_prev < -0.3 and momentum_recent > momentum_prev:
+                accel = momentum_recent - momentum_prev
+                if accel > 1.0 and momentum_recent >= 0:
+                    momentum_score = 20
+                    reasons.append(f"Momentum Reversed: {momentum_prev:.2f}%→{momentum_recent:.2f}% (+20)")
+                    momentum_reversal = True
+                    reversal_signals += 1
+                elif accel > 0.5:
+                    momentum_score = 12
+                    reasons.append(f"Momentum Recovering (+12)")
+                    momentum_reversal = True
+                    reversal_signals += 1
+                elif accel > 0.2:
+                    momentum_score = 6
+                    reasons.append(f"Momentum Slowing Down (+6)")
+
+        total_score += momentum_score
+        score_breakdown['momentum_reversal'] = momentum_score
+
+        # =========================================================
+        # 4. الحجم — هل الحجم يؤكد الانعكاس؟ (20 نقطة)
+        # =========================================================
+        vol_score = 0
+        volume_reversal = False
+        if len(df) >= 4:
+            current_vol = float(df.iloc[-1].get('volume_ratio', 1))
+            last_candle = df.iloc[-1]
+            prev_candle = df.iloc[-2]
+            is_bullish = last_candle['close'] > last_candle['open']
+            was_bearish = prev_candle['close'] < prev_candle['open']
+
+            # حجم عالي مع شمعة صاعدة بعد هابطة = إشارة انعكاس
+            if current_vol > 2.0 and is_bullish and was_bearish:
+                vol_score = 20
+                reasons.append(f"Vol Bullish Reversal {current_vol:.1f}x (+20)")
+                volume_reversal = True
+                reversal_signals += 1
+            elif current_vol > 1.5 and is_bullish:
+                vol_score = 12
+                reasons.append(f"Vol Bullish {current_vol:.1f}x (+12)")
+                volume_reversal = True
+                reversal_signals += 1
+            elif current_vol > 1.2 and is_bullish:
+                vol_score = 6
+                reasons.append(f"Vol Rising on Bounce {current_vol:.1f}x (+6)")
+
+        total_score += vol_score
+        score_breakdown['volume_reversal'] = vol_score
+
+        # =========================================================
+        # 5. Bullish Divergence — سعر يصنع قاعاً جديداً لكن RSI لا يؤكد (20 نقطة)
+        # =========================================================
+        div_score = 0
+        if len(df) >= 20 and 'rsi' in df.columns:
+            recent_lows = df['low'].tail(20).tolist()
+            recent_rsis = df['rsi'].tail(20).tolist()
+
+            if len(recent_lows) >= 10:
+                first_low = min(recent_lows[:10])
+                second_low = min(recent_lows[10:])
+                first_idx = recent_lows[:10].index(first_low)
+                second_idx = 10 + recent_lows[10:].index(second_low)
+                first_rsi = recent_rsis[first_idx]
+                second_rsi = recent_rsis[second_idx]
+
+                if second_low < first_low * 0.999 and second_rsi > first_rsi + 3:
+                    rsi_diff = second_rsi - first_rsi
+                    if rsi_diff > 8:
+                        div_score = 20
+                        reasons.append(f"Strong Bullish Divergence (price↓ RSI↑{rsi_diff:.0f}) (+20)")
+                        reversal_signals += 1
+                    elif rsi_diff > 4:
+                        div_score = 12
+                        reasons.append(f"Bullish Divergence (+12)")
+                        reversal_signals += 1
+
+        total_score += div_score
+        score_breakdown['divergence'] = div_score
+
+        # =========================================================
+        # 6. هيكل السوق — هل بدأ يشكل Higher Lows؟ (15 نقطة)
+        # =========================================================
+        ms = analyze_market_structure(df)
+        ms_score = 0
+        if ms['structure'] == 'higher_highs_higher_lows':
+            ms_score = 15
+            reasons.append(f"🏗️ {ms['reason']} (+15)")
+            reversal_signals += 1
+        elif ms['structure'] == 'higher_lows':
+            ms_score = 10
+            reasons.append(f"🏗️ {ms['reason']} (+10)")
+        total_score += ms_score
+        score_breakdown['market_structure'] = ms_score
+
+        # =========================================================
+        # 7. دعم — هل وصل منطقة دعم؟ (10 نقطة)
+        # =========================================================
+        sr = analyze_support_resistance(df)
+        sr_score = 0
+        if sr['at_support']:
+            sr_score = 10
+            reasons.append(f"📐 {sr['reason']} (+10)")
+        total_score += sr_score
+        score_breakdown['support'] = sr_score
+
+        # =========================================================
+        # 🚨 فلتر الارتداد الطبيعي — منع الشراء على تذبذب عادي
+        # =========================================================
+        if reversal_signals < 2:
+            total_score = min(total_score, 40)
+            reasons.append(f"⚠️ Only {reversal_signals} reversal signal(s) — possible noise")
+        elif reversal_signals == 2:
+            reasons.append(f"🟡 {reversal_signals} reversal signals — moderate bottom")
+        else:
+            reasons.append(f"🟢 {reversal_signals} reversal signals — strong bottom")
+
+        # =========================================================
+        # فلتر الفخ — ارتداد مؤقت بحجم كبير (Fake Pump)
+        # =========================================================
+        trap_is_filter = False
+        if len(df) >= 20:
+            avg_volume = df['volume'].tail(20).mean()
+            for check_idx in range(1, min(4, len(df) + 1)):
+                check_candle = df.iloc[-check_idx]
+                check_volume = check_candle['volume']
+                if avg_volume > 0 and check_volume > avg_volume * 3.5:
+                    candle_body = abs(check_candle['close'] - check_candle['open'])
+                    candle_range = check_candle['high'] - check_candle['low']
+                    if candle_range > 0 and candle_body > 0:
+                        upper_shadow = check_candle['high'] - max(check_candle['close'], check_candle['open'])
+                        if upper_shadow > candle_body * 3.5:
+                            trap_is_filter = True
+                            reasons.append(f"⚠️ Fake Pump Trap (Candle-{check_idx})")
+                            break
+
+        n = min(REVERSAL_CANDLES, len(df))
+        low_n = df['low'].tail(n).min()
+        current_price = df.iloc[-1]['close']
+        bounce_percent = ((current_price - low_n) / low_n) * 100 if low_n > 0 else 0
+
+        confidence_percent = min(total_score, 150)
+        is_candle_signal = (confidence_percent >= MIN_BUY_CONFIDENCE and reversal_signals >= 2)
+
+        if trap_is_filter and is_candle_signal:
+            is_candle_signal = False
+            reasons.append("🚫 Signal Blocked by Trap")
+
+        if confidence_percent >= MIN_BUY_CONFIDENCE and reversal_signals >= 3:
+            reasons.append(f"✅ STRONG BOTTOM ({total_score}/150, {reversal_signals} signals)")
+        elif confidence_percent >= MIN_BUY_CONFIDENCE and reversal_signals >= 2:
+            reasons.append(f"✅ BOTTOM SIGNAL ({total_score}/150, {reversal_signals} signals)")
+        elif total_score >= 40:
+            reasons.append(f"⏳ WEAK ({total_score}/150, {reversal_signals} signals)")
+        else:
+            reasons.append(f"❌ NO SIGNAL ({total_score}/150, {reversal_signals} signals)")
+
+        base_result['is_reversing'] = bounce_percent >= BOTTOM_BOUNCE_THRESHOLD
+
+        base_result.update({
+            'confidence': confidence_percent,
+            'candle_signal': is_candle_signal,
+            'reasons': reasons,
+            'bounce_percent': round(bounce_percent, 3),
+            'score_breakdown': score_breakdown,
+            'reversal_signals': reversal_signals
+        })
+        return base_result
+
+    except Exception as e:
+        base_result['reasons'].append(f'Error: {e}')
+        return base_result
 
     base_result = {
         'confidence': 0,
@@ -464,12 +736,9 @@ def analyze_reversal(df, rsi):
 
 def analyze_peak(df, rsi):
     """
-    تحليل القمة (بدون كود شموع ثابت - يعتمد على candle_expert)
-    - RSI + MACD: 35 نقطة
-    - Market Structure: 25 نقطة
-    - Support/Resistance: 20 نقطة
-    - MTF Confirmation: 15 نقطة
-    - Volume + Divergence: 45 نقطة
+    كشف القمة الحقيقية — يراقب انعكاس المؤشرات من صعود لهبوط
+    المنطق: المؤشرات كانت صاعدة → بدأت تنعكس معاً → قمة حقيقية
+    لا يبيع على أي ارتداد طبيعي، يشترط انعكاس واضح ومتعدد المؤشرات
     """
     from config import PEAK_DROP_THRESHOLD, REVERSAL_CANDLES, MIN_SELL_CONFIDENCE, MIN_BUY_CONFIDENCE
 
@@ -481,134 +750,221 @@ def analyze_peak(df, rsi):
         'is_peaking': False,
         'trend': 'neutral',
         'momentum': 0,
-        'score_breakdown': {}
+        'score_breakdown': {},
+        'reversal_signals': 0  # عدد المؤشرات التي انعكست
     }
 
-    if df is None or len(df) < 8:
+    if df is None or len(df) < 10:
         return base_result
 
     try:
         total_score = 0
         reasons = []
         score_breakdown = {}
-        
-        # --- 1. RSI + MACD - 35 نقطة ---
+        reversal_signals = 0  # عداد المؤشرات التي انعكست فعلاً
+
+        # =========================================================
+        # 1. RSI — هل كان صاعداً وبدأ ينعكس؟ (30 نقطة)
+        # =========================================================
         rsi_score = 0
-        if rsi > 78:
-            rsi_score = 25
-            reasons.append(f"RSI Extreme ({rsi:.0f}) (+25)")
-        elif rsi > 73:
-            rsi_score = 20
-            reasons.append(f"RSI Very High ({rsi:.0f}) (+20)")
-        elif rsi > 68:
-            rsi_score = 15
-            reasons.append(f"RSI Overbought ({rsi:.0f}) (+15)")
-        elif rsi > 63:
-            rsi_score = 10
-            reasons.append(f"RSI High ({rsi:.0f}) (+10)")
-        
+        rsi_reversal = False
+        if len(df) >= 5 and 'rsi' in df.columns:
+            rsi_values = df['rsi'].tail(5).tolist()
+            rsi_peak = max(rsi_values[:-1])  # أعلى RSI في الشموع السابقة
+            rsi_now = rsi_values[-1]
+            rsi_prev = rsi_values[-2]
+
+            # RSI كان مرتفعاً وبدأ ينزل (انعكاس)
+            if rsi_peak > 60 and rsi_now < rsi_prev:
+                rsi_drop = rsi_peak - rsi_now
+                if rsi_drop >= 5 and rsi_peak > 70:
+                    rsi_score = 30
+                    reasons.append(f"RSI Reversal: {rsi_peak:.0f}→{rsi_now:.0f} (-{rsi_drop:.0f}) (+30)")
+                    rsi_reversal = True
+                    reversal_signals += 1
+                elif rsi_drop >= 3 and rsi_peak > 65:
+                    rsi_score = 20
+                    reasons.append(f"RSI Weakening: {rsi_peak:.0f}→{rsi_now:.0f} (+20)")
+                    rsi_reversal = True
+                    reversal_signals += 1
+                elif rsi_drop >= 2 and rsi_peak > 60:
+                    rsi_score = 10
+                    reasons.append(f"RSI Softening: {rsi_peak:.0f}→{rsi_now:.0f} (+10)")
+            elif rsi > 75:
+                rsi_score = 8
+                reasons.append(f"RSI Extreme ({rsi:.0f}) (+8)")
+
+        total_score += rsi_score
+        score_breakdown['rsi_reversal'] = rsi_score
+
+        # =========================================================
+        # 2. MACD — هل كان موجباً وبدأ يضعف أو ينعكس؟ (25 نقطة)
+        # =========================================================
         macd_score = 0
-        if 'macd_histogram' in df.columns and len(df) >= 5:
-            hist_values = df['macd_histogram'].tail(5).tolist()
-            if len(hist_values) >= 3:
-                if hist_values[-1] > 0 and hist_values[-3] > 0:
-                    if hist_values[-1] < hist_values[-3]:
-                        weakness_ratio = abs(hist_values[-1] - hist_values[-3]) / abs(hist_values[-3]) if hist_values[-3] != 0 else 0
-                        if weakness_ratio > 0.3:
-                            macd_score = 10
-                            reasons.append("MACD Strong Weakening (+10)")
-                        else:
-                            macd_score = 6
-                            reasons.append("MACD Weakening (+6)")
-        
-        total_score += rsi_score + macd_score
-        score_breakdown['rsi_macd'] = rsi_score + macd_score
-        
-        # --- 2. Market Structure - 25 نقطة ---
+        macd_reversal = False
+        if 'macd_histogram' in df.columns and len(df) >= 6:
+            hist = df['macd_histogram'].tail(6).tolist()
+            # كان موجباً وصاعداً → صار ينزل
+            hist_peak = max(hist[:-2])
+            hist_now = hist[-1]
+            hist_prev = hist[-2]
+
+            if hist_peak > 0 and hist_now < hist_prev:
+                weakness = (hist_peak - hist_now) / abs(hist_peak) if hist_peak != 0 else 0
+                if weakness > 0.5 and hist_now > 0:
+                    macd_score = 25
+                    reasons.append(f"MACD Strong Weakening ({hist_peak:.3f}→{hist_now:.3f}) (+25)")
+                    macd_reversal = True
+                    reversal_signals += 1
+                elif weakness > 0.3 and hist_now > 0:
+                    macd_score = 15
+                    reasons.append(f"MACD Weakening (+15)")
+                    macd_reversal = True
+                    reversal_signals += 1
+                elif hist_now < 0 and hist_prev > 0:
+                    macd_score = 20
+                    reasons.append(f"MACD Crossed Below Zero (+20)")
+                    macd_reversal = True
+                    reversal_signals += 1
+                elif weakness > 0.15:
+                    macd_score = 8
+                    reasons.append(f"MACD Softening (+8)")
+
+        total_score += macd_score
+        score_breakdown['macd_reversal'] = macd_score
+
+        # =========================================================
+        # 3. الزخم (Momentum) — هل تباطأ الصعود؟ (20 نقطة)
+        # =========================================================
+        momentum_score = 0
+        momentum_reversal = False
+        if len(df) >= 6:
+            closes = df['close'].tail(6).tolist()
+            # حساب الزخم: معدل التغير في آخر 3 شموع مقارنة بـ 3 قبلها
+            momentum_recent = (closes[-1] - closes[-3]) / closes[-3] * 100 if closes[-3] > 0 else 0
+            momentum_prev = (closes[-3] - closes[-6]) / closes[-6] * 100 if closes[-6] > 0 else 0
+
+            if momentum_prev > 0.3 and momentum_recent < momentum_prev:
+                decel = momentum_prev - momentum_recent
+                if decel > 1.0 and momentum_recent <= 0:
+                    momentum_score = 20
+                    reasons.append(f"Momentum Reversed: {momentum_prev:.2f}%→{momentum_recent:.2f}% (+20)")
+                    momentum_reversal = True
+                    reversal_signals += 1
+                elif decel > 0.5:
+                    momentum_score = 12
+                    reasons.append(f"Momentum Decelerating (+12)")
+                    momentum_reversal = True
+                    reversal_signals += 1
+                elif decel > 0.2:
+                    momentum_score = 6
+                    reasons.append(f"Momentum Softening (+6)")
+
+        total_score += momentum_score
+        score_breakdown['momentum_reversal'] = momentum_score
+
+        # =========================================================
+        # 4. الحجم (Volume) — هل الحجم يؤكد الانعكاس؟ (20 نقطة)
+        # =========================================================
+        vol_score = 0
+        volume_reversal = False
+        if len(df) >= 4:
+            current_vol = float(df.iloc[-1].get('volume_ratio', 1))
+            last_candle = df.iloc[-1]
+            prev_candle = df.iloc[-2]
+            is_bearish = last_candle['close'] < last_candle['open']
+            was_bullish = prev_candle['close'] > prev_candle['open']
+
+            # حجم عالي مع شمعة هابطة بعد صاعدة = إشارة انعكاس
+            if current_vol > 2.0 and is_bearish and was_bullish:
+                vol_score = 20
+                reasons.append(f"Vol Bearish Reversal {current_vol:.1f}x (+20)")
+                volume_reversal = True
+                reversal_signals += 1
+            elif current_vol > 1.5 and is_bearish:
+                vol_score = 12
+                reasons.append(f"Vol Bearish {current_vol:.1f}x (+12)")
+                volume_reversal = True
+                reversal_signals += 1
+            elif current_vol < 0.6 and not is_bearish:
+                # حجم ضعيف على صعود = صعود بدون قوة = قمة محتملة
+                vol_score = 8
+                reasons.append(f"Vol Drying Up on Rally {current_vol:.1f}x (+8)")
+
+        total_score += vol_score
+        score_breakdown['volume_reversal'] = vol_score
+
+        # =========================================================
+        # 5. Bearish Divergence — سعر يصنع قمة جديدة لكن RSI لا يؤكد (20 نقطة)
+        # =========================================================
+        div_score = 0
+        if len(df) >= 20 and 'rsi' in df.columns:
+            recent_highs = df['high'].tail(20).tolist()
+            recent_rsis = df['rsi'].tail(20).tolist()
+
+            if len(recent_highs) >= 10:
+                first_high = max(recent_highs[:10])
+                second_high = max(recent_highs[10:])
+                first_idx = recent_highs[:10].index(first_high)
+                second_idx = 10 + recent_highs[10:].index(second_high)
+                first_rsi = recent_rsis[first_idx]
+                second_rsi = recent_rsis[second_idx]
+
+                if second_high > first_high * 1.001 and second_rsi < first_rsi - 3:
+                    rsi_diff = first_rsi - second_rsi
+                    if rsi_diff > 8:
+                        div_score = 20
+                        reasons.append(f"Strong Bearish Divergence (price↑ RSI↓{rsi_diff:.0f}) (+20)")
+                        reversal_signals += 1
+                    elif rsi_diff > 4:
+                        div_score = 12
+                        reasons.append(f"Bearish Divergence (+12)")
+                        reversal_signals += 1
+
+        total_score += div_score
+        score_breakdown['divergence'] = div_score
+
+        # =========================================================
+        # 6. هيكل السوق — هل بدأ يشكل Lower Highs؟ (15 نقطة)
+        # =========================================================
         ms = analyze_market_structure(df)
         ms_score = 0
         if ms['structure'] in ('lower_highs_lower_lows', 'lower_lows'):
-            ms_score = 25
-            reasons.append(f"🏗️ {ms['reason']} (+25)")
-        elif ms['structure'] == 'lower_highs':
             ms_score = 15
             reasons.append(f"🏗️ {ms['reason']} (+15)")
+            reversal_signals += 1
+        elif ms['structure'] == 'lower_highs':
+            ms_score = 8
+            reasons.append(f"🏗️ {ms['reason']} (+8)")
         total_score += ms_score
         score_breakdown['market_structure'] = ms_score
-        
-        # --- 3. Support/Resistance - 20 نقطة ---
+
+        # =========================================================
+        # 7. مقاومة — هل وصل منطقة مقاومة؟ (10 نقطة)
+        # =========================================================
         sr = analyze_support_resistance(df)
         sr_score = 0
         if sr['at_resistance']:
-            sr_score = 20
-            reasons.append(f"📐 {sr['reason']} (+20)")
-        score_breakdown['support_resistance'] = sr_score
+            sr_score = 10
+            reasons.append(f"📐 {sr['reason']} (+10)")
         total_score += sr_score
+        score_breakdown['resistance'] = sr_score
 
-        # --- 4. MTF Confirmation - 15 نقطة ---
-        mtf = analyze_mtf_confirmation(df)
-        mtf_score = min(15, int(mtf['score'] * 1.5))
-        total_score += mtf_score
-        score_breakdown['mtf_confirmation'] = mtf_score
-        if mtf['reason']:
-            reasons.append(f"⏱️ {mtf['reason']} ({mtf_score:+d})")
-        
-        # --- 5. Volume + Divergence - 45 نقطة ---
-        vol_score = 0
-        if len(df) >= 2:
-            current_vol = df.iloc[-1].get('volume_ratio', 1)
-            last_candle = df.iloc[-1]
-            is_bearish_vol = last_candle['close'] < last_candle['open']
-            if current_vol > 3.0 and is_bearish_vol:
-                vol_score = 30
-                reasons.append(f"Vol Explosion Bearish {current_vol:.1f}x (+30)")
-            elif current_vol > 2.0:
-                vol_score = 20
-                reasons.append(f"Vol Very High {current_vol:.1f}x (+20)")
-            elif current_vol > 1.5:
-                vol_score = 12
-                reasons.append(f"Vol High {current_vol:.1f}x (+12)")
-            elif current_vol > 1.0:
-                vol_score = 6
-                reasons.append(f"Vol Up {current_vol:.1f}x (+6)")
+        # =========================================================
+        # 🚨 فلتر الارتداد الطبيعي — منع البيع على تذبذب عادي
+        # =========================================================
+        # إذا أقل من مؤشرين انعكسوا → على الأرجح ارتداد طبيعي وليس قمة حقيقية
+        if reversal_signals < 2:
+            total_score = min(total_score, 40)  # تحديد النقاط بحيث لا تكفي للبيع
+            reasons.append(f"⚠️ Only {reversal_signals} reversal signal(s) — possible noise")
+        elif reversal_signals == 2:
+            reasons.append(f"🟡 {reversal_signals} reversal signals — moderate peak")
+        else:
+            reasons.append(f"🔴 {reversal_signals} reversal signals — strong peak")
 
-        div_score = 0
-        if len(df) >= 20:
-            recent_highs = []
-            recent_rsis = []
-            for i in range(-20, -1):
-                if i >= -len(df):
-                    candle = df.iloc[i]
-                    recent_highs.append(candle['high'])
-                    if 'rsi' in df.columns:
-                        recent_rsis.append(candle['rsi'])
-            
-            if len(recent_highs) >= 10 and len(recent_rsis) >= 10:
-                price_window = recent_highs[-10:]
-                rsi_window = recent_rsis[-10:]
-                
-                first_high = max(price_window[:5])
-                second_high = max(price_window[5:])
-                
-                first_idx = price_window[:5].index(first_high)
-                second_idx = 5 + price_window[5:].index(second_high)
-                
-                first_rsi = rsi_window[first_idx]
-                second_rsi = rsi_window[second_idx]
-                
-                if second_high > first_high and second_rsi < first_rsi:
-                    rsi_diff = first_rsi - second_rsi
-                    if rsi_diff > 5:
-                        div_score = 15
-                        reasons.append(f"Strong Bearish Divergence (+15)")
-                    elif rsi_diff > 2:
-                        div_score = 8
-                        reasons.append(f"Bearish Divergence (+8)")
-        
-        total_score += vol_score + div_score
-        score_breakdown['volume_divergence'] = vol_score + div_score
-        
-        # --- Trap Detection ---
+        # =========================================================
+        # فلتر الفخ — ارتداد مؤقت بحجم كبير
+        # =========================================================
         trap_is_filter = False
         if len(df) >= 20:
             avg_volume = df['volume'].tail(20).mean()
@@ -624,39 +980,37 @@ def analyze_peak(df, rsi):
                             trap_is_filter = True
                             reasons.append(f"⚠️ Fake Dip Trap (Candle-{check_idx})")
                             break
-        
+
         n = min(REVERSAL_CANDLES, len(df))
         high_n = df['high'].tail(n).max()
         current_price = df.iloc[-1]['close']
         drop_percent = ((high_n - current_price) / high_n) * 100 if high_n > 0 else 0
-        
+
         confidence_percent = min(total_score, 140)
-        is_candle_signal = (
-            confidence_percent >= MIN_SELL_CONFIDENCE or
-            (rsi >= 70 and drop_percent >= PEAK_DROP_THRESHOLD * 0.5)
-        )
-        
+        is_candle_signal = (confidence_percent >= MIN_SELL_CONFIDENCE and reversal_signals >= 2)
+
         if trap_is_filter and is_candle_signal:
             is_candle_signal = False
             reasons.append("🚫 Signal Blocked by Trap")
-        
-        if total_score >= MIN_BUY_CONFIDENCE + 10:
-            reasons.append(f"✅ STRONG ({total_score}/140)")
-        elif total_score >= MIN_BUY_CONFIDENCE:
-            reasons.append(f"✅ SIGNAL ({total_score}/140)")
+
+        if confidence_percent >= MIN_SELL_CONFIDENCE and reversal_signals >= 3:
+            reasons.append(f"✅ STRONG PEAK ({total_score}/140, {reversal_signals} signals)")
+        elif confidence_percent >= MIN_SELL_CONFIDENCE and reversal_signals >= 2:
+            reasons.append(f"✅ PEAK SIGNAL ({total_score}/140, {reversal_signals} signals)")
         elif total_score >= 40:
-            reasons.append(f"⏳ WEAK ({total_score}/140)")
+            reasons.append(f"⏳ WEAK ({total_score}/140, {reversal_signals} signals)")
         else:
-            reasons.append(f"❌ NO SIGNAL ({total_score}/140)")
-        
+            reasons.append(f"❌ NO PEAK ({total_score}/140, {reversal_signals} signals)")
+
         base_result['is_peaking'] = drop_percent >= PEAK_DROP_THRESHOLD
-        
+
         base_result.update({
             'confidence': confidence_percent,
             'candle_signal': is_candle_signal,
             'reasons': reasons,
             'drop_percent': round(drop_percent, 3),
-            'score_breakdown': score_breakdown
+            'score_breakdown': score_breakdown,
+            'reversal_signals': reversal_signals
         })
         return base_result
 
