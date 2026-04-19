@@ -282,24 +282,7 @@ def run_main_loop(exchange, ctx):
             if len(active_results) <= active_count and skipped_count > 0:
                 print(f"{Fore.CYAN}ℹ️  Scanned {skipped_count} other coins... (No opportunities found){Style.RESET_ALL}")
 
-            # 📊 تقرير الأداء الذكي (Self-Analysis Dashboard) - كل 24 ساعة
-            hours_since_performance_report = (datetime.now() - last_performance_report_time).total_seconds() / 3600
-            if hours_since_performance_report >= 24:
-                try:
-                    dashboard = advisor_manager.get('SelfAnalysisDashboard')
-                    if dashboard:
-                        report = dashboard.generate_performance_report(days=7)
-                        if 'error' not in report:
-                            # إرسال للويب هوك الحرج بدلاً من الرئيسي
-                            from config_encrypted import get_critical_webhook
-                            webhook = get_critical_webhook()
-                            if webhook:
-                                success = dashboard.send_report_to_discord(report, webhook)
-                                if success:
-                                    print("✅ Performance report sent to Discord")
-                                    last_performance_report_time = datetime.now()  # ✅ تحديث الوقت فقط بعد الإرسال الناجح
-                except Exception as e:
-                    print(f"⚠️ Dashboard error: {e}")
+
 
             # 📋 تقرير المحفظة (Portfolio Report) - كل 30 دقيقة
             if should_send_report(last_report_time, REPORT_INTERVAL):
