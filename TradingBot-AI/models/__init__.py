@@ -17,7 +17,6 @@ from .adaptive_intelligence import AdaptiveIntelligence
 from .liquidation_shield import LiquidationShield
 from .volume_forecast_engine import VolumeForecastEngine
 from .trend_early_detector import TrendEarlyDetector
-from .self_analysis_dashboard import SelfAnalysisDashboard
 
 __all__ = [
     'RiskManager',
@@ -31,6 +30,5 @@ __all__ = [
     'AdaptiveIntelligence',
     'LiquidationShield',
     'VolumeForecastEngine',
-    'TrendEarlyDetector',
-    'SelfAnalysisDashboard'
+    'TrendEarlyDetector'
 ]
