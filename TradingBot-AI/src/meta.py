@@ -869,37 +869,60 @@ class Meta:
         volume_ratio = analysis.get('volume_ratio', 1.0)
         rsi = analysis.get('rsi', 50)
 
-        # العتبة الأساسية من ATR والمخاطر فقط
-        base_threshold = atr_p * (1 + risk_level / 100)  # يزيد مع المخاطر
+        # ✅ الستوب لوس يُحسب من أعلى سعر وصلته العملة (Trailing Stop)
+        highest_price = position.get('highest_price', buy_price)
+        drop_from_highest = ((highest_price - current_price) / highest_price) * 100 if highest_price > 0 else 0
 
-        # تعديل بناءً على الحجم (مؤشر سوق)
-        volume_modifier = (volume_ratio - 1.0) * 0.5  # حجم عالي = حماية أكثر
+        # العتبة الأساسية من ATR والمخاطر
+        base_threshold = atr_p * (1 + risk_level / 100)
+
+        # تعديل بناءً على حالة السوق الكلية (Macro)
+        macro_trend = advisors_intelligence.get('macro_trend', 50)
+        if macro_trend < 30:  # سوق هابط → ستوب أضيق
+            base_threshold *= 0.8
+        elif macro_trend > 70:  # سوق صاعد → ستوب أوسع
+            base_threshold *= 1.2
+
+        # تعديل بناءً على الحجم
+        volume_modifier = (volume_ratio - 1.0) * 0.5
         base_threshold += volume_modifier
 
-        # تعديل بناءً على RSI (مؤشر فني)
-        rsi_modifier = (50 - rsi) / 100  # RSI منخفض = حماية أسرع
+        # تعديل بناءً على RSI
+        rsi_modifier = (50 - rsi) / 100
         base_threshold += rsi_modifier
 
-        # تعديل بناءً على الحيتان (مستشار)
-        whale_modifier = whale_tracking_score / 500  # حيتان إيجابية تقلل الحماية
+        # تعديل بناءً على الحيتان
+        whale_modifier = whale_tracking_score / 500
         base_threshold -= whale_modifier
 
-        # تعديل بناءً على المشاعر (مستشار)
-        sentiment_modifier = sentiment_score / 200  # مشاعر سلبية تزيد الحماية
+        # تعديل بناءً على المشاعر
+        sentiment_modifier = sentiment_score / 200
         base_threshold += sentiment_modifier
 
         # حدود مرنة بناءً على ATR
         final_threshold = max(atr_p * 0.5, min(atr_p * 3.0, base_threshold))
 
-        # فحص الستوب لوس - إذا تجاوز الخسارة العتبة، نبيع فوراً
-        if profit_percent <= -final_threshold:
+        # فحص الستوب لوس — من أعلى سعر وصلته العملة
+        if drop_from_highest >= final_threshold:
             return {
                 'action': 'SELL',
-                'reason': f'Stop Loss Triggered: {profit_percent:.2f}% <= -{final_threshold:.1f}% (ATR:{atr_p:.1f}%, Risk:{risk_level}, Whales:{int(whale_tracking_score)}, Sentiment:{sentiment_score})',
+                'reason': f'Stop Loss Triggered: -{drop_from_highest:.2f}% from peak ${highest_price:.4f} (Threshold:{final_threshold:.1f}%, ATR:{atr_p:.1f}%, Risk:{risk_level}, Whales:{int(whale_tracking_score)}, Sentiment:{sentiment_score})',
                 'profit': profit_percent,
                 'sell_votes': {},
-                'sell_vote_percentage': 100.0,  # قوة كاملة للستوب لوس
-                'sell_vote_count': 12,  # جميع المستشارين
+                'sell_vote_percentage': 100.0,
+                'sell_vote_count': 12,
+                'total_advisors': 12
+            }
+
+        # فحص إضافي: ستوب لوس من سعر الشراء كحد أقصى للخسارة
+        if profit_percent <= -(final_threshold * 1.5):
+            return {
+                'action': 'SELL',
+                'reason': f'Stop Loss Triggered: {profit_percent:.2f}% <= -{final_threshold*1.5:.1f}% (ATR:{atr_p:.1f}%, Risk:{risk_level}, Whales:{int(whale_tracking_score)}, Sentiment:{sentiment_score})',
+                'profit': profit_percent,
+                'sell_votes': {},
+                'sell_vote_percentage': 100.0,
+                'sell_vote_count': 12,
                 'total_advisors': 12
             }
 
@@ -1104,66 +1127,69 @@ class Meta:
         # 👑 5. الملك يقرر بناءً على القمة + المستشارين
         # =========================================================
         peak_analysis = analysis.get('peak', {})
-        peak_score = peak_analysis.get('confidence', 0) + peak_confidence  # إضافة نقاط المستشارين الجدد
+        peak_score = peak_analysis.get('confidence', 0) + peak_confidence
         
-        # 🚨 بيع فوري إذا:
-        # 1. المستشارون يؤكدون القمة (6+ أصوات)
-        # 2. نقاط القمة عالية (85+)
-        # 3. RSI مرتفع جداً (70+) مع MACD هابط
-        
+        # 🆕 عدد المؤشرات التي انعكست فعلاً من analyze_peak
+        peak_reversal_signals = peak_analysis.get('reversal_signals', 0)
+
         king_wants_to_sell = False
         sell_reason = ""
 
-        # فحص التفاؤل والأمل - إذا كان التفاؤل منخفض جداً، يساعد في تأكيد القمة
+        # فحص التفاؤل والأمل
         sentiment_confirmed = False
         try:
             sentiment = analysis.get('sentiment', {})
-            if sentiment.get('score', 0) < -1:  # تفاؤل منخفض = تأكيد قمة
+            if sentiment.get('score', 0) < -1:
                 sentiment_confirmed = True
         except:
             sentiment_confirmed = False
 
-        # الاعتماد على المستشارين لكشف القمة الحقيقية مع مرونة (ماعدا الحد الأدنى 0.5%)
-        if sell_vote_count >= 8 and peak_confidence >= 70 and sentiment_confirmed:  # قمة حقيقية من المستشارين
-            king_wants_to_sell = True
-            sell_reason = f"Ultimate Peak: {sell_vote_count}/{total_advisors} votes + Candles/Volume/Sentiment confirm (+{profit_percent:.1f}%)"
+        # =========================================================
+        # 🎯 القمة الحقيقية = انعكاس واضح من مؤشرات متعددة معاً
+        # القاعدة: لا بيع إلا إذا انعكست مؤشران على الأقل من analyze_peak
+        # =========================================================
 
-        elif peak_score >= 80:  # إشارات قمة قوية
+        # قمة قوية جداً: مستشارون + مؤشرات انعكست + sentiment
+        if sell_vote_count >= 8 and peak_confidence >= 70 and sentiment_confirmed and peak_reversal_signals >= 2:
             king_wants_to_sell = True
-            sell_reason = f"Strong Peak Signal: {peak_score}/110 points (+{profit_percent:.1f}%)"
+            sell_reason = f"Ultimate Peak: {sell_vote_count}/{total_advisors} votes + {peak_reversal_signals} signals + Sentiment (+{profit_percent:.1f}%)"
 
-        elif rsi > 70 and macd_diff < -1 and sell_vote_count >= 4:  # فني مع تأكيد مستشارين
+        # قمة بإشارات قوية من analyze_peak (مؤشران انعكسوا على الأقل)
+        elif peak_score >= 80 and peak_reversal_signals >= 2:
+            king_wants_to_sell = True
+            sell_reason = f"Strong Peak Signal: {peak_score}/110 pts + {peak_reversal_signals} reversal signals (+{profit_percent:.1f}%)"
+
+        # تقني + مستشارون + انعكاس مؤشرين
+        elif rsi > 70 and macd_diff < -1 and sell_vote_count >= 4 and peak_reversal_signals >= 2:
             king_wants_to_sell = True
             sell_reason = f"Technical Peak: RSI {rsi:.0f} + MACD {macd_diff:.1f} + {sell_vote_count} votes (+{profit_percent:.1f}%)"
 
-        elif peak_score >= 90:  # قمة قوية جداً
+        # قمة قوية جداً بنقاط عالية مع انعكاس
+        elif peak_score >= 95 and peak_reversal_signals >= 2:
             king_wants_to_sell = True
-            sell_reason = f"Strong Reversal (Peak: {peak_score})"
+            sell_reason = f"Strong Reversal (Peak: {peak_score}, Signals: {peak_reversal_signals})"
 
-        elif peak_confidence >= 50:  # إنهاك وانهيار من المستشارين - رفع من 35 لتجنب البيع المبكر
+        # مستشارون جدد + انعكاس مؤكد من مؤشرين على الأقل
+        elif peak_confidence >= 50 and peak_reversal_signals >= 3:
             king_wants_to_sell = True
-            sell_reason = f"New Advisors Alert: {', '.join(peak_reasons)}"
-        
-        # =========================================================
-        # 👑 6. القرار النهائي - البيع عند القمة الحقيقية بغض النظر عن الربح (طالما فوق 0.5%)
-        # =========================================================
+            sell_reason = f"Advisors Alert + {peak_reversal_signals} Signals: {', '.join(peak_reasons)}"
 
-        # حساب نسبة الأصوات
+        # =========================================================
+        # 👑 6. القرار النهائي
+        # =========================================================
         sell_vote_percentage = (sell_vote_count / total_advisors * 100) if total_advisors > 0 else 0
 
-        # ✅ دمج مع Risk وAnomaly للتمييز بين التقلبات الطبيعية والانهيار
         if candle_confirmed and sell_vote_count >= 6:
-            # تحقق من Risk وAnomaly للتأكيد على عدم كونها تقلباً طبيعياً
             risk_vote = sell_votes.get('risk', 0)
             anomaly_vote = sell_votes.get('anomaly', 0)
-            if risk_vote or anomaly_vote:  # إذا أكد أحدهما على المخاطر
-                peak_confidence += 10  # زيادة لتجنب القمم الوهمية
+            if risk_vote or anomaly_vote:
+                peak_confidence += 10
 
-        # فحص القمة الحقيقية - إذا كانت هناك قمة قوية مع تأكيد الشموع والزخم والتفاؤل، بيع بغض النظر عن حجم الربح
-        if peak_confidence >= 60 and len(peak_reasons) >= 2 and sentiment_confirmed:  # قمة حقيقية + تفاؤل منخفض
+        # قمة حقيقية محققة: نقاط عالية + مؤشران انعكسوا + sentiment
+        if peak_confidence >= 60 and len(peak_reasons) >= 2 and sentiment_confirmed and peak_reversal_signals >= 2:
             return {
                 'action': 'SELL',
-                'reason': f'REAL PEAK DETECTED: {", ".join(peak_reasons)} (Confidence: {peak_confidence} + Sentiment)',
+                'reason': f'REAL PEAK: {", ".join(peak_reasons)} (Conf:{peak_confidence}, Signals:{peak_reversal_signals})',
                 'profit': profit_percent,
                 'optimism_penalty': 0,
                 'sell_votes': sell_votes,
