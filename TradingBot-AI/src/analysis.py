@@ -1115,8 +1115,12 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
         order_book = {}
         try:
             order_book = exchange.fetch_order_book(symbol, limit=20)
-        except:
-            pass
+            # التحقق من صحة البيانات
+            if not order_book or not order_book.get('bids') or not order_book.get('asks') or len(order_book.get('bids', [])) < 5 or len(order_book.get('asks', [])) < 5:
+                raise ValueError("Invalid order_book data")
+        except Exception as e:
+            print(f"⚠️ Failed to fetch order_book for {symbol}: {e}. Order book features will be None.")
+            order_book = {}
 
         bid_ask_spread = 0
         try:
@@ -1238,12 +1242,35 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
         asks_volume = sum(float(level[1]) for level in order_book.get('asks', [])[:10])
         total_volume = bids_volume + asks_volume
 
-        # Liquidity Features
-        analysis_dict['order_book_imbalance'] = (bids_volume - asks_volume) / max(total_volume, 1) if total_volume > 0 else 0
-        analysis_dict['spread_volatility'] = abs(analysis_dict.get('bid_ask_spread', 0.001) - analysis_dict.get('average_spread', 0.001)) / max(analysis_dict.get('average_spread', 0.001), 0.0001)
-        analysis_dict['depth_at_1pct'] = sum(float(level[1]) for level in order_book.get('bids', []) + order_book.get('asks', []) if abs(float(level[0]) - latest['close']) / latest['close'] <= 0.01)
-        analysis_dict['market_impact_score'] = min(analysis_dict.get('volume_ratio', 1) / 10, 1.0)
-        analysis_dict['liquidity_trends'] = 1 if analysis_dict.get('volume_ratio', 1) > 1.5 and analysis_dict['spread_volatility'] < 0.5 else -1 if analysis_dict.get('volume_ratio', 1) < 0.7 or analysis_dict['spread_volatility'] > 1.0 else 0
+        # Liquidity Features - استخدام None إذا البيانات غير متوفرة
+        if total_volume > 0:
+            analysis_dict['order_book_imbalance'] = (bids_volume - asks_volume) / total_volume
+        else:
+            analysis_dict['order_book_imbalance'] = None
+
+        bid_ask = analysis_dict.get('bid_ask_spread')
+        avg_spread = analysis_dict.get('average_spread')
+        if bid_ask is not None and avg_spread is not None:
+            analysis_dict['spread_volatility'] = abs(bid_ask - avg_spread) / max(avg_spread, 0.0001)
+        else:
+            analysis_dict['spread_volatility'] = None
+
+        if order_book.get('bids') and order_book.get('asks'):
+            analysis_dict['depth_at_1pct'] = sum(float(level[1]) for level in order_book.get('bids', []) + order_book.get('asks', []) if abs(float(level[0]) - latest['close']) / latest['close'] <= 0.01)
+        else:
+            analysis_dict['depth_at_1pct'] = None
+
+        volume_ratio = analysis_dict.get('volume_ratio')
+        if volume_ratio is not None:
+            analysis_dict['market_impact_score'] = min(volume_ratio / 10, 1.0)
+            spread_vol = analysis_dict.get('spread_volatility')
+            if spread_vol is not None:
+                analysis_dict['liquidity_trends'] = 1 if volume_ratio > 1.5 and spread_vol < 0.5 else -1 if volume_ratio < 0.7 or spread_vol > 1.0 else 0
+            else:
+                analysis_dict['liquidity_trends'] = None
+        else:
+            analysis_dict['market_impact_score'] = None
+            analysis_dict['liquidity_trends'] = None
 
         # Risk Features
         analysis_dict['volatility_risk_score'] = (analysis_dict.get('atr', 0) / latest['close']) * 100 if latest['close'] > 0 else 0
