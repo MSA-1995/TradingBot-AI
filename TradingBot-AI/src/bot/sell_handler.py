@@ -207,7 +207,7 @@ def process_sell(result, exchange, ctx):
         volume_ratio = result.get('volume_ratio', 1.0)
         rsi = result.get('rsi', 50)
 
-        def safe_float(value, default=0.0):
+        def safe_float(value, default=None):
             try:
                 return float(value) if value is not None else default
             except Exception:
