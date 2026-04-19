@@ -1253,11 +1253,15 @@ class Meta:
             pass
         return 0
 
-    def _calculate_smart_amount(self, symbol, confidence, analysis):
+def _calculate_smart_amount(self, symbol, confidence, analysis):
         """حساب المبلغ الذكي حسب الثقة - من الأدنى للأعلى"""
         try:
-            # حساب المبلغ بناءً على الثقة: من 12 دولار (ثقة 30) إلى 35 دولار (ثقة 100)
-            confidence_ratio = max(0.3, min(1.0, confidence / 100.0))  # من 30% إلى 100%
+            # حساب المبلغ بناءً على الثقة: من 12 دولار (ثقة 50) إلى 30 دولار (ثقة 100)
+            MIN_CONFIDENCE = 50
+            MAX_CONFIDENCE = 100
+
+            confidence_clamped = max(MIN_CONFIDENCE, min(MAX_CONFIDENCE, confidence))
+            confidence_ratio = (confidence_clamped - MIN_CONFIDENCE) / (MAX_CONFIDENCE - MIN_CONFIDENCE)
             final_amount = MIN_TRADE_AMOUNT + (MAX_TRADE_AMOUNT - MIN_TRADE_AMOUNT) * confidence_ratio
 
             # تعديل حسب المؤشرات
