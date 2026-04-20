@@ -108,7 +108,9 @@ def process_buy(result, exchange, ctx):
         'buy_price':    buy_result['price'],
         'amount':       actual_amount,
         'highest_price': buy_result['price'],
-        'buy_time':     datetime.now(timezone.utc).isoformat()
+        'buy_time':     datetime.now(timezone.utc).isoformat(),
+        'buy_confidence': result['confidence'],
+        'buy_amount':   buy_value
     }
 
     if 'decision' in result:
