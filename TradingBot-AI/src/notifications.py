@@ -250,9 +250,9 @@ def send_positions_report(balance, invested, active_count, max_positions, open_p
         stop_price = highest_price * (1 - sl_threshold / 100)
         
         # جلب بيانات التصويت (إذا متوفرة)
-        buy_votes = pos_data.get('buy_votes', {})
-        buy_vote_count = sum(1 for v in buy_votes.values() if v == 1) if buy_votes else 0
-        total_advisors = len(buy_votes) if buy_votes else 0
+        advisor_votes = pos_data.get('advisor_votes', {})
+        buy_vote_count = sum(1 for v in advisor_votes.values() if v == 1) if advisor_votes else 0
+        total_advisors = len(advisor_votes) if advisor_votes else 0
         vote_percentage = (buy_vote_count / total_advisors * 100) if total_advisors > 0 else 0
         
         entry = (
