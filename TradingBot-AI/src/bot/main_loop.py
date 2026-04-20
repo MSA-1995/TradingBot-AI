@@ -111,6 +111,7 @@ def run_main_loop(exchange, ctx):
             except Exception:
                 pass
 
+            print()
             print(f"✦•······················•✦•······················•✦")
             print(f"⏰ {current_time}")
             print(f"💼 Balance: ${available:.2f} | Invested: ${invested:.2f} | Active: {active_count}/{MAX_POSITIONS}")
@@ -119,7 +120,8 @@ def run_main_loop(exchange, ctx):
                 print(f"🔒 Locked Profit: ${locked_profit:.2f} | Tradable: ${tradable_balance:.2f}")
             else:
                 print(f"  Tradable: ${tradable_balance:.2f} | Max Capital: ${MAX_CAPITAL}")
-            print(f"✦•······················•✦•······················•✦\n")
+            print(f"✦•······················•✦•······················•✦")
+            print()
 
             # الحصول على القائمة الديناميكية
             current_symbols = get_dynamic_symbols_fn()
