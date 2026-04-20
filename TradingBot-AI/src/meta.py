@@ -24,9 +24,32 @@ class Meta:
         self.storage = storage
         self.meta_model = None
         self.meta_feature_names = None
+        self._patterns_cache = None  # 🆕 كاش الأنماط في RAM
         self._load_model_data_from_db()
+        self._load_patterns_to_cache()  # 🆕 تحميل الأنماط عند التشغيل
 
         print("👑 Meta (The King) is initialized and ready to rule.")
+
+    def _load_patterns_to_cache(self):
+        """🚀 تحميل كل الأنماط من الداتابيز للرام مرة واحدة"""
+        try:
+            if not self.storage:
+                print("⚠️ Meta: Storage not available, patterns cache disabled")
+                self._patterns_cache = []
+                return
+            
+            patterns = self.storage.load_all_patterns()
+            self._patterns_cache = patterns
+            
+            # حساب الحجم المضغوط
+            import sys
+            cache_size_kb = sys.getsizeof(self._patterns_cache) / 1024
+            
+            print(f"✅ Meta: Loaded {len(patterns)} patterns to RAM cache ({cache_size_kb:.1f} KB)")
+            
+        except Exception as e:
+            print(f"❌ Meta: Failed to load patterns cache: {e}")
+            self._patterns_cache = []
 
     def _load_model_data_from_db(self):
         """Loads the raw model data (blueprint) from the database."""
@@ -1719,7 +1742,20 @@ class Meta:
                     }
                 }
                 self.storage.save_pattern(pattern_data)
-                print(f"✅ Saved {pattern_type} pattern for {symbol}")
+                
+                # 🔄 تحديث الكاش فورًا
+                self._patterns_cache.append({
+                    'id': None,
+                    'pattern_type': pattern_type,
+                    'data': {'features': pattern_data['features']},
+                    'success_rate': pattern_data['success_rate']
+                })
+                
+                # تنظيف الكاش (آخر 1000 نمط)
+                if len(self._patterns_cache) > 1000:
+                    self._patterns_cache = self._patterns_cache[-1000:]
+                
+                print(f"✅ Saved {pattern_type} pattern for {symbol} + updated cache")
             except Exception as e:
                 print(f"⚠️ Failed to save pattern: {e}")
 
@@ -1790,6 +1826,10 @@ class Meta:
         except Exception as e:
             print(f"⚠️ Error saving learning data: {e}")
     
+    def get_patterns_from_cache(self):
+        """💾 قراءة الأنماط من الرام بدلاً من الداتابيز"""
+        return self._patterns_cache if self._patterns_cache else []
+
     def get_learning_stats(self):
         """إحصائيات تعلم الملك"""
         try:
