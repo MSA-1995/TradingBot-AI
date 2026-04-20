@@ -107,15 +107,19 @@ def save_open_positions(storage, symbols_data, symbols_data_lock):
 
                 pos_data = {
                     'symbol': symbol,
-                    'buy_price': position.get('buy_price', 0.0), # Correctly reads from the 'position' dict.
+                    'buy_price': position.get('buy_price', 0.0),
                     'amount': position.get('amount', 0.0),
                     'highest_price': position.get('highest_price', position.get('buy_price', 0.0)),
                     'tp_level_1': float(position.get('tp_level_1', 0.0)) if position.get('tp_level_1') is not False else 0.0,
                     'tp_level_2': float(position.get('tp_level_2', 0.0)) if position.get('tp_level_2') is not False else 0.0,
                     'buy_time': buy_time,
                     'invested': position.get('invested', 0.0),
-                    # The DB 'data' column expects the dict from 'ai_data'
-                    'data': position.get('ai_data', {})
+                    'data': {
+                        'buy_confidence': position.get('buy_confidence', 0),
+                        'buy_amount': position.get('buy_amount', 0),
+                        'advisor_votes': position.get('advisor_votes', {}),
+                        'ai_data': position.get('ai_data', {})
+                    }
                 }
                 
                 positions_to_save.append(pos_data)
