@@ -3,10 +3,10 @@ Meta (The King) - The Ultimate Decision Maker
 """
 import pandas as pd
 from config import (
-    MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT, MIN_SELL_CONFIDENCE,
-    MACRO_CANDLE_THRESHOLD, PEAK_DROP_THRESHOLD, BOTTOM_BOUNCE_THRESHOLD, 
-    VOLUME_SPIKE_FACTOR, META_BUY_INTELLIGENCE, META_BUY_WHALE, META_BUY_TREND, 
-    META_BUY_VOLUME, META_BUY_PATTERN, META_BUY_CANDLE, META_BUY_SUPPORT, META_BUY_HISTORY, 
+    MIN_TRADE_AMOUNT, MAX_TRADE_AMOUNT, MIN_SELL_CONFIDENCE, MIN_BUY_CONFIDENCE,
+    MACRO_CANDLE_THRESHOLD, PEAK_DROP_THRESHOLD, BOTTOM_BOUNCE_THRESHOLD,
+    VOLUME_SPIKE_FACTOR, META_BUY_INTELLIGENCE, META_BUY_WHALE, META_BUY_TREND,
+    META_BUY_VOLUME, META_BUY_PATTERN, META_BUY_CANDLE, META_BUY_SUPPORT, META_BUY_HISTORY,
     META_BUY_CONSENSUS, META_DISPLAY_THRESHOLD
 )
 from datetime import datetime, timezone
@@ -743,8 +743,6 @@ class Meta:
                 print(f"⚠️ Multi-timeframe bottom detection error: {e}")
         
         # 🤖 القرار النهائي من meta_trading المتعلم
-        MIN_BUY_CONFIDENCE = 55  # 55% احتمال نجاح
-        
         if confidence >= MIN_BUY_CONFIDENCE:
             # حساب المبلغ الذكي
             try:
