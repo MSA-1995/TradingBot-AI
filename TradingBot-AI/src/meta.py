@@ -814,13 +814,27 @@ class Meta:
         # ✅ 2. حساب معلومات Stop Loss (للميزات - meta_trading يقرر)
         stop_loss_info = self._calculate_stop_loss_features(position, current_price, analysis, risk_level, whale_tracking_score, sentiment_score)
 
+        # 🛡️ Stop Loss - فحص فوري قبل أي شيء
+        drop_from_peak = stop_loss_info.get('drop_from_peak', 0)
+        threshold = stop_loss_info.get('threshold', 0)
+        
+        # ✅ إذا Drop >= Threshold → بيع فوري بدون استثناءات
+        if drop_from_peak >= threshold:
+            gc.collect()
+            return {
+                'action': 'SELL',
+                'reason': f'🛡️ Stop Loss: Drop {drop_from_peak:.1f}% >= Threshold {threshold:.1f}% (Instant Sell)',
+                'profit': profit_percent,
+                'optimism_penalty': 0,
+                'sell_votes': {},
+                'stop_loss_threshold': threshold
+            }
+        
         # فحص الحد الأدنى للربح قبل البيع (فقط للحماية من الخسارة)
         from config import MIN_SELL_PROFIT
         if profit_percent < MIN_SELL_PROFIT:
             # 🛡️ رسالة ديناميكية: Stop Loss إذا خسارة > -1.0% وإلا Minimum profit
             if profit_percent < -1.0:
-                drop_from_peak = stop_loss_info.get('drop_from_peak', 0)
-                threshold = stop_loss_info.get('threshold', 0)
                 return {
                     'action': 'HOLD',
                     'reason': f'🛡️ Stop Loss Zone: {profit_percent:.2f}% | Drop: {drop_from_peak:.1f}% | Threshold: {threshold:.1f}%',
