@@ -1562,11 +1562,12 @@ class Meta:
             except Exception as e:
                 print(f"⚠️ Real-time stop loss detection error: {e}")
 
+        # 🛡️ Stop Loss - بيع فوري بدون استثناءات
         if drop_from_peak >= trailing_threshold:
             gc.collect()
             return {
                 'action': 'SELL',
-                'reason': f'Wave Protection: -{drop_from_peak:.1f}% from peak (threshold: {trailing_threshold:.1f}%)',
+                'reason': f'🛡️ Stop Loss: Drop {drop_from_peak:.1f}% >= Threshold {trailing_threshold:.1f}% (Instant Sell)',
                 'profit': profit_percent,
                 'optimism_penalty': 0,
                 'sell_votes': sell_votes,
