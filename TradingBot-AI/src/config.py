@@ -6,7 +6,7 @@ All bot settings and constants
 # Trading Parameters
 
 MIN_SELL_CONFIDENCE = 70  # Meta AI: ثقة بيع (يحلب العملة ويبيع بالقمة الحقيقية)
-MIN_BUY_CONFIDENCE = 55   # حد الثقة للشراء (reversal analysis)
+MIN_BUY_CONFIDENCE = 60   # حد الثقة للشراء (reversal analysis)
 MACRO_CANDLE_THRESHOLD = 85  # حد الشموع لتجاوز حارس الماكرو
 MAX_POSITIONS = 20  # صفقتين كحد أقصى لكل مجموعة (5+5)
 TOTAL_COINS_TO_SCAN = 20
