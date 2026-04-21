@@ -200,6 +200,9 @@ def run_main_loop(exchange, ctx):
             # عداد العملات التي تم فحصها ولكن تم تجاهلها
             skipped_count = len(results) - len(active_results)
 
+            # Sort active results alphabetically by symbol
+            active_results.sort(key=lambda x: x['symbol'])
+
             # Process and display active results
             for result in active_results:
                 symbol = result['symbol']
