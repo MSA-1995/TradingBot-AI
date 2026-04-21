@@ -22,9 +22,9 @@ REALTIME_BOTTOM_BASE_CONFIRMATIONS = 2  # عدد التأكيدات الأساس
 
 # تعديلات حسب السوق (للقاع)
 REALTIME_BOTTOM_STRONG_BULL_CONFIDENCE = 50  # سوق صاعد قوي = شراء أسرع
-REALTIME_BOTTOM_BULL_CONFIDENCE = 55
-REALTIME_BOTTOM_SIDEWAYS_CONFIDENCE = 65
-REALTIME_BOTTOM_BEAR_CONFIDENCE = 65  # سوق هابط = حذر متوازن (كان 75)
+REALTIME_BOTTOM_BULL_CONFIDENCE = 60
+REALTIME_BOTTOM_SIDEWAYS_CONFIDENCE = 70
+REALTIME_BOTTOM_BEAR_CONFIDENCE = 80  # سوق هابط = حذر متوازن (كان 75)
 REALTIME_BOTTOM_BEAR_CONFIRMATIONS = 2  # إطاران كافيان (كان 3)
 
 # للقمة (البيع) - Base Threshold
@@ -32,10 +32,10 @@ REALTIME_PEAK_BASE_CONFIDENCE = 60  # العتبة الأساسية
 REALTIME_PEAK_BASE_CONFIRMATIONS = 2  # عدد التأكيدات الأساسي
 
 # تعديلات حسب السوق (للقمة)
-REALTIME_PEAK_STRONG_BULL_CONFIDENCE = 75  # سوق صاعد قوي = لا تبيع بسرعة
+REALTIME_PEAK_STRONG_BULL_CONFIDENCE = 70  # سوق صاعد قوي = لا تبيع بسرعة
 REALTIME_PEAK_STRONG_BULL_CONFIRMATIONS = 3  # يحتاج كل الأطر الزمنية
 REALTIME_PEAK_BULL_CONFIDENCE = 70
-REALTIME_PEAK_SIDEWAYS_CONFIDENCE = 65
+REALTIME_PEAK_SIDEWAYS_CONFIDENCE = 60
 REALTIME_PEAK_BEAR_CONFIDENCE = 50  # سوق هابط = بيع سريع
 
 # =====================================================================
