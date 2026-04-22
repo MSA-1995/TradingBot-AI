@@ -33,13 +33,10 @@ class Meta:
     MAX_CACHE_PATTERNS   = 1000
     MAX_PROFIT_HISTORY   = 5
 
-    # ─── عتبات الثقة ───
-    SPIKE_MIN_JUMP_1     = 5.0
-    SPIKE_MIN_PROFIT_1   = 8.0
-    SPIKE_MIN_JUMP_2     = 8.0
-    SPIKE_MIN_PROFIT_2   = 10.0
-    SPIKE_REVERSAL_HOLD  = 10.0
-    SPIKE_REVERSAL_DROP  = -3.0
+    # ─── عتبات القفزات (Spike Detection) ───
+    SPIKE_POSITIVE_THRESHOLD = 3.0    # قفزة +3% = بيع فوري
+    SPIKE_NEGATIVE_THRESHOLD = -3.0   # قفزة -3% = بيع فوري
+    SPIKE_TIME_WINDOW        = 20     # خلال 20 ثانية
 
     # ─── عتبات البيع ───
     PEAK_VOTE_STRONG     = 8
@@ -799,9 +796,18 @@ class Meta:
             buy_price = float(position.get('buy_price', 0) or 0)
             profit    = ((current_price - buy_price) / buy_price * 100
                          if buy_price > 0 else 0)
+            spike_type = spike.get('spike_type', 'UNKNOWN')
+
+            if spike_type == 'POSITIVE':
+                emoji = '🚀'
+                label = 'PROFIT SPIKE'
+            else:
+                emoji = '🛡️'
+                label = 'CRASH PROTECTION'
+
             return {
                 'action':             'SELL',
-                'reason':             (f"🚀 PROFIT SPIKE: "
+                'reason':             (f"{emoji} {label}: "
                                        f"{spike.get('profit_jump', 0):.1f}% in "
                                        f"{spike.get('time_diff', 0):.0f}s"),
                 'profit':             profit,
@@ -2088,7 +2094,7 @@ class Meta:
         try:
             buy_price = float(position.get('buy_price', 0) or 0)
             if buy_price == 0:
-                return {'profit_jump': 0, 'time_diff': 0, 'is_spike': 0}
+                return {'profit_jump': 0, 'time_diff': 0, 'is_spike': 0, 'spike_type': 'NONE'}
 
             current_profit = (current_price - buy_price) / buy_price * 100
             now            = datetime.now(timezone.utc)
@@ -2097,21 +2103,23 @@ class Meta:
             history = self.profit_history[symbol]
 
             profit_jump = time_diff = is_spike = 0
+            spike_type = 'NONE'
 
             if history:
                 last_time, last_profit = history[-1]
                 last_profit = last_profit or 0
                 time_diff   = (now - last_time).total_seconds()
 
-                if time_diff < 20:
+                if time_diff < self.SPIKE_TIME_WINDOW:
                     profit_jump = current_profit - last_profit
-                    if ((profit_jump >= self.SPIKE_MIN_JUMP_1
-                         and current_profit >= self.SPIKE_MIN_PROFIT_1)
-                        or (profit_jump >= self.SPIKE_MIN_JUMP_2
-                            and current_profit >= self.SPIKE_MIN_PROFIT_2)
-                        or (last_profit >= self.SPIKE_REVERSAL_HOLD
-                            and profit_jump <= self.SPIKE_REVERSAL_DROP)):
+
+                    if profit_jump >= self.SPIKE_POSITIVE_THRESHOLD:
                         is_spike = 1
+                        spike_type = 'POSITIVE'
+
+                    elif profit_jump <= self.SPIKE_NEGATIVE_THRESHOLD:
+                        is_spike = 1
+                        spike_type = 'NEGATIVE'
 
             history.append((now, current_profit))
             if len(history) > self.MAX_PROFIT_HISTORY:
@@ -2121,11 +2129,12 @@ class Meta:
                 'profit_jump':    profit_jump,
                 'time_diff':      time_diff,
                 'is_spike':       is_spike,
+                'spike_type':     spike_type,
                 'current_profit': current_profit
             }
         except Exception as e:
             print(f"⚠️ Profit spike error: {e}")
-            return {'profit_jump': 0, 'time_diff': 0, 'is_spike': 0}
+            return {'profit_jump': 0, 'time_diff': 0, 'is_spike': 0, 'spike_type': 'NONE'}
 
     def _calculate_stop_loss_features(self, position: dict,
                                        current_price: float,
