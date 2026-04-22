@@ -204,12 +204,12 @@ class Meta:
             if len(similar_wins) == 1:
                 boost = min(avg_profit * 1.2, 8.0)
                 #print(f"💪 Soft Courage [{symbol}]: +{boost:.1f} "
-                      f"(1 similar win, avg {avg_profit:.1f}%)")
+                      #f"(1 similar win, avg {avg_profit:.1f}%)")
                 return round(boost, 1)
 
             boost = min(avg_profit * 2.5, 18.0)
             #print(f"💪 Courage Boost [{symbol}]: +{boost:.1f} "
-                  f"(based on {len(similar_wins)} similar wins, avg {avg_profit:.1f}%)")
+                  #f"(based on {len(similar_wins)} similar wins, avg {avg_profit:.1f}%)")
             return round(boost, 1)
 
         except Exception as e:
