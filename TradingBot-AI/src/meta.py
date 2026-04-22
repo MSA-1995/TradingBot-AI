@@ -277,7 +277,7 @@ class Meta:
                 if avg_profit > 0.8:
                     boost = min(avg_profit * 2.0, 14.0)
                     label = f"Pattern({len(matches)}hits,avg{avg_profit:.1f}%)"
-                    print(f"🔁 Pattern Boost [{symbol}]: +{boost:.1f} — {label}")
+                    #print(f"🔁 Pattern Boost [{symbol}]: +{boost:.1f} — {label}")
                     return round(boost, 1), label
 
             if len(matches) >= 2:
