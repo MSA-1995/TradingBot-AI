@@ -849,9 +849,11 @@ class Meta:
             }
 
         if profit_pct < MIN_SELL_PROFIT:
-            reason = (f'🛡️ Stop Loss Zone: {profit_pct:.2f}%'
-                      if profit_pct < -1.0
-                      else f'Minimum profit not reached: {profit_pct:.2f}% < {MIN_SELL_PROFIT}%')
+            if profit_pct < -1.0:
+                reason = (f'🛡️ Stop Loss Zone: {profit_pct:.2f}% | '
+                          f'SL Trigger: -{sl_threshold:.2f}%')
+            else:
+                reason = f'Minimum profit not reached: {profit_pct:.2f}% < {MIN_SELL_PROFIT}%'
             return {'action': 'HOLD', 'reason': reason, 'profit': profit_pct}
 
         # 3. إضافة مستشاري Stop Loss
