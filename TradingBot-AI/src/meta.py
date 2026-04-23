@@ -619,22 +619,22 @@ class Meta:
         ai.update(self._gather_extra_buy_intelligence(symbol, analysis_data))
 
         # ✅ Smart Market Prediction
-        buy_mode = None
+        buy_mode     = None
+        macro_status = '⚪ NEUTRAL'
         try:
             macro = (self.advisor_manager.get('MacroTrendAdvisor')
                      if self.advisor_manager else None)
             if macro:
-                current_status = macro.get_macro_status()
-                ai['macro_status'] = current_status
+                macro_status = macro.get_macro_status()
+                ai['macro_status'] = macro_status
 
                 prediction = macro.predict_market()
                 ai['market_prediction'] = prediction
 
                 combined = prediction.get('combined', {})
                 predicted_direction = combined.get('direction', 'NEUTRAL')
-                predicted_strength = combined.get('strength', 'NEUTRAL')
+                predicted_strength  = combined.get('strength', 'NEUTRAL')
 
-                # Smart mapping: use strength for better decisions
                 if predicted_direction == 'MIXED' and predicted_strength == 'RECOVERY':
                     smart_direction = 'BULLISH'
                 elif predicted_direction == 'MIXED' and predicted_strength == 'CAUTION':
@@ -642,7 +642,7 @@ class Meta:
                 else:
                     smart_direction = predicted_direction
 
-                buy_mode, _ = get_prediction_modes(current_status, smart_direction)
+                buy_mode, _ = get_prediction_modes(macro_status, smart_direction)
 
         except Exception as e:
             print(f"⚠️ Market prediction error: {e}")
@@ -653,6 +653,7 @@ class Meta:
         price_momentum = analysis_data.get('price_momentum', 0)
         atr            = analysis_data.get('atr', 2.5)
 
+        # ✅ الذاكرة تدخل كـ input لميتا فقط
         symbol_memory = self._get_symbol_memory(symbol)
         features = self._build_meta_features(
             rsi=rsi, macd_diff=macd_diff, volume_ratio=volume_ratio,
@@ -666,13 +667,7 @@ class Meta:
             features, ai, direction='buy'
         )
 
-        # Memory adjustments
-        confidence += (
-            self._get_courage_boost(symbol, rsi, volume_ratio)
-            + self._get_time_memory_modifier(symbol)[0]
-            + self._get_symbol_pattern_score(symbol, rsi, macd_diff, volume_ratio)[0]
-            + self._get_symbol_win_rate_boost(symbol)[0]
-        )
+        # ✅ ما نضيف boosts بعد ميتا
         confidence = max(0.0, min(100.0, confidence))
 
         # Critical risk protection
@@ -687,25 +682,194 @@ class Meta:
                     'reason': '🛡️ High Liquidation Risk',
                     'confidence': 0}
 
-        # Multi-Timeframe Bottom Detection
-        confidence = self._apply_mtf_bottom_boost(
-            symbol, analysis_data, candles, ai, confidence)
+        # =========================================================
+        # ✅ نظام النقاط لكشف القاع الحقيقي (114 → مطبّعة على 100)
+        # =========================================================
 
-        # ✅ Dynamic buy threshold based on prediction
+        # 🤖 ميتا (meta_trading): 10 نقطة
+        meta_points = (confidence / 100) * 10
+
+        # ⚡ Realtime Price Action (أسرع كاشف قاع): 10 نقطة
+        rtpa_buy_conf = 0.0
+        try:
+            if self.realtime_pa and candles and len(candles) >= 3:
+                rt_result = self.realtime_pa.detect_bottom(
+                    symbol=symbol,
+                    candles=candles,
+                    current_price=analysis_data.get('close', 0),
+                    analysis=analysis_data
+                )
+                if rt_result:
+                    rtpa_buy_conf = rt_result.get('confidence', 0)
+        except Exception as e:
+            print(f"⚠️ Realtime bottom error: {e}")
+        rtpa_points = (rtpa_buy_conf / 100) * 10
+
+        # 🕯️ Candle Expert (Hammer, Doji, انعكاس): 9 نقطة
+        candle_score  = ai.get('candle_expert_score', 50)
+        candle_points = (candle_score / 100) * 9
+
+        # 📊 Chart CNN: 9 نقطة
+        chart_cnn_score = analysis_data.get('chart_cnn_score', 0)
+        chart_points    = (chart_cnn_score / 100) * 9
+
+        # 🐋 Smart Money (حيتان تشتري): 8 نقطة
+        whale_score     = ai.get('whale_activity', 0)
+        whale_direction = ai.get('whale_direction', 'sell')
+        whale_points    = (whale_score / 100) * 8 if whale_direction == 'buy' else 0
+
+        # 📈 MTF Bottom (5m+15m+1h): 8 نقطة
+        mtf_points = 0
+        try:
+            if self.mtf_analyzer and candles and len(candles) >= 5:
+                candles_5m  = analysis_data.get('candles_5m',  candles)
+                candles_15m = analysis_data.get('candles_15m', candles)
+                candles_1h  = analysis_data.get('candles_1h',  candles)
+
+                vol_5m  = self._extract_volumes(candles_5m)
+                vol_15m = self._extract_volumes(candles_15m)
+                vol_1h  = self._extract_volumes(candles_1h)
+
+                result = self.mtf_analyzer.analyze_bottom(
+                    candles_5m=candles_5m, candles_15m=candles_15m,
+                    candles_1h=candles_1h,
+                    current_price=analysis_data.get('close', 0),
+                    volume_data_5m=vol_5m, volume_data_15m=vol_15m,
+                    volume_data_1h=vol_1h,
+                    order_book=analysis_data.get('order_book'),
+                    macro_status=ai.get('macro_status', 'NEUTRAL')
+                )
+                if result['is_bottom']:
+                    conf = result['confirmations']
+                    print(f"⚡ MTF Bottom [{symbol}]: "
+                          f"{result['confidence']:.0f}% ({conf}/3 TF)")
+                    mtf_points = (result['confidence'] / 100) * 8 * (conf / 3)
+        except Exception as e:
+            print(f"⚠️ MTF bottom error: {e}")
+
+        # 💥 Volume Forecast + Volume Pred: 7 نقطة
+        volume_momentum = ai.get('volume_momentum', 40)
+        vol_pred_score  = analysis_data.get('volume_pred_score', 0)
+        volume_points   = ((volume_momentum / 100) * 4) + ((vol_pred_score / 100) * 3)
+        volume_points   = min(volume_points, 7)
+
+        # 📊 Pattern Recognition: 6 نقطة
+        pattern_conf   = ai.get('pattern_confidence', 0)
+        pattern_points = (pattern_conf / 100) * 6
+
+        # 📐 Fibonacci Support: 6 نقطة
+        support_strength = ai.get('support_strength', 30)
+        support_points   = (support_strength / 100) * 6
+
+        # 🎯 Trend Early Detector (اتجاه يولد): 5 نقطة
+        trend_birth  = ai.get('trend_birth', 30)
+        trend_points = (trend_birth / 100) * 5
+
+        # 😨 Sentiment Fear (خوف = قاع): 5 نقطة
+        fear_greed      = analysis_data.get('sentiment', {}).get('fear_greed', 50)
+        sentiment_score = ai.get('sentiment_score', 0)
+        fear_points     = 0
+        if fear_greed < 30:
+            fear_points = ((30 - fear_greed) / 30) * 5
+        elif sentiment_score > 0:
+            fear_points = (sentiment_score / 100) * 2
+
+        # 📰 Crypto News (أخبار إيجابية): 4 نقطة
+        news_positive = analysis_data.get('news', {}).get('positive', 0)
+        news_points   = min((news_positive / 10) * 4, 4)
+
+        # 🛡️ Liquidation Safety: 4 نقطة
+        liq_safety = ai.get('liquidation_safety', 50)
+        liq_points = (liq_safety / 100) * 4
+
+        # 🔍 Anomaly/Trap (مو فخ): 4 نقطة
+        trap_detection = ai.get('trap_detection', 60)
+        anomaly_points = (trap_detection / 100) * 4
+
+        # 💧 Liquidity: 3 نقطة
+        liquidity_score  = ai.get('liquidity_score', 50)
+        liquidity_points = (liquidity_score / 100) * 3
+
+        # 📉 RSI Oversold: 3 نقطة
+        rsi_points = 0
+        if rsi < 30:
+            rsi_points = ((30 - rsi) / 30) * 3
+        elif rsi < 40:
+            rsi_points = ((40 - rsi) / 10) * 1
+
+        # 📈 MACD Bullish: 3 نقطة
+        macd_points = 0
+        if macd_diff > 0:
+            macd_points = (min(abs(macd_diff), 10) / 10) * 3
+
+        # 🌍 Market Intelligence: 3 نقطة
+        market_intel  = analysis_data.get('market_intelligence', {})
+        intel_score   = market_intel.get('bullish_score', 0)
+        intel_points  = (intel_score / 100) * 3
+
+        # ⚠️ Risk Model (خطر منخفض = قاع آمن): 2 نقطة
+        risk_level  = ai.get('risk_level', 50)
+        risk_points = ((100 - risk_level) / 100) * 2
+
+        # 🔄 Adaptive Intelligence: 2 نقطة
+        hist_success    = ai.get('historical_success', 50)
+        adaptive_points = (hist_success / 100) * 2
+
+        # 🌐 Macro Trend: 2 نقطة
+        macro_points = 0
+        if 'BULL' in macro_status:
+            macro_points = 2
+        elif 'NEUTRAL' in macro_status:
+            macro_points = 1
+
+        # 📡 External APIs: 1 نقطة
+        ext_signal  = analysis_data.get('external_signal', {}).get('bullish', 0)
+        ext_points  = min(ext_signal, 1)
+
+        # ✅ المجموع الكلي (114 → مطبّع على 100)
+        raw_points = (
+            meta_points       # 10
+            + rtpa_points     # 10
+            + candle_points   # 9
+            + chart_points    # 9
+            + whale_points    # 8
+            + mtf_points      # 8
+            + volume_points   # 7
+            + pattern_points  # 6
+            + support_points  # 6
+            + trend_points    # 5
+            + fear_points     # 5
+            + news_points     # 4
+            + liq_points      # 4
+            + anomaly_points  # 4
+            + liquidity_points# 3
+            + rsi_points      # 3
+            + macd_points     # 3
+            + intel_points    # 3
+            + risk_points     # 2
+            + adaptive_points # 2
+            + macro_points    # 2
+            + ext_points      # 1
+        )
+        buy_points = min((raw_points / 114) * 100, 100)
+
+        # ✅ حدود الشراء من الكونفج حسب السوق
         required_confidence = MIN_BUY_CONFIDENCE
-        max_amount = MAX_TRADE_AMOUNT
+        max_amount          = MAX_TRADE_AMOUNT
 
         if buy_mode:
             required_confidence = buy_mode.get('min_confidence', MIN_BUY_CONFIDENCE)
-            max_amount = buy_mode.get('max_amount', MAX_TRADE_AMOUNT)
+            max_amount          = buy_mode.get('max_amount', MAX_TRADE_AMOUNT)
 
-        if confidence >= required_confidence:
+        if buy_points >= required_confidence:
             amount = self._calculate_smart_amount_safe(symbol, confidence, analysis_data)
             amount = min(amount, max_amount)
 
             return {
                 'action':                 'BUY',
-                'reason':                 f'🤖 Meta AI: {confidence:.1f}%',
+                'reason':                 (f'🤖 Meta AI: {confidence:.1f}% | '
+                                           f'Points: {buy_points:.0f}/{required_confidence} | '
+                                           f'RT:{rtpa_buy_conf:.0f}%'),
                 'confidence':             min(confidence, 99),
                 'amount':                 amount,
                 'advisors_intelligence':  ai,
@@ -716,7 +880,9 @@ class Meta:
 
         return {
             'action':                'DISPLAY',
-            'reason':                f'🤖 Meta AI: {confidence:.1f}% (need {required_confidence}%+)',
+            'reason':                (f'🤖 Meta AI: {confidence:.1f}% | '
+                                      f'Points: {buy_points:.0f} '
+                                      f'(need {required_confidence}+)'),
             'confidence':            min(confidence, 99),
             'advisors_intelligence': ai,
             'buy_probability':       buy_prob,
@@ -877,23 +1043,23 @@ class Meta:
         volume_ratio  = analysis.get('volume_ratio', 1.0)
 
         # ✅ Smart Market Prediction
-        sell_mode = None
+        sell_mode    = None
+        macro_status = '⚪ NEUTRAL'
         dynamic_min_sell_profit = MIN_SELL_PROFIT
         try:
             macro = (self.advisor_manager.get('MacroTrendAdvisor')
                      if self.advisor_manager else None)
             if macro:
-                current_status = macro.get_macro_status()
-                ai['macro_status'] = current_status
+                macro_status = macro.get_macro_status()
+                ai['macro_status'] = macro_status
 
                 prediction = macro.predict_market()
                 ai['market_prediction'] = prediction
 
                 combined = prediction.get('combined', {})
                 predicted_direction = combined.get('direction', 'NEUTRAL')
-                predicted_strength = combined.get('strength', 'NEUTRAL')
+                predicted_strength  = combined.get('strength', 'NEUTRAL')
 
-                # Smart mapping: use strength for better decisions
                 if predicted_direction == 'MIXED' and predicted_strength == 'RECOVERY':
                     smart_direction = 'BULLISH'
                 elif predicted_direction == 'MIXED' and predicted_strength == 'CAUTION':
@@ -901,10 +1067,8 @@ class Meta:
                 else:
                     smart_direction = predicted_direction
 
-                _, sell_mode = get_prediction_modes(current_status, smart_direction)
+                _, sell_mode = get_prediction_modes(macro_status, smart_direction)
                 dynamic_min_sell_profit = sell_mode.get('min_sell_profit', MIN_SELL_PROFIT)
-
-                # ✅ الحد الأدنى ما ينزل تحت MIN_SELL_PROFIT أبداً
                 dynamic_min_sell_profit = max(dynamic_min_sell_profit, MIN_SELL_PROFIT)
 
         except Exception as e:
@@ -918,7 +1082,7 @@ class Meta:
         sl_threshold = sl_info.get('threshold', 0)
 
         if sell_mode:
-            sl_mult = sell_mode.get('stop_loss_mult', 1.0)
+            sl_mult      = sell_mode.get('stop_loss_mult', 1.0)
             sl_threshold = sl_threshold * sl_mult
 
         if drop >= sl_threshold:
@@ -932,7 +1096,7 @@ class Meta:
                 'stop_loss_threshold': sl_threshold
             }
 
-        # 3. ✅ MIN PROFIT CHECK - حاجز 0.5% (لا يبيع تحته أبداً)
+        # 3. ✅ MIN PROFIT CHECK
         if profit_pct < dynamic_min_sell_profit:
             if profit_pct < -1.0:
                 reason = (f'🛡️ Stop Loss Zone: {profit_pct:.2f}% | '
@@ -958,57 +1122,203 @@ class Meta:
         )
 
         # 6. Meta Model
-        sell_prob, sell_conf, coin_fc_sell, market_fc_sell = self._run_meta_model(
-            features, ai, direction='sell'
-        )
-        meta_sell_confidence = sell_conf
+        sell_prob, meta_sell_confidence, coin_fc_sell, market_fc_sell = \
+            self._run_meta_model(features, ai, direction='sell')
 
-        # 7. Multi-Timeframe Peak Detection
-        sell_conf = self._apply_mtf_peak_boost(
-            symbol, analysis, candles, position, ai, sell_conf)
+        # 7. Realtime Price Action Peak (أسرع كاشف ⚡)
+        rtpa_sell_conf = 0.0
+        try:
+            if self.realtime_pa and candles and len(candles) >= 3:
+                rt_result = self.realtime_pa.detect_peak(
+                    symbol=symbol,
+                    candles=candles,
+                    current_price=current_price,
+                    analysis=analysis
+                )
+                if rt_result:
+                    rtpa_sell_conf = rt_result.get('confidence', 0)
+        except Exception as e:
+            print(f"⚠️ Realtime peak error: {e}")
 
-        # 8. Peak Signals
+        # 8. Multi-Timeframe Peak Detection
+        mtf_sell_conf = self._apply_mtf_peak_boost(
+            symbol, analysis, candles, position, ai, meta_sell_confidence)
+        mtf_peak_boost = max(mtf_sell_conf - meta_sell_confidence, 0)
+
+        # 9. Peak Signals
         peak_conf, peak_reasons = self._detect_peak_signals(
             symbol, analysis, ai, profit_pct)
 
-        # 9. Advisor Voting
+        # 10. Advisor Voting (16 مستشار)
         sell_vote_count, total_advisors, sell_votes, candle_confirmed = \
             self._run_sell_advisor_voting(
                 symbol, analysis, rsi, macd_diff, volume_ratio, profit_pct)
 
-        # 10. King Decision (يكشف القمة الحقيقية أولاً 👑)
-        sell_vote_pct = (sell_vote_count / total_advisors * 100
-                         if total_advisors > 0 else 0)
+        vote_ratio    = sell_vote_count / total_advisors if total_advisors > 0 else 0
         peak_analysis = analysis.get('peak', {})
         peak_score    = peak_analysis.get('confidence', 0) + peak_conf
         peak_rev_sigs = peak_analysis.get('reversal_signals', 0)
 
-        sentiment_confirmed = analysis.get('sentiment', {}).get('score', 0) < -1
+        # =========================================================
+        # ✅ نظام النقاط لكشف القمة الحقيقية (111 → مطبّعة على 100)
+        # =========================================================
 
-        sell_result = self._king_sell_decision(
-            symbol, profit_pct, rsi, macd_diff,
-            peak_conf, peak_score, peak_reasons, peak_rev_sigs,
-            sell_vote_count, total_advisors, sell_votes,
-            sell_vote_pct, candle_confirmed, sentiment_confirmed,
-            coin_fc_sell, market_fc_sell
+        # 🤖 ميتا (meta_trading): 10 نقطة
+        meta_points = (meta_sell_confidence / 100) * 10
+
+        # ⚡ Realtime Price Action: 10 نقطة
+        rtpa_points = (rtpa_sell_conf / 100) * 10
+
+        # 🕯️ Candle Expert: 9 نقطة
+        candle_expert_score = sell_votes.get('candle_expert', 0)
+        candle_points = 9 if candle_confirmed else (candle_expert_score * 5)
+        candle_points = min(candle_points, 9)
+
+        # 📊 Chart CNN: 9 نقطة
+        chart_cnn_score = sell_votes.get('chart_cnn', 0)
+        chart_points    = (chart_cnn_score * 9)
+        chart_points    = min(chart_points, 9)
+
+        # 🚪 Exit Model: 8 نقطة
+        exit_score  = sell_votes.get('exit', 0)
+        exit_points = (exit_score * 8)
+        exit_points = min(exit_points, 8)
+
+        # 📊 Peak Signals: 7 نقطة
+        peak_points = (peak_conf / 100) * 7
+
+        # 👥 Advisor Voting (16 مستشار): 7 نقطة
+        vote_points = vote_ratio * 7
+
+        # 🐋 Smart Money (حيتان تبيع): 6 نقطة
+        whale_dump   = analysis.get('whale_dumping', False)
+        whale_points = 6 if whale_dump else (whale_tracking_score / 100) * 3
+
+        # 💥 Volume Forecast + Volume Pred: 6 نقطة
+        vol_momentum  = ai.get('volume_momentum', 40)
+        vol_pred      = sell_votes.get('volume_pred', 0)
+        volume_points = ((vol_momentum / 100) * 3) + (vol_pred * 3)
+        volume_points = min(volume_points, 6)
+
+        # 📐 Fibonacci (مقاومة): 5 نقطة
+        support_strength = ai.get('support_strength', 30)
+        fib_points       = ((100 - support_strength) / 100) * 5  # عكسي: مقاومة مو دعم
+
+        # 🎯 Trend Early Detector (اتجاه ينتهي): 4 نقطة
+        trend_birth  = ai.get('trend_birth', 30)
+        trend_points = ((100 - trend_birth) / 100) * 4  # عكسي: اتجاه ينتهي
+
+        # 📰 Crypto News: 4 نقطة
+        news_score   = analysis.get('news', {}).get('negative', 0)
+        news_points  = min((news_score / 10) * 4, 4)
+
+        # 😨 Sentiment (طمع = قمة): 4 نقطة
+        fear_greed   = analysis.get('sentiment', {}).get('fear_greed', 50)
+        sent_points  = 0
+        if fear_greed > 70:
+            sent_points = ((fear_greed - 70) / 30) * 4
+        elif sentiment_score < -1:
+            sent_points = min(abs(sentiment_score) / 5 * 4, 4)
+
+        # 🛡️ Liquidation Shield: 3 نقطة
+        liq_safety   = ai.get('liquidation_safety', 50)
+        liq_points   = ((100 - liq_safety) / 100) * 3  # عكسي: خطر عالي = بيع
+
+        # 📈 RSI Overbought: 3 نقطة
+        rsi_points = 0
+        if rsi > 70:
+            rsi_points = ((rsi - 70) / 30) * 3
+        elif rsi > 60:
+            rsi_points = ((rsi - 60) / 10) * 1
+
+        # 📉 MACD Bearish: 3 نقطة
+        macd_points = 0
+        if macd_diff < 0:
+            macd_points = (min(abs(macd_diff), 10) / 10) * 3
+
+        # 🌍 Market Intelligence: 3 نقطة
+        market_intel = analysis.get('market_intelligence', {})
+        intel_score  = market_intel.get('bearish_score', 0)
+        intel_points = (intel_score / 100) * 3
+
+        # ⚠️ Anomaly: 2 نقطة
+        anomaly_score  = analysis.get('anomaly_score', 0)
+        anomaly_points = (anomaly_score / 100) * 2
+
+        # 🔄 Adaptive Intelligence: 2 نقطة
+        hist_success   = ai.get('historical_success', 50)
+        adaptive_points = ((100 - hist_success) / 100) * 2  # عكسي
+
+        # 💧 Liquidity: 2 نقطة
+        liquidity_score  = ai.get('liquidity_score', 50)
+        liquidity_points = ((100 - liquidity_score) / 100) * 2  # عكسي
+
+        # 🔴 Macro Trend: 2 نقطة
+        macro_points = 0
+        if 'BEAR' in macro_status:
+            macro_points = 2
+        elif 'NEUTRAL' in macro_status:
+            macro_points = 1
+
+        # 📡 External APIs: 1 نقطة
+        ext_signal   = analysis.get('external_signal', {}).get('bearish', 0)
+        ext_points   = min(ext_signal, 1)
+
+        # ✅ المجموع الكلي (111 → مطبّع على 100)
+        raw_points = (
+            meta_points      # 10
+            + rtpa_points    # 10
+            + candle_points  # 9
+            + chart_points   # 9
+            + exit_points    # 8
+            + peak_points    # 7
+            + vote_points    # 7
+            + whale_points   # 6
+            + volume_points  # 6
+            + fib_points     # 5
+            + trend_points   # 4
+            + news_points    # 4
+            + sent_points    # 4
+            + liq_points     # 3
+            + rsi_points     # 3
+            + macd_points    # 3
+            + intel_points   # 3
+            + anomaly_points # 2
+            + adaptive_points# 2
+            + liquidity_points# 2
+            + macro_points   # 2
+            + ext_points     # 1
         )
-        if sell_result:
-            return sell_result
+        sell_points = min((raw_points / 111) * 100, 100)
 
-        # 11. Meta Final Say (يحكم ثانياً 🤖)
-        if meta_sell_confidence >= MIN_SELL_CONFIDENCE:
+        # ✅ حد البيع حسب حالة السوق
+        if 'BULL' in macro_status:
+            required_sell_points = 75   # ينتظر القمة الحقيقية
+        elif 'BEAR' in macro_status:
+            required_sell_points = 55   # يبيع بسرعة
+        else:
+            required_sell_points = 65   # NEUTRAL
+
+        sell_vote_pct = vote_ratio * 100
+
+        # 11. ✅ قرار البيع بنظام النقاط
+        if sell_points >= required_sell_points:
             gc.collect()
             return {
-                'action':       'SELL',
-                'reason':       f'🤖 Meta AI: {meta_sell_confidence:.1f}% sell confidence',
-                'profit':       profit_pct,
-                'sell_votes':   sell_votes,
-                'sell_confidence': meta_sell_confidence,
+                'action':     'SELL',
+                'reason':     (f'👑 Peak: {sell_points:.0f}/{required_sell_points}pts | '
+                               f'Meta:{meta_sell_confidence:.0f}% | '
+                               f'RT:{rtpa_sell_conf:.0f}% | '
+                               f'Votes:{sell_vote_count}/{total_advisors}'),
+                'profit':     profit_pct,
+                'sell_votes': sell_votes,
+                'peak_score': peak_score,
+                'sell_vote_percentage': sell_vote_pct,
                 'coin_forecast':   coin_fc_sell,
                 'market_forecast': market_fc_sell
             }
 
-        # 12. Smart Sell (backup للسوق النازل - بعد King وMeta 🧠)
+        # 12. Smart Sell (backup للسوق النازل 🧠)
         if sell_mode and sell_mode.get('mode') != 'NORMAL':
             smart_sell = self._smart_sell_check(
                 symbol, position, profit_pct, sell_mode)
