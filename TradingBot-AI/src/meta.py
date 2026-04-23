@@ -906,7 +906,7 @@ class Meta:
         except Exception as e:
             print(f"⚠️ Sell prediction error: {e}")
 
-        # 2. Stop Loss
+        # 2. Stop Loss (يبيع فوراً حتى بخسارة = حماية)
         sl_info      = self._calculate_stop_loss_features(
             position, current_price, analysis,
             risk_level, whale_tracking_score, sentiment_score)
@@ -928,13 +928,7 @@ class Meta:
                 'stop_loss_threshold': sl_threshold
             }
 
-        # 3. Smart Sell Check
-        if sell_mode and sell_mode.get('mode') != 'NORMAL':
-            smart_sell = self._smart_sell_check(
-                symbol, position, profit_pct, sell_mode)
-            if smart_sell:
-                return smart_sell
-
+        # 3. ✅ MIN PROFIT CHECK (نقلناه قبل Smart Sell)
         if profit_pct < dynamic_min_sell_profit:
             if profit_pct < -1.0:
                 reason = (f'🛡️ Stop Loss Zone: {profit_pct:.2f}% | '
@@ -944,11 +938,18 @@ class Meta:
                           f'{dynamic_min_sell_profit}%')
             return {'action': 'HOLD', 'reason': reason, 'profit': profit_pct}
 
-        # 4. Stop Loss Intelligence
+        # 4. Smart Sell Check (ما يوصل هنا إلا لو فوق MIN_PROFIT)
+        if sell_mode and sell_mode.get('mode') != 'NORMAL':
+            smart_sell = self._smart_sell_check(
+                symbol, position, profit_pct, sell_mode)
+            if smart_sell:
+                return smart_sell
+
+        # 5. Stop Loss Intelligence
         ai.update(self._gather_stop_loss_intelligence(
             symbol, analysis, volume_ratio, sl_info))
 
-        # 5. Build Features
+        # 6. Build Features
         symbol_memory = self._get_symbol_memory(symbol)
         features = self._build_meta_features(
             rsi=rsi, macd_diff=macd_diff, volume_ratio=volume_ratio,
@@ -959,26 +960,26 @@ class Meta:
             symbol_memory=symbol_memory
         )
 
-        # 6. Meta Model
+        # 7. Meta Model
         sell_prob, sell_conf, coin_fc_sell, market_fc_sell = self._run_meta_model(
             features, ai, direction='sell'
         )
         meta_sell_confidence = sell_conf
 
-        # 7. Multi-Timeframe Peak Detection
+        # 8. Multi-Timeframe Peak Detection
         sell_conf = self._apply_mtf_peak_boost(
             symbol, analysis, candles, position, ai, sell_conf)
 
-        # 8. Peak Signals
+        # 9. Peak Signals
         peak_conf, peak_reasons = self._detect_peak_signals(
             symbol, analysis, ai, profit_pct)
 
-        # 9. Advisor Voting
+        # 10. Advisor Voting
         sell_vote_count, total_advisors, sell_votes, candle_confirmed = \
             self._run_sell_advisor_voting(
                 symbol, analysis, rsi, macd_diff, volume_ratio, profit_pct)
 
-        # 10. King Decision
+        # 11. King Decision
         sell_vote_pct = (sell_vote_count / total_advisors * 100
                          if total_advisors > 0 else 0)
         peak_analysis = analysis.get('peak', {})
@@ -997,7 +998,7 @@ class Meta:
         if sell_result:
             return sell_result
 
-        # 11. Meta Final Say
+        # 12. Meta Final Say
         if meta_sell_confidence >= MIN_SELL_CONFIDENCE:
             gc.collect()
             return {
@@ -1010,7 +1011,7 @@ class Meta:
                 'market_forecast': market_fc_sell
             }
 
-        # 12. Wave Protection
+        # 13. Wave Protection
         return self._wave_protection(
             symbol, analysis, candles, position,
             ai, rsi, macd_diff, volume_ratio,
