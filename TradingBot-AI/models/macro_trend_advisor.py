@@ -17,25 +17,36 @@ class MacroTrendAdvisor:
 
     MACRO_SYMBOLS = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']
 
-    CACHE_DURATION            = 300
-    PREDICTION_CACHE_DURATION = 300
+    CACHE_DURATION      = 300  # 5 دقائق - حالة السوق
+    PREDICTION_CACHE_1H = 300  # 5 دقائق - بيانات 1h
+    PREDICTION_CACHE_4H = 300  # 5 دقائق - بيانات 4h
 
     RSI_PERIOD        = 14
     MOMENTUM_LOOKBACK = 10
 
     def __init__(self, exchange=None):
-        self.exchange              = exchange
-        self._last_status          : str   = '⚪ NEUTRAL'
-        self._last_check_time      : float = 0.0
+        self.exchange = exchange
+
+        # حالة السوق
+        self._last_status     : str   = '⚪ NEUTRAL'
+        self._last_check_time : float = 0.0
+
+        # كاش predict_market المجمّع
         self._last_prediction      : dict  = {}
         self._last_prediction_time : float = 0.0
+
+        # كاش منفصل لكل timeframe
+        self._last_1h_prediction      : dict  = {}
+        self._last_1h_prediction_time : float = 0.0
+        self._last_4h_prediction      : dict  = {}
+        self._last_4h_prediction_time : float = 0.0
 
     # ─────────────────────────────────────────────
     # Main Interface
     # ─────────────────────────────────────────────
 
     def get_macro_status(self) -> str:
-        """الحالة الحقيقية من إشارات 1h + 4h الفعلية"""
+        """الحالة الحقيقية من إشارات 1h + 4h الفعلية - تتحدث كل 5 دقائق"""
         if not self.exchange:
             return '⚪ NEUTRAL'
 
@@ -53,16 +64,11 @@ class MacroTrendAdvisor:
             total_bull = short_bull  + medium_bull
             total_bear = short_bear  + medium_bear
 
-            if   total_bull > total_bear * 1.5:
-                final_status = '🟢 BULL_MARKET'
-            elif total_bear > total_bull * 1.5:
-                final_status = '🔴 BEAR_MARKET'
-            elif total_bull > total_bear * 1.2:
-                final_status = '🟢 MILD_BULL'
-            elif total_bear > total_bull * 1.2:
-                final_status = '🔴 MILD_BEAR'
-            else:
-                final_status = '⚪ SIDEWAYS'
+            if   total_bull > total_bear * 1.5: final_status = '🟢 BULL_MARKET'
+            elif total_bear > total_bull * 1.5: final_status = '🔴 BEAR_MARKET'
+            elif total_bull > total_bear * 1.2: final_status = '🟢 MILD_BULL'
+            elif total_bear > total_bull * 1.2: final_status = '🔴 MILD_BEAR'
+            else:                               final_status = '⚪ SIDEWAYS'
 
             short_p  = pred.get('short',  {}).get('prediction', '?')
             medium_p = pred.get('medium', {}).get('prediction', '?')
@@ -105,8 +111,11 @@ class MacroTrendAdvisor:
         return 'BULL' in self.get_macro_status()
 
     def invalidate_cache(self) -> None:
-        self._last_check_time      = 0.0
-        self._last_prediction_time = 0.0
+        """إعادة ضبط كل الكاش"""
+        self._last_check_time         = 0.0
+        self._last_prediction_time    = 0.0
+        self._last_1h_prediction_time = 0.0
+        self._last_4h_prediction_time = 0.0
 
     # ─────────────────────────────────────────────
     # Indicators
@@ -126,14 +135,15 @@ class MacroTrendAdvisor:
         return ((current_price - past_price) / past_price) * 100
 
     # ═════════════════════════════════════════════
-    # 🔮 Prediction System - Next 1h + 4h
+    # 🔮 Prediction System
     # ═════════════════════════════════════════════
 
     def predict_market(self) -> dict:
+        """تتحدث كل 5 دقائق"""
         if not self.exchange:
             return self._empty_prediction()
 
-        if time.time() - self._last_prediction_time < self.PREDICTION_CACHE_DURATION:
+        if time.time() - self._last_prediction_time < self.CACHE_DURATION:
             return self._last_prediction
 
         try:
@@ -145,8 +155,6 @@ class MacroTrendAdvisor:
                 'short'   : short,
                 'medium'  : medium,
                 'combined': combined,
-                # ✅ sell_mode و buy_mode محذوفان
-                # المرجع الوحيد هو config.get_prediction_modes()
             }
 
             self._last_prediction      = result
@@ -158,8 +166,22 @@ class MacroTrendAdvisor:
             return self._empty_prediction()
 
     def _predict_timeframe(self, timeframe: str, limit: int) -> dict:
-        predictions = []
+        """كل timeframe له كاش مستقل - كلهم 5 دقائق"""
+        if timeframe == '1h':
+            cache_dur = self.PREDICTION_CACHE_1H
+            last_time = self._last_1h_prediction_time
+            last_pred = self._last_1h_prediction
+        else:
+            cache_dur = self.PREDICTION_CACHE_4H
+            last_time = self._last_4h_prediction_time
+            last_pred = self._last_4h_prediction
 
+        # رجع الكاش لو ما انتهى
+        if time.time() - last_time < cache_dur and last_pred:
+            return last_pred
+
+        # جلب بيانات جديدة من API
+        predictions = []
         for symbol in self.MACRO_SYMBOLS:
             try:
                 result = self._predict_symbol_direction(symbol, timeframe, limit)
@@ -171,7 +193,17 @@ class MacroTrendAdvisor:
         if not predictions:
             return {'prediction': 'NEUTRAL', 'confidence': 50, 'reason': '⚪ No signals'}
 
-        return self._combine_predictions(predictions, timeframe)
+        result = self._combine_predictions(predictions, timeframe)
+
+        # حفظ في الكاش الصحيح
+        if timeframe == '1h':
+            self._last_1h_prediction      = result
+            self._last_1h_prediction_time = time.time()
+        else:
+            self._last_4h_prediction      = result
+            self._last_4h_prediction_time = time.time()
+
+        return result
 
     def _predict_symbol_direction(self, symbol: str, timeframe: str, limit: int) -> Optional[dict]:
         ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
@@ -226,12 +258,12 @@ class MacroTrendAdvisor:
         else:              bear_signals += 1
 
         # 6. Reversal candle (weight 2)
-        c_last        = float(df['c'].iloc[-1])
-        o_last        = float(df['o'].iloc[-1])
-        h_last        = float(df['h'].iloc[-1])
-        l_last        = float(df['l'].iloc[-1])
-        candle_body   = abs(c_last - o_last)
-        candle_range  = h_last - l_last
+        c_last       = float(df['c'].iloc[-1])
+        o_last       = float(df['o'].iloc[-1])
+        h_last       = float(df['h'].iloc[-1])
+        l_last       = float(df['l'].iloc[-1])
+        candle_body  = abs(c_last - o_last)
+        candle_range = h_last - l_last
 
         if candle_range > 0:
             body_ratio   = candle_body / candle_range
@@ -259,16 +291,11 @@ class MacroTrendAdvisor:
         bear_pct = total_bear / total * 100
         tf_label = 'Next 1h' if timeframe == '1h' else 'Next 4h'
 
-        if   bull_pct >= 75:
-            prediction, confidence, reason = 'STRONG_BULLISH', bull_pct, f'🟢🟢 Strong Bullish - {tf_label}'
-        elif bull_pct >= 60:
-            prediction, confidence, reason = 'BULLISH',        bull_pct, f'🟢 Bullish - {tf_label}'
-        elif bear_pct >= 75:
-            prediction, confidence, reason = 'STRONG_BEARISH', bear_pct, f'🔴🔴 Strong Bearish - {tf_label}'
-        elif bear_pct >= 60:
-            prediction, confidence, reason = 'BEARISH',        bear_pct, f'🔴 Bearish - {tf_label}'
-        else:
-            prediction, confidence, reason = 'NEUTRAL',        50,       f'⚪ Neutral - {tf_label}'
+        if   bull_pct >= 75: prediction, confidence, reason = 'STRONG_BULLISH', bull_pct, f'🟢🟢 Strong Bullish - {tf_label}'
+        elif bull_pct >= 60: prediction, confidence, reason = 'BULLISH',        bull_pct, f'🟢 Bullish - {tf_label}'
+        elif bear_pct >= 75: prediction, confidence, reason = 'STRONG_BEARISH', bear_pct, f'🔴🔴 Strong Bearish - {tf_label}'
+        elif bear_pct >= 60: prediction, confidence, reason = 'BEARISH',        bear_pct, f'🔴 Bearish - {tf_label}'
+        else:                prediction, confidence, reason = 'NEUTRAL',        50,       f'⚪ Neutral - {tf_label}'
 
         details = ', '.join(
             f"{p['symbol'].split('/')[0]}(🟢{p['bull']}/🔴{p['bear']})"
@@ -293,41 +320,16 @@ class MacroTrendAdvisor:
         is_medium_bull = 'BULL' in medium_pred
         is_medium_bear = 'BEAR' in medium_pred
 
-        if is_short_bull and is_medium_bull:
-            return {
-                'direction' : 'BULLISH',
-                'strength'  : 'STRONG',
-                'confidence': max(short['confidence'], medium['confidence']),
-                'reason'    : '🟢🟢 Confirmed Bullish (1h + 4h)',
-            }
+        if   is_short_bull and is_medium_bull:
+            return {'direction': 'BULLISH', 'strength': 'STRONG',   'confidence': max(short['confidence'], medium['confidence']), 'reason': '🟢🟢 Confirmed Bullish (1h + 4h)'}
         elif is_short_bear and is_medium_bear:
-            return {
-                'direction' : 'BEARISH',
-                'strength'  : 'STRONG',
-                'confidence': max(short['confidence'], medium['confidence']),
-                'reason'    : '🔴🔴 Confirmed Bearish (1h + 4h)',
-            }
+            return {'direction': 'BEARISH', 'strength': 'STRONG',   'confidence': max(short['confidence'], medium['confidence']), 'reason': '🔴🔴 Confirmed Bearish (1h + 4h)'}
         elif is_short_bull and is_medium_bear:
-            return {
-                'direction' : 'MIXED',
-                'strength'  : 'CAUTION',
-                'confidence': 50,
-                'reason'    : '⚠️ Short Bullish but Medium Bearish (Caution)',
-            }
+            return {'direction': 'MIXED',   'strength': 'CAUTION',  'confidence': 50,                                             'reason': '⚠️ Short Bullish but Medium Bearish (Caution)'}
         elif is_short_bear and is_medium_bull:
-            return {
-                'direction' : 'MIXED',
-                'strength'  : 'RECOVERY',
-                'confidence': 55,
-                'reason'    : '⏳ Temp Dip then Recovery (Wait)',
-            }
+            return {'direction': 'MIXED',   'strength': 'RECOVERY', 'confidence': 55,                                             'reason': '⏳ Temp Dip then Recovery (Wait)'}
         else:
-            return {
-                'direction' : 'NEUTRAL',
-                'strength'  : 'NEUTRAL',
-                'confidence': 50,
-                'reason'    : '⚪ Market Unclear',
-            }
+            return {'direction': 'NEUTRAL', 'strength': 'NEUTRAL',  'confidence': 50,                                             'reason': '⚪ Market Unclear'}
 
     # ─────────────────────────────────────────────
     # Helpers
@@ -337,11 +339,5 @@ class MacroTrendAdvisor:
         return {
             'short'   : {'prediction': 'NEUTRAL', 'confidence': 50, 'reason': '⚪ No data'},
             'medium'  : {'prediction': 'NEUTRAL', 'confidence': 50, 'reason': '⚪ No data'},
-            'combined': {
-                'direction' : 'NEUTRAL',
-                'strength'  : 'NEUTRAL',
-                'confidence': 50,
-                'reason'    : '⚪ No data',
-            },
-            # ✅ sell_mode و buy_mode محذوفان - config.py هو المرجع الوحيد
+            'combined': {'direction': 'NEUTRAL', 'strength': 'NEUTRAL', 'confidence': 50, 'reason': '⚪ No data'},
         }
