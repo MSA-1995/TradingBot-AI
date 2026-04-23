@@ -903,6 +903,10 @@ class Meta:
 
                 _, sell_mode = get_prediction_modes(current_status, smart_direction)
                 dynamic_min_sell_profit = sell_mode.get('min_sell_profit', MIN_SELL_PROFIT)
+
+                # ✅ الحد الأدنى ما ينزل تحت MIN_SELL_PROFIT أبداً
+                dynamic_min_sell_profit = max(dynamic_min_sell_profit, MIN_SELL_PROFIT)
+
         except Exception as e:
             print(f"⚠️ Sell prediction error: {e}")
 
