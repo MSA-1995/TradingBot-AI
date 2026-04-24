@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from colorama import Fore, Style
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from utils import get_active_positions_count, get_total_invested, should_send_report, format_price
+from utils import get_active_positions_count, get_total_invested, should_send_report, format_price, save_open_positions
 from notifications import send_positions_report
 from config import MAX_POSITIONS, LOOP_SLEEP, REPORT_INTERVAL, TOP_COINS_TO_TRADE, MAX_CAPITAL, BATCH_SIZE, MAX_WORKERS, META_DISPLAY_THRESHOLD
 
@@ -195,8 +195,14 @@ def run_main_loop(exchange, ctx):
 
                     with symbols_data_lock:
                         if symbol in SYMBOLS_DATA and SYMBOLS_DATA[symbol].get('position'):
-                            real_sl = result.get('stop_loss_threshold') or SYMBOLS_DATA[symbol]['position'].get('stop_loss_threshold', 3.0)
-                            SYMBOLS_DATA[symbol]['position']['stop_loss_threshold'] = real_sl
+                            old_sl = SYMBOLS_DATA[symbol]['position'].get('stop_loss_threshold', 0)
+                            new_sl = result.get('stop_loss_threshold') or old_sl or 3.0
+                            SYMBOLS_DATA[symbol]['position']['stop_loss_threshold'] = new_sl
+                            if abs(new_sl - old_sl) > 0.01:
+                                try:
+                                    save_open_positions(storage, SYMBOLS_DATA, symbols_data_lock)
+                                except:
+                                    pass
 
                     if profit < 0:
                         line_color = Fore.RED
