@@ -146,26 +146,6 @@ class MemoryCompressor:
             print(f"⚠️ compress_partial error: {e}")
             return data
 
-        try:
-            data_str = str(data)
-            if len(data_str) <= threshold:
-                return data   # لا داعي للضغط
-
-            compressed = zlib.compress(
-                data_str.encode('utf-8'),
-                level=MemoryCompressor.COMPRESS_LEVEL_DEFAULT
-            )
-            return {
-                MemoryCompressor.KEY_PARTIAL:         compressed,
-                MemoryCompressor.KEY_ORIGINAL_SIZE:   len(data_str),
-                MemoryCompressor.KEY_COMPRESSED_SIZE: len(compressed),
-                MemoryCompressor.KEY_RATIO:           len(compressed) / len(data_str)
-            }
-
-        except Exception as e:
-            print(f"⚠️ compress_partial error: {e}")
-            return data
-
     @staticmethod
     def decompress_partial(data: Any) -> Any:
         """يفك الضغط الجزئي"""
