@@ -11,6 +11,17 @@ from config_encrypted import get_discord_webhook, get_critical_webhook
 DISCORD_WEBHOOK = get_discord_webhook()
 CRITICAL_WEBHOOK = get_critical_webhook()
 
+def _fmt_price(price):
+    """Format price smartly based on value"""
+    if price >= 100:
+        return f"${price:,.2f}"
+    elif price >= 1:
+        return f"${price:.4f}"
+    elif price >= 0.01:
+        return f"${price:.4f}"
+    else:
+        return f"${price:.6f}"
+
 def send_discord_embed(title, fields, color='blue', thumbnail_url=None, message_id=None, webhook_url=None):
     """Send or edit an embed message on Discord."""
     target_webhook = webhook_url if webhook_url else DISCORD_WEBHOOK
@@ -116,7 +127,7 @@ def send_buy_notification(symbol, amount, price, value, confidence, tp_target=No
     fields = [
         {"name": "Pair",        "value": symbol,                  "inline": True},
         {"name": "Quantity",    "value": amount_format,            "inline": True},
-        {"name": "Price",       "value": f"${price:,.0f}",         "inline": True},
+        {"name": "Price",       "value": _fmt_price(price),         "inline": True},
         {"name": "Total Value", "value": f"${value:.2f}",          "inline": True},
         {"name": "Confidence",  "value": f"{confidence:.0f}/100",  "inline": True}
     ]
@@ -177,7 +188,7 @@ def send_sell_notification(symbol, amount, price, value, profit_percent, reason,
     fields = [
         {"name": "Pair",        "value": symbol,                                "inline": True},
         {"name": "Quantity",    "value": amount_format,                          "inline": True},
-        {"name": "Price",       "value": f"${price:,.0f}",                      "inline": True},
+        {"name": "Price",       "value": _fmt_price(price),                      "inline": True},
         {"name": "Total Value", "value": f"${value:.2f}",                       "inline": True},
         {"name": "Profit",      "value": f"{profit_sign}{profit_percent:.1f}%", "inline": True},
         {"name": "Reason",      "value": reason,                                "inline": False}
