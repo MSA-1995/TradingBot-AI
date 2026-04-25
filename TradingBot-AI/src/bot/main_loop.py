@@ -127,33 +127,6 @@ def run_main_loop(exchange, ctx):
             print(f"✦•······················•✦•······················•✦")
             print()
 
-            # ========== SAVE BOT STATUS TO DB ==========
-            try:
-                import json as _json
-                _bot_status = {
-                    'balance': available,
-                    'invested': invested,
-                    'active': active_count,
-                    'max_positions': MAX_POSITIONS,
-                    'macro_status': macro_status,
-                    'locked_profit': locked_profit,
-                    'tradable': tradable_balance,
-                    'time': current_time,
-                    '1h_icon': '⚪',
-                    '4h_icon': '⚪',
-                }
-                try:
-                    _ma = meta.advisor_manager.get('MacroTrendAdvisor') if meta.advisor_manager else None
-                    if _ma:
-                        _info = _ma.get_display_info()
-                        _bot_status['1h_icon'] = _info.get('1h_icon', '⚪')
-                        _bot_status['4h_icon'] = _info.get('4h_icon', '⚪')
-                except:
-                    pass
-                ctx['storage'].save_setting('bot_status', _json.dumps(_bot_status))
-            except:
-                pass
-
             # ========== PARALLEL PROCESSING ==========
             current_symbols = get_dynamic_symbols_fn()
             results = []
@@ -470,6 +443,36 @@ def run_main_loop(exchange, ctx):
                             pass
                     except Exception as e:
                         print(f"⚠️ Pattern stats error: {e}")
+
+            # ========== SAVE BOT STATUS TO DB ==========
+            try:
+                import json as _json
+                _bot_status = {
+                    'balance': available,
+                    'invested': invested,
+                    'active': active_count,
+                    'max_positions': MAX_POSITIONS,
+                    'macro_status': macro_status,
+                    'locked_profit': locked_profit,
+                    'tradable': tradable_balance,
+                    'time': current_time,
+                    '1h_icon': '⚪',
+                    '4h_icon': '⚪',
+                }
+                try:
+                    _ma = meta.advisor_manager.get('MacroTrendAdvisor') if meta.advisor_manager else None
+                    if _ma:
+                        _info = _ma.get_display_info()
+                        _bot_status['1h_icon'] = _info.get('1h_icon', '⚪')
+                        _bot_status['4h_icon'] = _info.get('4h_icon', '⚪')
+                except:
+                    pass
+                threading.Thread(
+                    target=lambda: ctx['storage'].save_setting('bot_status', _json.dumps(_bot_status)),
+                    daemon=True
+                ).start()
+            except:
+                pass
 
             # ========== CLEANUP ==========
             gc.collect()
