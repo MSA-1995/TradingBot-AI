@@ -93,6 +93,21 @@ class SellMixin:
                     smart = pd_dir
 
                 _, sell_mode = get_prediction_modes(macro_status, smart)
+
+                # Save predictions for Meta (1h + 4h + current)
+                ai['macro_prediction'] = {
+                    'current': macro_status,
+                    '1h': prediction.get('short', {}).get('prediction', 'NEUTRAL'),
+                    '4h': prediction.get('medium', {}).get('prediction', 'NEUTRAL'),
+                    '1h_confidence': prediction.get('short', {}).get('confidence', 50),
+                    '4h_confidence': prediction.get('medium', {}).get('confidence', 50),
+                    'direction': pd_dir,
+                    'strength': pd_str,
+                }
+                ai['1h_bullish'] = 'BULL' in str(prediction.get('short', {}).get('prediction', ''))
+                ai['4h_bullish'] = 'BULL' in str(prediction.get('medium', {}).get('prediction', ''))
+                ai['1h_bearish'] = 'BEAR' in str(prediction.get('short', {}).get('prediction', ''))
+                ai['4h_bearish'] = 'BEAR' in str(prediction.get('medium', {}).get('prediction', ''))
                 dyn_min = max(
                     sell_mode.get('min_sell_profit', MIN_SELL_PROFIT),
                     MIN_SELL_PROFIT)
@@ -108,27 +123,59 @@ class SellMixin:
             sell_mode = SELL_MODE_CAUTIOUS
 
 
+
         # ══════════════════════════════════════
-        # MARKET INTELLIGENCE for Sell (NEW)
+        # ══════════════════════════════════════
+        # MARKET INTELLIGENCE for Sell (SMART)
         # ══════════════════════════════════════
         _intel = analysis.get('market_intelligence', {})
-        _regime = _intel.get('regime', '')
         _bullish = _intel.get('bullish_score', 50)
+        _adx = _intel.get('adx', 20)
+        _reversal = analysis.get('reversal', {})
+        _reversal_conf = _reversal.get('confidence', 0)
+        _reversal_signals = _reversal.get('reversal_signals', 0)
         _flash = analysis.get('flash_crash_protection', {})
-        _flash_triggered = _flash.get('triggered', False)
+        _flash_risk = _flash.get('risk_score', 0) if isinstance(_flash.get('risk_score'), (int, float)) else 0
+        _1h_bull = ai.get('1h_bullish', False)
+        _4h_bull = ai.get('4h_bullish', False)
+        _1h_bear = ai.get('1h_bearish', False)
+        _4h_bear = ai.get('4h_bearish', False)
 
-        # Tighten stop loss in bad market conditions
-        _market_mult = 1.0
-        if _regime == 'STRONG_DOWNTREND':
-            _market_mult = 0.7
-        elif _regime == 'HIGH_VOLATILITY':
-            _market_mult = 0.85
-        elif _bullish < 25:
-            _market_mult = 0.8
-        if _flash_triggered:
-            _market_mult = min(_market_mult, 0.6)
+        # Smart multiplier from ALL indicators
+        _factors = []
 
-        # ══════════════════════════════════════
+        # 1. Market regime (bullish_score 0-100)
+        _factors.append(_bullish / 100.0)  # 0.0 to 1.0
+
+        # 2. Reversal signals (if coin shows bounce signs -> widen)
+        if _reversal_conf > 0:
+            _factors.append(_reversal_conf / 100.0)  # 0.0 to 1.0
+
+        # 3. Future prediction (1h + 4h)
+        if _1h_bull and _4h_bull:
+            _factors.append(1.0)  # future good -> widen
+        elif _1h_bull:
+            _factors.append(0.7)
+        elif _1h_bear and _4h_bear:
+            _factors.append(0.0)  # future bad -> tighten
+        elif _1h_bear:
+            _factors.append(0.3)
+        else:
+            _factors.append(0.5)  # neutral
+
+        # 4. Flash crash risk
+        if _flash_risk > 0:
+            _factors.append(max(0, (100 - _flash_risk) / 100.0))
+
+        # 5. RSI (oversold = might bounce -> widen)
+        _rsi = analysis.get('rsi', 50)
+        _factors.append(_rsi / 100.0)
+
+        # Average all factors -> multiplier
+        _avg = sum(_factors) / len(_factors) if _factors else 0.5
+        # Scale: avg=0 -> mult=0.4, avg=0.5 -> mult=1.0, avg=1.0 -> mult=1.6
+        _market_mult = _avg * 1.6 + 0.4 * (1.0 - _avg)
+
         # 2. Stop Loss - Instant
         # ══════════════════════════════════════
         sl   = self._calculate_stop_loss_features(
@@ -237,8 +284,30 @@ class SellMixin:
         # Anomaly (2)
         anom_p = (analysis.get('anomaly_score', 0) / 100) * 2
 
+
+        # Prediction Points (1h + 4h forecast)
+        _pred = ai.get('macro_prediction', {})
+        _1h_bull = ai.get('1h_bullish', False)
+        _4h_bull = ai.get('4h_bullish', False)
+        _1h_bear = ai.get('1h_bearish', False)
+        _4h_bear = ai.get('4h_bearish', False)
+        _1h_conf = _pred.get('1h_confidence', 50) / 100.0
+        _4h_conf = _pred.get('4h_confidence', 50) / 100.0
+
+        # Sell boost: future looks bad = sell faster
+        # Sell penalty: future looks good = hold more
+        pred_p = 0
+        if _1h_bear and _4h_bear:
+            pred_p = (_1h_conf + _4h_conf) * 2.5  # max ~5 (sell faster)
+        elif _1h_bear:
+            pred_p = _1h_conf * 2.0
+        elif _1h_bull and _4h_bull:
+            pred_p = -(_1h_conf + _4h_conf) * 2.5  # max ~-5 (hold more)
+        elif _1h_bull:
+            pred_p = -_1h_conf * 2.0
+
         support_total = min(
-            rsi_p + fg_p + macd_p + macro_p + news_p + anom_p, 20)
+            rsi_p + fg_p + macd_p + macro_p + news_p + anom_p + pred_p, 25)
 
         # ══════════════════════════════════════
         # Total Score
