@@ -77,7 +77,7 @@ class DeepLearningClientV2:
                 'keepalives_interval': 10,
                 'keepalives_count'   : 5,
             }
-            self._pool = ThreadedConnectionPool(3, 12, **self._db_params)
+            self._pool = ThreadedConnectionPool(1, 4, **self._db_params)
             conn       = self._pool.getconn()
             self.conn  = conn
             self._pool.putconn(conn)
