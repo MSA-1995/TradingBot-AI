@@ -71,7 +71,7 @@ class DashboardDB:
                     try:
                         extra = json.loads(pos['data']) if isinstance(pos['data'], str) else pos['data']
                         pos['buy_confidence'] = extra.get('buy_confidence', 0)
-                        pos['stop_loss_threshold'] = extra.get('stop_loss_threshold', 0)
+                        pos['stop_loss_threshold'] = extra.get('stop_loss_threshold') or 0
                     except:
                         pass
                 positions.append(pos)
