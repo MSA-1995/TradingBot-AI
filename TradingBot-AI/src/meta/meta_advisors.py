@@ -97,7 +97,7 @@ class AdvisorsMixin:
                     volume_ratio=analysis_data.get('volume_ratio', 1.0),
                     symbol=symbol
                 )
-                votes['fibonacci'] = boost * 2 if is_support else 30
+                votes['fibonacci'] = boost * 2 if is_support else 10
         except Exception as e:
             print(f"⚠️ fibonacci buy error: {e}")
             votes['fibonacci'] = 0
@@ -124,7 +124,7 @@ class AdvisorsMixin:
                 brk  = ve.detect_volume_breakout(symbol, vols, pred)
                 votes['volume_forecast'] = (
                     brk['probability'] if brk.get('breakout_imminent')
-                    else 40)
+                    else 15)
         except Exception as e:
             print(f"⚠️ volume_forecast buy error: {e}")
             votes['volume_forecast'] = 0
@@ -333,7 +333,7 @@ class AdvisorsMixin:
                     brk  = ve.detect_volume_breakout(symbol, vols, pred)
                     ai['volume_momentum'] = (
                         brk['probability']
-                        if brk.get('breakout_imminent') else 40)
+                        if brk.get('breakout_imminent') else 15)
         except Exception as e:
             logger.warning(f"VolumeForecast error: {e}")
 
@@ -372,7 +372,7 @@ class AdvisorsMixin:
                     volume_ratio=analysis_data.get('volume_ratio', 1.0),
                     symbol=symbol
                 )
-                ai['support_strength'] = boost * 2 if is_sup else 30
+                ai['support_strength'] = boost * 2 if is_sup else 10
         except Exception as e:
             logger.warning(f"Fibonacci error: {e}")
 
