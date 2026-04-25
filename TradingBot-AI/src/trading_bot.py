@@ -312,6 +312,9 @@ def analyze_single_symbol(
                     SYMBOLS_DATA[symbol]['position']['highest_price'] = max(
                         current_price, position.get('highest_price', current_price)
                     )
+                    threshold = decision.get('stop_loss_threshold')
+                    if threshold is not None and threshold > 0:
+                        SYMBOLS_DATA[symbol]['position']['stop_loss_threshold'] = threshold
 
                 return {
                     'symbol':          symbol,
