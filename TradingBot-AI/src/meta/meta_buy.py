@@ -64,6 +64,21 @@ class BuyMixin:
 
                 buy_mode, _ = get_prediction_modes(macro_status, smart)
 
+                # Save predictions for Meta (1h + 4h + current)
+                ai['macro_prediction'] = {
+                    'current': macro_status,
+                    '1h': prediction.get('short', {}).get('prediction', 'NEUTRAL'),
+                    '4h': prediction.get('medium', {}).get('prediction', 'NEUTRAL'),
+                    '1h_confidence': prediction.get('short', {}).get('confidence', 50),
+                    '4h_confidence': prediction.get('medium', {}).get('confidence', 50),
+                    'direction': p_direction,
+                    'strength': p_strength,
+                }
+                ai['1h_bullish'] = 'BULL' in str(prediction.get('short', {}).get('prediction', ''))
+                ai['4h_bullish'] = 'BULL' in str(prediction.get('medium', {}).get('prediction', ''))
+                ai['1h_bearish'] = 'BEAR' in str(prediction.get('short', {}).get('prediction', ''))
+                ai['4h_bearish'] = 'BEAR' in str(prediction.get('medium', {}).get('prediction', ''))
+
         except Exception as e:
             logger.warning(f"MacroTrend error: {e}")
 
@@ -185,9 +200,31 @@ class BuyMixin:
                    else 0.2 if ext_s >= 50
                    else 0.0)
 
+
+        # Prediction Points (1h + 4h forecast)
+        _pred = ai.get('macro_prediction', {})
+        _1h_bull = ai.get('1h_bullish', False)
+        _4h_bull = ai.get('4h_bullish', False)
+        _1h_bear = ai.get('1h_bearish', False)
+        _4h_bear = ai.get('4h_bearish', False)
+        _1h_conf = _pred.get('1h_confidence', 50) / 100.0
+        _4h_conf = _pred.get('4h_confidence', 50) / 100.0
+
+        # Buy boost: future looks good = more points
+        # Buy penalty: future looks bad = less points
+        pred_p = 0
+        if _1h_bull and _4h_bull:
+            pred_p = (_1h_conf + _4h_conf) * 2.5  # max ~5
+        elif _1h_bull:
+            pred_p = _1h_conf * 2.0  # max ~2
+        elif _1h_bear and _4h_bear:
+            pred_p = -(_1h_conf + _4h_conf) * 2.5  # max ~-5
+        elif _1h_bear:
+            pred_p = -_1h_conf * 2.0  # max ~-2
+
         support_total = min(
             rsi_macd_p + fg_p + news_p + vr_p
-            + intel_p + safe_p + ext_p, 20)
+            + intel_p + safe_p + ext_p + pred_p, 25)
 
         # ══════════════════════════════════════
         # Total Score
