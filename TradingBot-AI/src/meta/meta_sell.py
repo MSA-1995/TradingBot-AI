@@ -129,7 +129,7 @@ class SellMixin:
                 reason = (f'🛡️ Stop Loss Zone: {profit_pct:.2f}% | SL Trigger: -{slt:.2f}%'
                           if profit_pct < -1.0
                           else f'⏳ Waiting: {profit_pct:.2f}% < {dyn_min:.1f}%')
-                return {'action':'HOLD','reason':reason,'profit':profit_pct}
+                return {'action':'HOLD','reason':reason,'profit':profit_pct,'stop_loss_threshold':slt}
 
         # ══════════════════════════════════════
         # Support Inputs
