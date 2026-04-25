@@ -166,8 +166,8 @@ class SellMixin:
 
         candle_p = (core_votes.get('candle_expert',   0) / 100) * 8
         chart_p  = (core_votes.get('chart_cnn',       0) / 100) * 8
-        rtpa_p   = (core_votes.get('realtime_pa',     0) / 100) * 6
-        mtf_p    = (core_votes.get('multitimeframe',  0) / 100) * 6
+        rtpa_p   = (core_votes.get('realtime_pa',     0) / 100) * 8
+        mtf_p    = (core_votes.get('multitimeframe',  0) / 100) * 4
         trend_p  = (core_votes.get('trend_detector',  0) / 100) * 5
         whale_p  = (core_votes.get('smart_money',     0) / 100) * 5
         vol_p    = (core_votes.get('volume_forecast', 0) / 100) * 2
