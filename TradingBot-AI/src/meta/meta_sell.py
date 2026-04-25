@@ -107,6 +107,27 @@ class SellMixin:
             from config import SELL_MODE_CAUTIOUS
             sell_mode = SELL_MODE_CAUTIOUS
 
+
+        # ══════════════════════════════════════
+        # MARKET INTELLIGENCE for Sell (NEW)
+        # ══════════════════════════════════════
+        _intel = analysis.get('market_intelligence', {})
+        _regime = _intel.get('regime', '')
+        _bullish = _intel.get('bullish_score', 50)
+        _flash = analysis.get('flash_crash_protection', {})
+        _flash_triggered = _flash.get('triggered', False)
+
+        # Tighten stop loss in bad market conditions
+        _market_mult = 1.0
+        if _regime == 'STRONG_DOWNTREND':
+            _market_mult = 0.7
+        elif _regime == 'HIGH_VOLATILITY':
+            _market_mult = 0.85
+        elif _bullish < 25:
+            _market_mult = 0.8
+        if _flash_triggered:
+            _market_mult = min(_market_mult, 0.6)
+
         # ══════════════════════════════════════
         # 2. Stop Loss - Instant
         # ══════════════════════════════════════
@@ -116,6 +137,7 @@ class SellMixin:
         slt  = sl.get('threshold',      0)
         if sell_mode:
             slt *= sell_mode.get('stop_loss_mult', 1.0)
+            slt *= _market_mult  # Market regime adjustment
         if drop >= slt:
             gc.collect()
             return {
