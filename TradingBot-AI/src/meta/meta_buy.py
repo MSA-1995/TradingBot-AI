@@ -112,8 +112,8 @@ class BuyMixin:
 
         candle_points  = (core_votes.get('candle_expert',  0) / 100) * 8
         chart_points   = (core_votes.get('chart_cnn',      0) / 100) * 8
-        rtpa_points    = (core_votes.get('realtime_pa',    0) / 100) * 6
-        mtf_points     = (core_votes.get('multitimeframe', 0) / 100) * 6
+        rtpa_points    = (core_votes.get('realtime_pa',    0) / 100) * 8
+        mtf_points     = (core_votes.get('multitimeframe', 0) / 100) * 4
         fib_points     = (core_votes.get('fibonacci',      0) / 100) * 5
         whale_points   = (core_votes.get('smart_money',    0) / 100) * 5
         volume_points  = (core_votes.get('volume_forecast',0) / 100) * 2
