@@ -195,7 +195,7 @@ def run_main_loop(exchange, ctx):
 
                     with symbols_data_lock:
                         if symbol in SYMBOLS_DATA and SYMBOLS_DATA[symbol].get('position'):
-                            old_sl = SYMBOLS_DATA[symbol]['position'].get('stop_loss_threshold', 0)
+                            old_sl = SYMBOLS_DATA[symbol]['position'].get('stop_loss_threshold') or 0
                             new_sl = result.get('stop_loss_threshold') or old_sl or 3.0
                             SYMBOLS_DATA[symbol]['position']['stop_loss_threshold'] = new_sl
                             if abs(new_sl - old_sl) > 0.01:
