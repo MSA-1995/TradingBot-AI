@@ -36,7 +36,7 @@ class DatabaseStorage:
             'keepalives_count':    10
         }
         
-        self.pool                 = ThreadedConnectionPool(20, 20, **self._db_params)
+        self.pool                 = ThreadedConnectionPool(6, 10, **self._db_params)
         self.db_access_semaphore  = threading.Semaphore(self.pool.maxconn)
         self.json                 = json_module
         self.RealDictCursor       = RealDictCursor
