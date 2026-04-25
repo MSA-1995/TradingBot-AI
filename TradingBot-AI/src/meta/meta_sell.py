@@ -99,6 +99,14 @@ class SellMixin:
         except Exception as e:
             logger.warning(f"Sell macro error: {e}")
 
+
+        # ══════════════════════════════════════
+        # ENSURE sell_mode is ALWAYS set
+        # ══════════════════════════════════════
+        if sell_mode is None:
+            from config import SELL_MODE_CAUTIOUS
+            sell_mode = SELL_MODE_CAUTIOUS
+
         # ══════════════════════════════════════
         # 2. Stop Loss - Instant
         # ══════════════════════════════════════
