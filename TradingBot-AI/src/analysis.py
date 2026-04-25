@@ -1096,12 +1096,50 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
         analysis_dict['sentiment'] = {'fear_greed': fear_greed_value}
 
         # ─────────────────────────────────────────────
-        # Fix 3: market_intelligence
+        # Fix 3: market_intelligence (UPGRADED - uses MarketRegimeDetector)
         # ─────────────────────────────────────────────
-        analysis_dict['market_intelligence'] = {
-            'bullish_score': max(0, min(100, 50 + btc_change_1h * 10)),
-            'bearish_score': max(0, min(100, 50 - btc_change_1h * 10)),
-        }
+        try:
+            _regime = market_regime if isinstance(market_regime, dict) else {}
+            _regime_name = _regime.get('regime', 'RANGING')
+            _trend = _regime.get('trend_strength', 'neutral')
+            _adx = _regime.get('adx', 20)
+            _advice = _regime.get('trading_advice', {}) if isinstance(_regime.get('trading_advice'), dict) else {}
+
+            # Regime base score
+            _regime_scores = {
+                'STRONG_UPTREND': 85, 'STRONG_DOWNTREND': 15,
+                'HIGH_VOLATILITY': 40, 'LOW_VOLATILITY': 55, 'RANGING': 50
+            }
+            _base = _regime_scores.get(_regime_name, 50)
+
+            # Trend adjustment
+            _trend_adj = {
+                'strong_uptrend': 10, 'weak_uptrend': 5,
+                'neutral': 0, 'weak_downtrend': -5, 'strong_downtrend': -10
+            }.get(_trend, 0)
+
+            # ADX strength (stronger trend = more confident)
+            _adx_adj = min(5, (_adx - 20) * 0.25) if _adx > 20 else 0
+
+            # BTC influence (keep some, but reduced)
+            _btc_adj = btc_change_1h * 3  # was *10, now *3
+
+            _bullish = max(0, min(100, _base + _trend_adj + _adx_adj + _btc_adj))
+
+            analysis_dict['market_intelligence'] = {
+                'bullish_score': _bullish,
+                'bearish_score': max(0, min(100, 100 - _bullish)),
+                'regime': _regime_name,
+                'trend': _trend,
+                'adx': _adx,
+                'can_trade': _advice.get('can_trade', True),
+                'position_size_mult': _advice.get('position_size', 1.0),
+            }
+        except Exception:
+            analysis_dict['market_intelligence'] = {
+                'bullish_score': max(0, min(100, 50 + btc_change_1h * 10)),
+                'bearish_score': max(0, min(100, 50 - btc_change_1h * 10)),
+            }
 
         # ─────────────────────────────────────────────
         # Fix 4: external_signal
