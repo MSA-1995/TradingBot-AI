@@ -1,6 +1,7 @@
 """
-🎯 Real-time Price Action Analyzer
+🎯 Real-time Price Action Analyzer v2
 كشف القمم والقيعان بشكل فوري
++ تحليل متعدد الشموع + أنماط الظلال + Shadow+Volume Combo
 """
 
 from datetime import datetime, timezone
@@ -16,54 +17,197 @@ class RealTimePriceAction:
     MACD_SIGNAL  = 9
 
     # ─── عتبات القمة ───
-    PEAK_MIN_CONFIDENCE     = 65
-    PEAK_MIN_SIGNALS        = 3
-    PEAK_DISTANCE_MAX       = 2.0    # أقصى مسافة من القمة %
-    PEAK_DISTANCE_MIN       = 0.5    # أدنى مسافة لاعتبارها عند القمة %
+    PEAK_MIN_CONFIDENCE     = 55       # خفضنا من 65 → 55 علشان يكشف أبكر
+    PEAK_MIN_SIGNALS        = 2        # خفضنا من 3 → 2
+    PEAK_DISTANCE_MAX       = 2.0
+    PEAK_DISTANCE_MIN       = 0.5
     PEAK_CONFIDENCE_BOOST   = 20
-    UPPER_WICK_THRESHOLD    = 60     # % من نطاق الشمعة
+    UPPER_WICK_THRESHOLD    = 50       # خفضنا من 60 → 50 (أحس أسرع)
     RSI_OVERBOUGHT          = 70
-    VOLUME_DROP_THRESHOLD   = 30     # % انخفاض الحجم
-    SELL_WALL_RATIO         = 150    # % نسبة asks/bids
+    VOLUME_DROP_THRESHOLD   = 30
+    SELL_WALL_RATIO         = 150
 
     # ─── عتبات القاع ───
-    BOTTOM_MIN_CONFIDENCE   = 65
-    BOTTOM_MIN_SIGNALS      = 3
-    LOWER_WICK_THRESHOLD    = 60
+    BOTTOM_MIN_CONFIDENCE   = 55       # خفضنا من 65 → 55
+    BOTTOM_MIN_SIGNALS      = 2        # خفضنا من 3 → 2
+    LOWER_WICK_THRESHOLD    = 50       # خفضنا من 60 → 50
     RSI_OVERSOLD            = 30
-    VOLUME_SPIKE_THRESHOLD  = 50     # % ارتفاع الحجم
-    BUY_WALL_RATIO          = 150    # % نسبة bids/asks
-    BOUNCE_THRESHOLD        = 0.5    # % ارتداد من القاع
+    VOLUME_SPIKE_THRESHOLD  = 50
+    BUY_WALL_RATIO          = 150
+    BOUNCE_THRESHOLD        = 0.5
+
+    # ─── عتبات أنماط الشموع الجديدة ───
+    MULTI_CANDLE_LOOKBACK   = 5        # عدد الشموع للتحليل
+    SHADOW_BODY_RATIO       = 2.0      # نسبة الظل للجسم (Hammer/Star)
+    ENGULFING_MIN_RATIO     = 1.2      # الشمعة الجديدة أكبر بـ 20%
+    DOJI_MAX_BODY           = 0.1      # أقصى حجم جسم الدوجي %
+    CONSECUTIVE_WICKS       = 2        # عدد الشموع المتتالية بظل
+    SHADOW_VOLUME_BOOST     = 15       # بونص ظل + Volume عالي
 
     # ─── إعدادات عامة ───
     ORDER_BOOK_DEPTH        = 10
     VOLUME_LOOKBACK         = 5
-    STALLING_PRICE_CHANGE   = 0.3    # % تغير السعر للتعرف على الركود
-    STALLING_MIN_DURATION   = 3      # دقائق
-    STALLING_TRACKER_TTL    = 24     # ساعات
+    STALLING_PRICE_CHANGE   = 0.3
+    STALLING_MIN_DURATION   = 3
+    STALLING_TRACKER_TTL    = 24
     MOMENTUM_LOOKBACK       = 5
     MOMENTUM_THRESHOLD      = 0.5
     MOMENTUM_MIN_AVG        = 0.3
-    STOP_LOSS_TIME_LIMIT    = 5      # دقائق
+    STOP_LOSS_TIME_LIMIT    = 5
 
     def __init__(self):
         self.stalling_tracker: dict = {}
-        # للتوافق مع الكود القديم
         self.rsi_period  = self.RSI_PERIOD
         self.macd_fast   = self.MACD_FAST
         self.macd_slow   = self.MACD_SLOW
         self.macd_signal = self.MACD_SIGNAL
 
-    # ─────────────────────────────────────────────
-    # الواجهات الرئيسية
-    # ─────────────────────────────────────────────
+    # ═══════════════════════════════════════════════
+    # 🔴 detect_peak - الواجهة اللي يستدعيها meta_advisors
+    # ═══════════════════════════════════════════════
+
+    def detect_peak(self, symbol: str, candles: list,
+                    current_price: float, analysis: dict = None) -> dict:
+        """
+        🔴 كشف القمة - يستدعيه meta_advisors للتصويت
+        يجمع: analyze_peak_signals + أنماط الشموع المتعددة
+        """
+        if not candles or len(candles) < 3:
+            return {'is_peak': False, 'confidence': 0, 'signals': []}
+
+        analysis = analysis or {}
+        highest_price = analysis.get('highest_price', max(c.get('high', 0) for c in candles[-10:]))
+        volume_data   = analysis.get('volume_list')
+        order_book    = analysis.get('order_book')
+
+        # أساسي: التحليل القديم
+        base = self.analyze_peak_signals(
+            symbol, candles, current_price,
+            highest_price=highest_price,
+            volume_data=volume_data,
+            order_book=order_book
+        )
+
+        signals    = list(base.get('signals', []))
+        confidence = base.get('confidence', 0)
+
+        # ══ جديد: أنماط الشموع المتعددة ══
+
+        # 8. Shooting Star (ظل علوي طويل + جسم صغير)
+        star = self._detect_shooting_star(candles[-1])
+        if star['detected']:
+            signals.append(f"🌠 Shooting Star: {star['strength']:.0f}%")
+            confidence += star['strength'] * 0.3
+
+        # 9. Bearish Engulfing (شمعة حمراء تبتلع الخضراء)
+        engulf = self._detect_bearish_engulfing(candles)
+        if engulf['detected']:
+            signals.append(f"🔴 Bearish Engulfing: {engulf['strength']:.0f}%")
+            confidence += engulf['strength'] * 0.3
+
+        # 10. Doji عند القمة (تردد)
+        doji = self._detect_doji(candles[-1])
+        if doji['detected'] and confidence > 20:
+            signals.append(f"✝️ Doji at Peak: {doji['strength']:.0f}%")
+            confidence += doji['strength'] * 0.2
+
+        # 11. ظلال علوية متتالية (أقوى إشارة!)
+        consec = self._detect_consecutive_upper_wicks(candles)
+        if consec['detected']:
+            signals.append(f"⚡ {consec['count']}x Upper Wicks: {consec['strength']:.0f}%")
+            confidence += consec['strength'] * 0.35
+
+        # 12. Shadow + Volume Combo (ظل علوي + Volume عالي)
+        combo = self._detect_shadow_volume_combo(candles, volume_data, direction='peak')
+        if combo['detected']:
+            signals.append(f"💀 Shadow+Volume Peak: {combo['strength']:.0f}%")
+            confidence += combo['strength'] * 0.25
+
+        confidence = min(100.0, confidence)
+
+        return {
+            'is_peak':    confidence >= self.PEAK_MIN_CONFIDENCE and len(signals) >= self.PEAK_MIN_SIGNALS,
+            'confidence': confidence,
+            'signals':    signals
+        }
+
+    # ═══════════════════════════════════════════════
+    # 🟢 detect_bottom - واجهة جديدة متوافقة
+    # ═══════════════════════════════════════════════
+
+    def detect_bottom(self, symbol: str, candles: list,
+                      current_price: float, analysis: dict = None) -> dict:
+        """
+        🟢 كشف القاع - نسخة محسنة
+        يجمع: analyze_bottom_signals + أنماط الشموع المتعددة
+        """
+        if not candles or len(candles) < 3:
+            return {'is_bottom': False, 'confidence': 0, 'signals': []}
+
+        analysis = analysis or {}
+        volume_data = analysis.get('volume_list')
+        order_book  = analysis.get('order_book')
+
+        # أساسي: التحليل القديم
+        base = self.analyze_bottom_signals(
+            symbol, candles, current_price,
+            volume_data=volume_data,
+            order_book=order_book
+        )
+
+        signals    = list(base.get('signals', []))
+        confidence = base.get('confidence', 0)
+
+        # ══ جديد: أنماط الشموع المتعددة ══
+
+        # 8. Hammer (ظل سفلي طويل + جسم صغير فوق)
+        hammer = self._detect_hammer(candles[-1])
+        if hammer['detected']:
+            signals.append(f"🔨 Hammer: {hammer['strength']:.0f}%")
+            confidence += hammer['strength'] * 0.3
+
+        # 9. Bullish Engulfing (شمعة خضراء تبتلع الحمراء)
+        engulf = self._detect_bullish_engulfing(candles)
+        if engulf['detected']:
+            signals.append(f"🟢 Bullish Engulfing: {engulf['strength']:.0f}%")
+            confidence += engulf['strength'] * 0.3
+
+        # 10. Doji عند القاع (تردد ثم انعكاس)
+        doji = self._detect_doji(candles[-1])
+        if doji['detected'] and confidence > 20:
+            signals.append(f"✝️ Doji at Bottom: {doji['strength']:.0f}%")
+            confidence += doji['strength'] * 0.2
+
+        # 11. ظلال سفلية متتالية (أقوى إشارة!)
+        consec = self._detect_consecutive_lower_wicks(candles)
+        if consec['detected']:
+            signals.append(f"⚡ {consec['count']}x Lower Wicks: {consec['strength']:.0f}%")
+            confidence += consec['strength'] * 0.35
+
+        # 12. Shadow + Volume Combo (ظل سفلي + Volume عالي)
+        combo = self._detect_shadow_volume_combo(candles, volume_data, direction='bottom')
+        if combo['detected']:
+            signals.append(f"💎 Shadow+Volume Bottom: {combo['strength']:.0f}%")
+            confidence += combo['strength'] * 0.25
+
+        confidence = min(100.0, confidence)
+
+        return {
+            'is_bottom':  confidence >= self.BOTTOM_MIN_CONFIDENCE and len(signals) >= self.BOTTOM_MIN_SIGNALS,
+            'confidence': confidence,
+            'signals':    signals
+        }
+
+    # ═══════════════════════════════════════════════
+    # الواجهات القديمة (محفوظة للتوافق)
+    # ═══════════════════════════════════════════════
 
     def analyze_peak_signals(
         self, symbol: str, candles: list,
         current_price: float, highest_price: Optional[float] = None,
         volume_data=None, order_book=None
     ) -> dict:
-        """🔴 كشف القمة السريع"""
+        """🔴 كشف القمة السريع - الأصلي"""
         if not candles or len(candles) < 2:
             return {'is_peak': False, 'confidence': 0, 'signals': []}
 
@@ -136,7 +280,7 @@ class RealTimePriceAction:
         current_price: float,
         volume_data=None, order_book=None
     ) -> dict:
-        """🟢 كشف القاع السريع"""
+        """🟢 كشف القاع السريع - الأصلي"""
         if not candles or len(candles) < 2:
             return {'is_bottom': False, 'confidence': 0, 'signals': []}
 
@@ -217,9 +361,305 @@ class RealTimePriceAction:
             'time_estimate': time_to_stop
         }
 
-    # ─────────────────────────────────────────────
-    # كشف الأنماط
-    # ─────────────────────────────────────────────
+    # ═══════════════════════════════════════════════
+    # 🕯️ أنماط الشموع الجديدة (Multi-Candle Patterns)
+    # ═══════════════════════════════════════════════
+
+    def _detect_shooting_star(self, candle: dict) -> dict:
+        """🌠 Shooting Star - ظل علوي طويل + جسم صغير = قمة"""
+        try:
+            high   = candle.get('high', 0)
+            low    = candle.get('low', 0)
+            open_p = candle.get('open', 0)
+            close  = candle.get('close', 0)
+
+            body        = abs(close - open_p)
+            upper_wick  = high - max(close, open_p)
+            lower_wick  = min(close, open_p) - low
+            total_range = high - low
+
+            if total_range == 0 or body == 0:
+                return {'detected': False, 'strength': 0}
+
+            # شروط Shooting Star:
+            # 1. الظل العلوي >= ضعف الجسم
+            # 2. الظل السفلي صغير (أقل من الجسم)
+            # 3. الشمعة حمراء (close < open) أقوى
+            shadow_ratio = upper_wick / body if body > 0 else 0
+            is_star = (shadow_ratio >= self.SHADOW_BODY_RATIO and
+                       lower_wick < body and
+                       upper_wick > total_range * 0.4)
+
+            if not is_star:
+                return {'detected': False, 'strength': 0}
+
+            strength = min(100.0, shadow_ratio * 25)
+            # بونص لو حمراء
+            if close < open_p:
+                strength = min(100.0, strength + 15)
+
+            return {'detected': True, 'strength': strength}
+
+        except Exception as e:
+            print(f"⚠️ _detect_shooting_star error: {e}")
+            return {'detected': False, 'strength': 0}
+
+    def _detect_hammer(self, candle: dict) -> dict:
+        """🔨 Hammer - ظل سفلي طويل + جسم صغير فوق = قاع"""
+        try:
+            high   = candle.get('high', 0)
+            low    = candle.get('low', 0)
+            open_p = candle.get('open', 0)
+            close  = candle.get('close', 0)
+
+            body        = abs(close - open_p)
+            upper_wick  = high - max(close, open_p)
+            lower_wick  = min(close, open_p) - low
+            total_range = high - low
+
+            if total_range == 0 or body == 0:
+                return {'detected': False, 'strength': 0}
+
+            shadow_ratio = lower_wick / body if body > 0 else 0
+            is_hammer = (shadow_ratio >= self.SHADOW_BODY_RATIO and
+                         upper_wick < body and
+                         lower_wick > total_range * 0.4)
+
+            if not is_hammer:
+                return {'detected': False, 'strength': 0}
+
+            strength = min(100.0, shadow_ratio * 25)
+            # بونص لو خضراء
+            if close > open_p:
+                strength = min(100.0, strength + 15)
+
+            return {'detected': True, 'strength': strength}
+
+        except Exception as e:
+            print(f"⚠️ _detect_hammer error: {e}")
+            return {'detected': False, 'strength': 0}
+
+    def _detect_bearish_engulfing(self, candles: list) -> dict:
+        """🔴 Bearish Engulfing - شمعة حمراء تبتلع الخضراء"""
+        try:
+            if len(candles) < 2:
+                return {'detected': False, 'strength': 0}
+
+            prev = candles[-2]
+            curr = candles[-1]
+
+            prev_open  = prev.get('open', 0)
+            prev_close = prev.get('close', 0)
+            curr_open  = curr.get('open', 0)
+            curr_close = curr.get('close', 0)
+
+            prev_body = abs(prev_close - prev_open)
+            curr_body = abs(curr_close - curr_open)
+
+            # شروط: السابقة خضراء + الحالية حمراء + الحالية أكبر
+            is_engulfing = (prev_close > prev_open and
+                            curr_close < curr_open and
+                            curr_body > prev_body * self.ENGULFING_MIN_RATIO and
+                            curr_open >= prev_close and
+                            curr_close <= prev_open)
+
+            if not is_engulfing:
+                return {'detected': False, 'strength': 0}
+
+            ratio    = curr_body / prev_body if prev_body > 0 else 1
+            strength = min(100.0, ratio * 35)
+            return {'detected': True, 'strength': strength}
+
+        except Exception as e:
+            print(f"⚠️ _detect_bearish_engulfing error: {e}")
+            return {'detected': False, 'strength': 0}
+
+    def _detect_bullish_engulfing(self, candles: list) -> dict:
+        """🟢 Bullish Engulfing - شمعة خضراء تبتلع الحمراء"""
+        try:
+            if len(candles) < 2:
+                return {'detected': False, 'strength': 0}
+
+            prev = candles[-2]
+            curr = candles[-1]
+
+            prev_open  = prev.get('open', 0)
+            prev_close = prev.get('close', 0)
+            curr_open  = curr.get('open', 0)
+            curr_close = curr.get('close', 0)
+
+            prev_body = abs(prev_close - prev_open)
+            curr_body = abs(curr_close - curr_open)
+
+            is_engulfing = (prev_close < prev_open and
+                            curr_close > curr_open and
+                            curr_body > prev_body * self.ENGULFING_MIN_RATIO and
+                            curr_open <= prev_close and
+                            curr_close >= prev_open)
+
+            if not is_engulfing:
+                return {'detected': False, 'strength': 0}
+
+            ratio    = curr_body / prev_body if prev_body > 0 else 1
+            strength = min(100.0, ratio * 35)
+            return {'detected': True, 'strength': strength}
+
+        except Exception as e:
+            print(f"⚠️ _detect_bullish_engulfing error: {e}")
+            return {'detected': False, 'strength': 0}
+
+    def _detect_doji(self, candle: dict) -> dict:
+        """✝️ Doji - جسم صغير جداً = تردد"""
+        try:
+            high   = candle.get('high', 0)
+            low    = candle.get('low', 0)
+            open_p = candle.get('open', 0)
+            close  = candle.get('close', 0)
+
+            total_range = high - low
+            body        = abs(close - open_p)
+
+            if total_range == 0:
+                return {'detected': False, 'strength': 0}
+
+            body_pct = (body / total_range) * 100
+
+            if body_pct > self.DOJI_MAX_BODY * 100:
+                return {'detected': False, 'strength': 0}
+
+            # كل ما الجسم أصغر = الدوجي أقوى
+            strength = min(100.0, (1 - body_pct / 10) * 60)
+            return {'detected': True, 'strength': max(0, strength)}
+
+        except Exception as e:
+            print(f"⚠️ _detect_doji error: {e}")
+            return {'detected': False, 'strength': 0}
+
+    def _detect_consecutive_upper_wicks(self, candles: list) -> dict:
+        """⚡ ظلال علوية متتالية - أقوى إشارة قمة"""
+        try:
+            lookback = min(self.MULTI_CANDLE_LOOKBACK, len(candles))
+            if lookback < 2:
+                return {'detected': False, 'strength': 0, 'count': 0}
+
+            count     = 0
+            total_str = 0
+
+            for c in candles[-lookback:]:
+                high   = c.get('high', 0)
+                close  = c.get('close', 0)
+                open_p = c.get('open', 0)
+                total  = high - c.get('low', 0)
+
+                if total == 0:
+                    continue
+
+                upper_wick = high - max(close, open_p)
+                ratio      = (upper_wick / total) * 100
+
+                if ratio > 35:  # عتبة أقل للمتتالية
+                    count     += 1
+                    total_str += ratio
+
+            avg_str  = total_str / count if count > 0 else 0
+            detected = count >= self.CONSECUTIVE_WICKS
+
+            strength = min(100.0, avg_str * 0.8 + count * 15) if detected else 0
+
+            return {'detected': detected, 'strength': strength, 'count': count}
+
+        except Exception as e:
+            print(f"⚠️ _detect_consecutive_upper_wicks error: {e}")
+            return {'detected': False, 'strength': 0, 'count': 0}
+
+    def _detect_consecutive_lower_wicks(self, candles: list) -> dict:
+        """⚡ ظلال سفلية متتالية - أقوى إشارة قاع"""
+        try:
+            lookback = min(self.MULTI_CANDLE_LOOKBACK, len(candles))
+            if lookback < 2:
+                return {'detected': False, 'strength': 0, 'count': 0}
+
+            count     = 0
+            total_str = 0
+
+            for c in candles[-lookback:]:
+                low    = c.get('low', 0)
+                close  = c.get('close', 0)
+                open_p = c.get('open', 0)
+                total  = c.get('high', 0) - low
+
+                if total == 0:
+                    continue
+
+                lower_wick = min(close, open_p) - low
+                ratio      = (lower_wick / total) * 100
+
+                if ratio > 35:
+                    count     += 1
+                    total_str += ratio
+
+            avg_str  = total_str / count if count > 0 else 0
+            detected = count >= self.CONSECUTIVE_WICKS
+
+            strength = min(100.0, avg_str * 0.8 + count * 15) if detected else 0
+
+            return {'detected': detected, 'strength': strength, 'count': count}
+
+        except Exception as e:
+            print(f"⚠️ _detect_consecutive_lower_wicks error: {e}")
+            return {'detected': False, 'strength': 0, 'count': 0}
+
+    def _detect_shadow_volume_combo(self, candles: list,
+                                     volume_data: list = None,
+                                     direction: str = 'peak') -> dict:
+        """💀💎 Shadow + Volume Combo - ظل + Volume عالي = إشارة قوية"""
+        try:
+            if not candles or len(candles) < 2:
+                return {'detected': False, 'strength': 0}
+
+            c = candles[-1]
+            high   = c.get('high', 0)
+            low    = c.get('low', 0)
+            close  = c.get('close', 0)
+            open_p = c.get('open', 0)
+            total  = high - low
+
+            if total == 0:
+                return {'detected': False, 'strength': 0}
+
+            if direction == 'peak':
+                wick  = high - max(close, open_p)
+                ratio = (wick / total) * 100
+            else:
+                wick  = min(close, open_p) - low
+                ratio = (wick / total) * 100
+
+            has_shadow = ratio > 40
+
+            # تشيك Volume
+            has_volume = False
+            vol_boost  = 0
+            if volume_data and len(volume_data) >= 3:
+                avg_vol = sum(volume_data[-4:-1]) / 3
+                cur_vol = volume_data[-1]
+                if avg_vol > 0:
+                    vol_change = ((cur_vol - avg_vol) / avg_vol) * 100
+                    has_volume = vol_change > 30
+                    vol_boost  = min(30, vol_change * 0.3)
+
+            if has_shadow and has_volume:
+                strength = min(100.0, ratio * 0.6 + vol_boost + self.SHADOW_VOLUME_BOOST)
+                return {'detected': True, 'strength': strength}
+
+            return {'detected': False, 'strength': 0}
+
+        except Exception as e:
+            print(f"⚠️ _detect_shadow_volume_combo error: {e}")
+            return {'detected': False, 'strength': 0}
+
+    # ═══════════════════════════════════════════════
+    # كشف الأنماط الأساسية (القديمة - محفوظة)
+    # ═══════════════════════════════════════════════
 
     def _detect_upper_rejection(self, candle: dict, current_price: float) -> dict:
         """كشف الفتيلة العلوية"""
@@ -305,7 +745,7 @@ class RealTimePriceAction:
         return self._detect_momentum(candles, direction='gain')
 
     def _detect_momentum(self, candles: list, direction: str) -> dict:
-        """كشف تغير الزخم (مشترك بين loss و gain)"""
+        """كشف تغير الزخم"""
         try:
             if len(candles) < self.MOMENTUM_LOOKBACK:
                 return {'detected': False, 'strength': 0}
@@ -338,9 +778,9 @@ class RealTimePriceAction:
             print(f"⚠️ _detect_momentum error: {e}")
             return {'detected': False, 'strength': 0}
 
-    # ─────────────────────────────────────────────
+    # ═══════════════════════════════════════════════
     # تحليل الحجم و Order Book
-    # ─────────────────────────────────────────────
+    # ═══════════════════════════════════════════════
 
     def _analyze_volume_drop(self, volume_data: list) -> dict:
         """كشف انخفاض الحجم"""
@@ -351,7 +791,7 @@ class RealTimePriceAction:
         return self._analyze_volume(volume_data, direction='spike')
 
     def _analyze_volume(self, volume_data: list, direction: str) -> dict:
-        """تحليل الحجم (مشترك بين drop و spike)"""
+        """تحليل الحجم"""
         try:
             if len(volume_data) < self.VOLUME_LOOKBACK:
                 return {'detected': False, 'strength': 0}
@@ -384,7 +824,7 @@ class RealTimePriceAction:
         return self._analyze_order_book_wall(order_book, side='buy')
 
     def _analyze_order_book_wall(self, order_book: dict, side: str) -> dict:
-        """تحليل Order Book (مشترك بين sell و buy)"""
+        """تحليل Order Book"""
         try:
             asks = order_book.get('asks', [])
             bids = order_book.get('bids', [])
@@ -396,13 +836,13 @@ class RealTimePriceAction:
             bid_vol = sum(float(b[1]) for b in bids[:self.ORDER_BOOK_DEPTH])
 
             if side == 'sell':
-                denom = bid_vol
+                denom     = bid_vol
                 threshold = self.SELL_WALL_RATIO
-                ratio = (ask_vol / denom) * 100 if denom > 0 else 0
+                ratio     = (ask_vol / denom) * 100 if denom > 0 else 0
             else:
-                denom = ask_vol
+                denom     = ask_vol
                 threshold = self.BUY_WALL_RATIO
-                ratio = (bid_vol / denom) * 100 if denom > 0 else 0
+                ratio     = (bid_vol / denom) * 100 if denom > 0 else 0
 
             return {'detected': ratio > threshold, 'strength': min(100.0, ratio - 100)}
 
@@ -410,9 +850,9 @@ class RealTimePriceAction:
             print(f"⚠️ _analyze_order_book_wall error: {e}")
             return {'detected': False, 'strength': 0}
 
-    # ─────────────────────────────────────────────
+    # ═══════════════════════════════════════════════
     # حساب المؤشرات
-    # ─────────────────────────────────────────────
+    # ═══════════════════════════════════════════════
 
     def _calculate_rsi(self, candles: list) -> float:
         """حساب RSI"""
@@ -522,12 +962,12 @@ class RealTimePriceAction:
             print(f"⚠️ _ema error: {e}")
             return 0.0
 
-    # ─────────────────────────────────────────────
+    # ═══════════════════════════════════════════════
     # تنظيف الكاش
-    # ─────────────────────────────────────────────
+    # ═══════════════════════════════════════════════
 
     def _cleanup_stalling_tracker(self) -> None:
-        """تنظيف الـ stalling tracker من الإدخالات القديمة"""
+        """تنظيف الـ stalling tracker"""
         try:
             now       = datetime.now(timezone.utc)
             to_remove = [
