@@ -212,6 +212,15 @@ class BuyMixin:
 
         # Buy boost: future looks good = more points
         # Buy penalty: future looks bad = less points
+
+        # Reversal Analysis (bottom detection)
+        _rev = analysis_data.get('reversal', {})
+        _rev_conf = _rev.get('confidence', 0)
+        _rev_signals = _rev.get('reversal_signals', 0)
+        rev_p = 0
+        if _rev_conf > 0 and _rev_signals > 0:
+            rev_p = (_rev_conf / 100.0) * 3  # max 3 points
+
         pred_p = 0
         if _1h_bull and _4h_bull:
             pred_p = (_1h_conf + _4h_conf) * 2.5  # max ~5
@@ -224,7 +233,7 @@ class BuyMixin:
 
         support_total = min(
             rsi_macd_p + fg_p + news_p + vr_p
-            + intel_p + safe_p + ext_p + pred_p, 25)
+            + intel_p + safe_p + ext_p + pred_p + rev_p, 28)
 
         # ══════════════════════════════════════
         # Total Score
