@@ -48,12 +48,11 @@ class AdvisorsMixin:
         try:
             votes['realtime_pa'] = 0
             if self.realtime_pa and candles and len(candles) >= 3:
-                rt = self.realtime_pa.analyze_bottom_signals(
+                rt = self.realtime_pa.detect_bottom(
                     symbol=symbol,
                     candles=candles,
                     current_price=analysis_data.get('close', 0),
-                    volume_data=analysis_data.get('volume_list'),
-                    order_book=analysis_data.get('order_book')
+                    analysis=analysis_data
                 )
                 if rt:
                     votes['realtime_pa'] = rt.get('confidence', 0)
