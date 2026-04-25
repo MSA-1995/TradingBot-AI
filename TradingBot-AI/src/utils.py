@@ -119,7 +119,7 @@ def save_open_positions(storage, symbols_data, symbols_data_lock):
                         'buy_amount': position.get('buy_amount', 0),
                         'advisor_votes': position.get('advisor_votes', {}),
                         'ai_data': position.get('ai_data', {}),
-                        'stop_loss_threshold': position.get('stop_loss_threshold')
+                        'stop_loss_threshold': position.get('stop_loss_threshold') or 0
                     }
                 }
                 
