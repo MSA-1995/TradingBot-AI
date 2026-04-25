@@ -87,6 +87,15 @@ class BuyMixin:
                     'reason':'🛡️ High Liquidation Risk',
                     'confidence':0}
 
+
+        # ══════════════════════════════════════
+        # ENSURE buy_mode is ALWAYS set
+        # ══════════════════════════════════════
+        if buy_mode is None:
+            from config import BUY_MODE_CAUTIOUS
+            buy_mode = BUY_MODE_CAUTIOUS
+            reasons.append('MacroTrend unavailable - Cautious mode')
+
         # ══════════════════════════════════════
         # 👑 meta_trading = 40 Points
         # ══════════════════════════════════════
