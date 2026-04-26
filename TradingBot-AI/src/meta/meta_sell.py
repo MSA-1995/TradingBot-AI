@@ -31,14 +31,14 @@ class SellMixin:
         spike = self._calculate_profit_spike_features(
             symbol, position, current_price)
 
-        if spike.get('is_spike') == 1:
+        if spike.get('is_spike') == 1 and spike.get('spike_type') == 'POSITIVE':
             buy_price  = float(position.get('buy_price', 0) or 0)
             profit     = ((current_price - buy_price) / buy_price * 100
                           if buy_price > 0 else 0)
-            st    = spike.get('spike_type', 'UNKNOWN')
-            emoji = '🚀' if st == 'POSITIVE' else '🛡️'
-            label = ('PROFIT SPIKE' if st == 'POSITIVE'
-                     else 'CRASH PROTECTION')
+            emoji = '🚀'
+            label = 'PROFIT SPIKE'
+
+
             return {
                 'action'    : 'SELL',
                 'reason'    : (f"{emoji} {label}: "
