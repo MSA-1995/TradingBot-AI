@@ -94,32 +94,32 @@ SELL_MODE_NORMAL = {
 
 SELL_MODE_SNIPER_PROFIT = {
     'mode': 'SNIPER_PROFIT',
-    'stability_minutes': 5,
-    'min_sell_profit': 1.0,    # كان 0.1 ← خطير
+    'stability_minutes': 0,
+    'min_sell_profit': 0.5,    # حد أدنى عمولة فقط - AI يقرر القمة
     'stop_loss_mult': 0.8,
     'label': '🎯 Sniper Profit',
 }
 
 SELL_MODE_SNIPER_EXIT = {
     'mode': 'SNIPER_EXIT',
-    'stability_minutes': 3,
-    'min_sell_profit': 0.5,    # كان 0.0 ← خسارة مضمونة
+    'stability_minutes': 0,
+    'min_sell_profit': 0.5,    # حد أدنى عمولة فقط - AI يقرر القمة
     'stop_loss_mult': 0.5,
     'label': '🛡️ Sniper Exit',
 }
 
 SELL_MODE_WAIT_RECOVERY = {
     'mode': 'WAIT_RECOVERY',
-    'stability_minutes': 10,
-    'min_sell_profit': 0.8,    # كان 0.3 ← بعد العمولة خسارة
+    'stability_minutes': 0,
+    'min_sell_profit': 0.5,    # حد أدنى عمولة فقط - AI يقرر القمة
     'stop_loss_mult': 1.0,
     'label': '⏳ Wait Recovery',
 }
 
 SELL_MODE_CAUTIOUS = {
     'mode': 'CAUTIOUS',
-    'stability_minutes': 8,    # كان 5
-    'min_sell_profit': 1.0,    # كان 0.3 ← بعد العمولة خسارة
+    'stability_minutes': 0,    # AI يقرر بدون وقت ثابت
+    'min_sell_profit': 0.5,    # حد أدنى عمولة فقط - AI يقرر القمة
     'stop_loss_mult': 0.8,
     'label': '⚪ Cautious',
 }
