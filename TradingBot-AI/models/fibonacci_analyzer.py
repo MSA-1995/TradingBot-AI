@@ -30,7 +30,7 @@ class FibonacciAnalyzer:
     MAJOR_SYMBOLS = {'BTC', 'ETH'}
 
     def __init__(self):
-        print("📊 Fibonacci Analyzer initialized (Enhanced)")
+        pass  # silent
 
     # ─────────────────────────────────────────────
     # حسابات المستويات
