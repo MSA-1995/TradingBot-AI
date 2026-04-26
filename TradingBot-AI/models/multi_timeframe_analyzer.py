@@ -50,7 +50,7 @@ class MultiTimeframeAnalyzer:
     BEAR_BOTTOM_MULTIPLIER    = 0.9
 
     def __init__(self):
-        print("✅ Multi-Timeframe Analyzer initialized")
+        pass  # silent
 
     # ─────────────────────────────────────────────
     # تحليل القمة
