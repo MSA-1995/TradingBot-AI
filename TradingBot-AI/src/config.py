@@ -155,17 +155,17 @@ BUY_MODE_CAUTIOUS = {
 BUY_MODE_MINIMAL = {
     'mode': 'MINIMAL',
     'min_confidence': 70,
-    'max_amount': 15,
-    'max_positions': 5,
-    'label': '⚠️ Minimal',
-}
+    'min_confidence': 75,       # ثقة عالية - فرص قوية فقط
+    'max_amount': 30,
+    'max_positions': 20,
+    'label': '⚠️ High Confidence',
 
 BUY_MODE_NO_BUY = {
     'mode': 'NO_BUY',
-    'min_confidence': 90,
-    'max_amount': 12,           # كان 12 ← NO_BUY = لا شراء
-    'max_positions': 3,
-    'label': '🔴🔴 Bear Mode',
+    'min_confidence': 80,       # ثقة عالية جداً - يشتري القاع الحقيقي فقط
+    'max_amount': 30,
+    'max_positions': 20,
+    'label': '🔴🔴 High Confidence Only',
 }
 
 # =====================================================================
@@ -190,20 +190,20 @@ PREDICTION_MATRIX = {
     # 🟢 Bullish now
     ('BULLISH', 'BULLISH'):   ('AGGRESSIVE', 'NORMAL'),
     ('BULLISH', 'NEUTRAL'):   ('BALANCED', 'NORMAL'),
-    ('BULLISH', 'BEARISH'):   ('NO_BUY', 'SNIPER_PROFIT'),
+    ('BULLISH', 'BEARISH'):   ('CAUTIOUS_BUY', 'NORMAL'),    # كان NO_BUY ← يشتري بثقة 65+
     ('BULLISH', 'MIXED'):     ('BALANCED', 'NORMAL'),
 
     # ⚪ Neutral now
     ('NEUTRAL', 'BULLISH'):   ('BALANCED', 'NORMAL'),
     ('NEUTRAL', 'NEUTRAL'):   ('BALANCED', 'NORMAL'),
-    ('NEUTRAL', 'BEARISH'):   ('NO_BUY', 'SNIPER_PROFIT'),
+    ('NEUTRAL', 'BEARISH'):   ('CAUTIOUS_BUY', 'NORMAL'),    # كان NO_BUY ← يشتري بثقة 65+
     ('NEUTRAL', 'MIXED'):     ('BALANCED', 'NORMAL'),
 
     # 🔴 Bearish now
-    ('BEARISH', 'BULLISH'):   ('MINIMAL', 'WAIT_RECOVERY'),
-    ('BEARISH', 'NEUTRAL'):   ('MINIMAL', 'CAUTIOUS'),
-    ('BEARISH', 'BEARISH'):   ('NO_BUY', 'SNIPER_EXIT'),
-    ('BEARISH', 'MIXED'):     ('MINIMAL', 'CAUTIOUS'),
+    ('BEARISH', 'BULLISH'):   ('BALANCED', 'NORMAL'),         # كان MINIMAL ← ارتداد!
+    ('BEARISH', 'NEUTRAL'):   ('CAUTIOUS_BUY', 'NORMAL'),    # كان MINIMAL+CAUTIOUS
+    ('BEARISH', 'BEARISH'):   ('MINIMAL', 'NORMAL'),          # كان NO_BUY ← قاع حقيقي 75+
+    ('BEARISH', 'MIXED'):     ('CAUTIOUS_BUY', 'NORMAL'),    # كان MINIMAL+CAUTIOUS
 }
 
 
