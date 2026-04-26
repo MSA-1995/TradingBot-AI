@@ -50,8 +50,8 @@ def get_encryption_key():
                             break
                 if encrypted_key:
                     break
-            except:
-                pass
+            except Exception as e:
+                print(f'⚠️ Config key read error: {e}')
     
     if encrypted_key:
         try:
