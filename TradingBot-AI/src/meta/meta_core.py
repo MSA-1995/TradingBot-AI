@@ -117,7 +117,7 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
             print(f"⚠️ NewsAnalyzer not loaded: {e}")
             self.news_analyzer = None
 
-        print("👑 Meta (The King) is initialized and ready to rule.")
+        pass  # silent init
 
     # ─────────────────────────────────────────────
     # تحميل المكونات
@@ -132,7 +132,7 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
                 sys.path.insert(0, extra_path)
             module = __import__(module_name)
             obj    = getattr(module, class_name)()
-            print(f"✅ Meta: {class_name} initialized")
+            pass  # silent
             return obj
         except Exception as e:
             print(f"⚠️ Meta: Failed to load {class_name}: {e}")
@@ -151,8 +151,8 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
 
             import sys
             cache_size_kb = sys.getsizeof(self._patterns_cache) / 1024
-            print(f"✅ Meta: Loaded {len(patterns)} patterns to RAM "
-                  f"cache ({cache_size_kb:.1f} KB)")
+            pass  # silent
+
 
         except Exception as e:
             print(f"❌ Meta: Failed to load patterns cache: {e}")
@@ -171,7 +171,7 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
             cached_models = getattr(dl_client, '_models', None)
             if cached_models:
                 self.meta_model = cached_models.get('meta_trading')
-                print("✅ Meta: King's Intelligence (AI Model) loaded.")
+                pass  # silent
             else:
                 print("⚠️ Meta: Meta-Learner model not found in DL Client cache.")
                 self.meta_model = None
