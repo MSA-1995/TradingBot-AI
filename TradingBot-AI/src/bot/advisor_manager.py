@@ -65,7 +65,7 @@ class AdvisorManager:
             'VolumeForecastEngine': lambda: VolumeForecastEngine(),
             'TrendEarlyDetector':   lambda: TrendEarlyDetector(),
         }
-        print("✅ AdvisorManager is initialized and ready for on-demand loading.")
+        pass  # silent
 
     def _create_ai_advisor(self, model_name):
         """
@@ -83,7 +83,7 @@ class AdvisorManager:
                 print(f"⚠️ AI Advisor '{model_name}': Model not trained yet, using fallback")
                 return AIAdvisorWrapper(model_name, None, self._storage, self._exchange)
 
-            print(f"✅ AI Advisor '{model_name}': Using trained model from database")
+            pass  # silent load
             return AIAdvisorWrapper(model_name, dl_client, self._storage, self._exchange)
 
         except Exception as e:
