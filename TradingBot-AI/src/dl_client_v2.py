@@ -320,10 +320,10 @@ class DeepLearningClientV2:
             exchange_whale_flows       = analysis.get('exchange_whale_flows', 0.0)
             features = (base_features + [whale, inflow, whale_wallet_changes,
                         institutional_accumulation, smart_money_ratio,
-                        exchange_whale_flows, 0.5, 0.5])[:12]
+                        exchange_whale_flows, 0.5, 0.5])
             names    = (base_names + ['whale_activity', 'exchange_inflow', 'whale_wallet_changes',
                         'institutional_accumulation', 'smart_money_ratio',
-                        'exchange_whale_flows', 'tp_accuracy', 'sell_accuracy'])[:12]
+                        'exchange_whale_flows', 'tp_accuracy', 'sell_accuracy'])
             advice['smart_money'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['smart_money'] = "N/A"
@@ -338,10 +338,10 @@ class DeepLearningClientV2:
             behavioral_risk        = analysis.get('behavioral_risk', 0.0)
             features = (base_features + [rsi, analysis.get('atr', 1), volatility_risk_score,
                         correlation_risk, gap_risk_score, black_swan_probability,
-                        behavioral_risk, 0.5, 0.5])[:12]
+                        behavioral_risk, 0.5, 0.5])
             names    = (base_names + ['risk_rsi', 'risk_atr', 'volatility_risk_score',
                         'correlation_risk', 'gap_risk_score', 'black_swan_probability',
-                        'behavioral_risk', 'tp_accuracy', 'sell_accuracy'])[:12]
+                        'behavioral_risk', 'tp_accuracy', 'sell_accuracy'])
             advice['risk'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['risk'] = "N/A"
@@ -355,10 +355,10 @@ class DeepLearningClientV2:
             volume_anomalies     = analysis.get('volume_anomalies', 0.0)
             features = (base_features + [analysis.get('anomaly_score', 0), statistical_outliers,
                         pattern_anomalies, behavioral_anomalies,
-                        volume_anomalies, 0.5, 0.5])[:12]
+                        volume_anomalies, 0.5, 0.5])
             names    = (base_names + ['anomaly_score', 'statistical_outliers', 'pattern_anomalies',
                         'behavioral_anomalies', 'volume_anomalies',
-                        'tp_accuracy', 'sell_accuracy'])[:12]
+                        'tp_accuracy', 'sell_accuracy'])
             advice['anomaly'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['anomaly'] = "N/A"
@@ -371,10 +371,10 @@ class DeepLearningClientV2:
             opportunity_cost_exits    = analysis.get('opportunity_cost_exits', 0.0)
             market_condition_exits    = analysis.get('market_condition_exits', 0.0)
             features = (base_features + [24, profit_optimization_score, time_decay_signals,
-                        opportunity_cost_exits, market_condition_exits, 0.5, 0.5])[:12]
+                        opportunity_cost_exits, market_condition_exits, 0.5, 0.5])
             names    = (base_names + ['hours_held', 'profit_optimization_score', 'time_decay_signals',
                         'opportunity_cost_exits', 'market_condition_exits',
-                        'tp_accuracy', 'sell_accuracy'])[:12]
+                        'tp_accuracy', 'sell_accuracy'])
             advice['exit'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['exit'] = "N/A"
@@ -389,10 +389,10 @@ class DeepLearningClientV2:
             momentum_patterns       = analysis.get('momentum_patterns', 0.0)
             features = (base_features + [price_momentum, harmonic_patterns_score,
                         elliott_wave_signals, fractal_patterns, cycle_patterns,
-                        momentum_patterns, 0.5, 0.5])[:12]
+                        momentum_patterns, 0.5, 0.5])
             names    = (base_names + ['pattern_momentum', 'harmonic_patterns_score',
                         'elliott_wave_signals', 'fractal_patterns', 'cycle_patterns',
-                        'momentum_patterns', 'tp_accuracy', 'sell_accuracy'])[:12]
+                        'momentum_patterns', 'tp_accuracy', 'sell_accuracy'])
             advice['pattern'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['pattern'] = "N/A"
@@ -455,10 +455,10 @@ class DeepLearningClientV2:
             multi_scale_features      = analysis.get('multi_scale_features', 0.0)
             temporal_features         = analysis.get('temporal_features', 0.0)
             features = (base_features + [bullish, bearish, neutral, attention_mechanism_score,
-                        multi_scale_features, temporal_features, 0.5, 0.5])[:12]
+                        multi_scale_features, temporal_features, 0.5, 0.5])
             names    = (base_names + ['bullish_chart', 'bearish_chart', 'neutral_chart',
                         'attention_mechanism_score', 'multi_scale_features',
-                        'temporal_features', 'tp_accuracy', 'sell_accuracy'])[:12]
+                        'temporal_features', 'tp_accuracy', 'sell_accuracy'])
             advice['chart_cnn'] = _predict(model, features, names, is_sell_mode)
         else:
             advice['chart_cnn'] = "N/A"
