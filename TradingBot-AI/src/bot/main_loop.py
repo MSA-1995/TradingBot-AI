@@ -467,12 +467,14 @@ def run_main_loop(exchange, ctx):
                         _bot_status['4h_icon'] = _info.get('4h_icon', '⚪')
                 except:
                     pass
-                threading.Thread(
-                    target=lambda: ctx['storage'].save_setting('bot_status', _json.dumps(_bot_status)),
-                    daemon=True
-                ).start()
-            except:
-                pass
+                def _save_status(s, st):
+                    try:
+                        s.save_setting('bot_status', st)
+                    except Exception as e:
+                        print(f'⚠️ bot_status save failed: {e}')
+                threading.Thread(target=_save_status, args=(ctx['storage'], _json.dumps(_bot_status)), daemon=True).start()
+            except Exception as e:
+                print(f'⚠️ bot_status block error: {e}')
 
             # ========== CLEANUP ==========
             gc.collect()
