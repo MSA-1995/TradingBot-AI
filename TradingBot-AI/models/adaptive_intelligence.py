@@ -50,13 +50,13 @@ class AdaptiveIntelligence:
         avg_profit = memory.get('avg_profit') or 0.0
         best_rsi = memory.get('best_rsi') or 30
 
-        # تعديل حد الثقة بناءً على معدل النجاح
-        if win_rate >= 0.8:
-            min_confidence = 65   # عملة موثوقة - نخفف الشروط
-        elif win_rate >= 0.6:
-            min_confidence = 75   # عادي
-        else:
-            min_confidence = 85   # عملة صعبة - نشدد الشروط
+        # تعديل حد الثقة ديناميكي - بدون أرقام ثابتة
+        # AI يقرر بناءً على win_rate بشكل متدرج
+        min_confidence = max(50, int(100 - (win_rate * 50)))
+        # win_rate 1.0 = 50% ثقة (حرية كاملة)
+        # win_rate 0.5 = 75% ثقة (متوسط)
+        # win_rate 0.0 = 100% ثقة (حذر)
+
 
         # تعديل نطاق RSI بناءً على أفضل نقاط دخول سابقة
         rsi_oversold = max(20, min(40, best_rsi))
@@ -81,10 +81,10 @@ class AdaptiveIntelligence:
             profile = self.get_symbol_profile(symbol)
             win_rate = profile.get('win_rate') or 0.0
 
-            if win_rate >= 0.75:
-                return base_confidence + 10
-            elif win_rate < 0.4:
-                return base_confidence - 15
+            # تعديل ديناميكي بدون أرقام ثابتة
+            boost = (win_rate - 0.5) * 30  # -15 to +15 ديناميكي
+            return base_confidence + boost
+
 
         except Exception as e:
             print(f"⚠️ Adaptive AI confidence error: {e}")
