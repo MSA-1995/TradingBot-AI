@@ -24,7 +24,7 @@ class TrendEarlyDetector:
     BEARISH_SIGNALS = {'BEARISH', 'BOS_BEARISH', 'SWEEP_BEARISH', 'FVG_BEARISH'}
 
     # ─── عتبات الاتجاه ───
-    MIN_TREND_SCORE         = 40     # أدنى نقاط للاعتراف بالاتجاه
+    MIN_TREND_SCORE         = 30     # أدنى نقاط - AI يقرر الباقي ديناميكياً
     VOLUME_CONFIRM_RATIO    = 1.3    # نسبة ارتفاع الحجم للتأكيد
     VOLUME_DECLINE_RATIO    = 0.7    # نسبة انخفاض الحجم للإنهاك
     ORDER_BOOK_DEPTH        = 10
@@ -46,8 +46,8 @@ class TrendEarlyDetector:
     STALLING_PRICE_CHANGE   = 0.3
 
     # ─── ثقة الإشارات ───
-    CONFIDENCE_THRESHOLDS = {4: 90, 3: 75, 2: 60}
-    CONFIDENCE_DEFAULT    = 40
+    CONFIDENCE_THRESHOLDS = {4: 85, 3: 65, 2: 50}  # أكثر مرونة - AI يكتشف أبكر
+    CONFIDENCE_DEFAULT    = 35  # يعطي فرصة أكبر للاتجاهات الضعيفة
 
     # ─── درجات الإشارات ───
     SCORE_CANDLE_PATTERN    = 20
