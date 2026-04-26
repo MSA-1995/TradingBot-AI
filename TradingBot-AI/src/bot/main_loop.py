@@ -119,8 +119,8 @@ def run_main_loop(exchange, ctx):
                     s1 = info.get('1h_icon', '⚪')
                     s4 = info.get('4h_icon', '⚪')
                     print(f"🔮 1h{s1} | 4h{s4}")
-            except:
-                pass
+            except Exception as e:
+                print(f'⚠️ MacroTrend display error: {e}')
             if locked_profit > 0:
                 print(f"🔒 Locked Profit: ${locked_profit:.2f} | Tradable: ${tradable_balance:.2f}")
             else:
@@ -202,8 +202,8 @@ def run_main_loop(exchange, ctx):
                             if abs(new_sl - old_sl) > 0.01:
                                 try:
                                     save_open_positions(storage, SYMBOLS_DATA, symbols_data_lock)
-                                except:
-                                    pass
+                                except Exception as e:
+                                    print(f'⚠️ Save positions error: {e}')
 
                     if profit < 0:
                         line_color = Fore.RED
@@ -466,8 +466,8 @@ def run_main_loop(exchange, ctx):
                         _info = _ma.get_display_info()
                         _bot_status['1h_icon'] = _info.get('1h_icon', '⚪')
                         _bot_status['4h_icon'] = _info.get('4h_icon', '⚪')
-                except:
-                    pass
+                except Exception as e:
+                    print(f'⚠️ MacroTrend icons error: {e}')
                 def _save_status(s, st):
                     try:
                         s.save_setting('bot_status', st)
