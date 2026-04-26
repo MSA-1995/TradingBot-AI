@@ -195,22 +195,34 @@ if META_ENABLED:
     meta = META_CLASS(advisor_manager, storage)
 
 # ========== BANNER ==========
-print("✦•······················•✦•······················•✦")
-print("\n  ███╗   ███╗███████╗ █████╗ ")
-print("  ████╗ ████║██╔════╝██╔══██╗")
-print("  ██╔████╔██║███████╗███████║")
-print("  ██║╚██╔╝██║╚════██║██╔══██║")
-print("  ██║ ╚═╝ ██║███████║██║  ██║")
-print("  ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝\n")
-print("  ✦•······················•✦•······················•✦")
-print("  🚀 MSA Smart Trading Bot V4.0")
-print("  💰 Binance Testnet - AI-Powered")
-print("  👑 Meta King + 12 LightGBM Models")
-print("  🧠 Deep Learning Active (16K+ Trades)")
-print("  🎯 Peak/Valley Catcher (Target: 80%)")
-print("  🏆 The Golden Five (BTC, ETH, BNB, SOL, XRP)")
-print("  ✅ Version 4.0 - All Systems Ready")
-print("  ✦•······················•✦•······················•✦\n")
+print("")
+print("")
+C = "\033[1;36m"
+G = "\033[1;32m"
+Y = "\033[1;33m"
+W = "\033[1;37m"
+P = "\033[1;35m"
+R = "\033[0m"
+print(f"{C}   ·•● MSA ●•·{R}")
+print("")
+print(f"{C}    ███╗   ███╗ ███████╗  █████╗{R}")
+print(f"{C}    ████╗ ████║ ██╔════╝ ██╔══██╗{R}")
+print(f"{W}    ██╔████╔██║ ███████╗ ███████║{R}")
+print(f"{W}    ██║╚██╔╝██║ ╚════██║ ██╔══██║{R}")
+print(f"{C}    ██║ ╚═╝ ██║ ███████║ ██║  ██║{R}")
+print(f"{C}    ╚═╝     ╚═╝ ╚══════╝ ╚═╝  ╚═╝{R}")
+print("")
+print(f"{W}    Smart Trading Bot {Y}V5.0{R}")
+print(f"{C}    ── AI Full Power Edition ──{R}")
+print("")
+print(f"   {G}🧠{W} 12 AI Models · Full Features Unlocked{R}")
+print(f"   {Y}👑{W} Meta King · 49 Features + Symbol Memory{R}")
+print(f"   {C}📊{W} Deep Learning · 16K+ Trained Trades{R}")
+print(f"   {P}🎯{W} Peak/Valley Catcher · Target 80%{R}")
+print(f"   {Y}💎{W} BTC · ETH · BNB · SOL · XRP{R}")
+print("")
+print(f"   {G}⚡ All Systems Online{R}")
+print("")
 
 # ========== LOAD POSITIONS ==========
 SYMBOLS_DATA = init_symbols()
@@ -241,7 +253,7 @@ for symbol, pos in loaded.items():
     SYMBOLS_DATA[symbol]['position'] = pos
     print(f"📂 Loaded {symbol}: ${pos['buy_price']:.2f}")
 
-print(f"\n🤖 Bot started!")
+print("   ── Ready · Watching Markets ──\n")
 
 last_report_time = datetime.now(timezone.utc)
 
