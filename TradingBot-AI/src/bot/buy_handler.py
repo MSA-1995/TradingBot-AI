@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from colorama import Fore, Style
 
 from utils import execute_buy, save_open_positions
-from notifications import send_buy_notification
+from notifications import send_buy_notification, send_advisor_report
 from config import MIN_TRADE_AMOUNT
 
 # Optional import - does not stop the program if not available
@@ -220,6 +220,37 @@ def process_buy(result: dict, exchange, ctx: dict) -> bool:
         buy_vote_count      = buy_vote_count,
         total_consultants   = total_consultants
     )
+
+    # 📊 Send Advisor Report
+    try:
+        _decision = result.get('decision', {})
+        _core_votes = _decision.get('core_votes', {})
+        _ai = _decision.get('advisors_intelligence', {})
+        _analysis = result.get('analysis', {})
+
+        _support_data = {
+            'rsi': _analysis.get('rsi', 50),
+            'macd_diff': _analysis.get('macd_diff', 0),
+            'volume_ratio': _analysis.get('volume_ratio', 1.0),
+            'fear_greed': _analysis.get('sentiment', {}).get('fear_greed', 50),
+            '1h_bullish': _ai.get('1h_bullish', False),
+            '4h_bullish': _ai.get('4h_bullish', False),
+            '1h_bearish': _ai.get('1h_bearish', False),
+            '4h_bearish': _ai.get('4h_bearish', False),
+            'prediction_1h': True,
+        }
+
+        send_advisor_report(
+            signal_type='BUY',
+            symbol=symbol,
+            core_votes=_core_votes,
+            meta_confidence=result['confidence'],
+            support_data=_support_data,
+            total_points=result['confidence'],
+            reason=result.get('reason', ''),
+        )
+    except Exception as e:
+        print(f"⚠️ [{symbol}] Advisor report error: {e}")
 
     # Build position data
     position_data = {
