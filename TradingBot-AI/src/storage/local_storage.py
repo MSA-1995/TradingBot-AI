@@ -25,8 +25,8 @@ class LocalStorage:
             if os.path.exists(filepath):
                 with open(filepath, 'r', encoding='utf-8') as f:
                     return json.load(f)
-        except:
-            pass
+        except Exception as e:
+            print(f'⚠️ Load JSON error: {e}')
         return default if default is not None else []
     
     def _save_json(self, filepath, data):
