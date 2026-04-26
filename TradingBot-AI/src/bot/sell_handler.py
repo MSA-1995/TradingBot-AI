@@ -19,7 +19,7 @@ from colorama import Fore, Style
 import json
 
 from utils import execute_sell, calculate_sell_value
-from notifications import send_sell_notification
+from notifications import send_sell_notification, send_advisor_report
 
 
 def process_sell(result, exchange, ctx):
@@ -64,6 +64,22 @@ def process_sell(result, exchange, ctx):
         profit_percent = result['profit'],
         reason         = result['reason']
     )
+
+    # 📊 Send Advisor Report
+    try:
+        _sell_votes = result.get('sell_votes', {})
+
+        send_advisor_report(
+            signal_type='SELL',
+            symbol=symbol,
+            core_votes=_sell_votes,
+            meta_confidence=result.get('confidence', 0),
+            total_points=result.get('confidence', 0),
+            profit_percent=result.get('profit', 0),
+            reason=result.get('reason', ''),
+        )
+    except Exception as e:
+        print(f"⚠️ [{symbol}] Advisor report error: {e}")
 
     position = result['position']
 
