@@ -159,6 +159,7 @@ BUY_MODE_MINIMAL = {
     'max_amount': 30,
     'max_positions': 20,
     'label': '⚠️ High Confidence',
+}
 
 BUY_MODE_NO_BUY = {
     'mode': 'NO_BUY',
