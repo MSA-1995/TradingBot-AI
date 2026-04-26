@@ -383,3 +383,119 @@ def send_exchange_error(error_message):
         "Failed to connect to Binance",
         error_message
     )
+
+# ═══════════════════════════════════════════════════
+# 📊 Advisor Report
+# ═══════════════════════════════════════════════════
+
+def send_advisor_report(signal_type, symbol, core_votes, meta_confidence,
+                        support_data=None, total_points=None, required=None,
+                        profit_percent=None, reason=None):
+    """Send advisor voting report to critical channel - same style as BUY/SELL signals"""
+    if not CRITICAL_WEBHOOK:
+        return
+
+    try:
+        is_buy = signal_type.upper() == 'BUY'
+        color = 'green' if is_buy else 'red'
+
+        # Meta points
+        meta_pts = (min(meta_confidence, 100) / 100) * 40
+
+        # Advisor weights
+        if is_buy:
+            advisor_config = [
+                ('candle_expert',   'Candle Expert',    8),
+                ('chart_cnn',       'Chart CNN',        8),
+                ('realtime_pa',     'RealTime PA',      8),
+                ('multitimeframe',  'Multi-Timeframe',  4),
+                ('fibonacci',       'Fibonacci',        5),
+                ('smart_money',     'Smart Money',      5),
+                ('volume_forecast', 'Volume Forecast',  2),
+            ]
+        else:
+            advisor_config = [
+                ('candle_expert',   'Candle Expert',    8),
+                ('chart_cnn',       'Chart CNN',        8),
+                ('realtime_pa',     'RealTime PA',      8),
+                ('multitimeframe',  'Multi-Timeframe',  4),
+                ('trend_detector',  'Trend Detector',   5),
+                ('smart_money',     'Smart Money',      5),
+                ('volume_forecast', 'Volume Forecast',  2),
+            ]
+
+        votes = core_votes or {}
+        core_total = 0
+
+        # Build fields - same style as BUY/SELL
+        fields = [
+            {"name": "Pair",           "value": symbol,                        "inline": True},
+            {"name": "Signal",         "value": signal_type.upper(),           "inline": True},
+            {"name": "Meta Trading",   "value": f"{meta_pts:.1f}/40 pts ({meta_confidence:.0f}%)", "inline": True},
+        ]
+
+        # Each advisor as inline field
+        for key, label, max_pts in advisor_config:
+            raw = votes.get(key, 0)
+            pts = (raw / 100) * max_pts
+            core_total += pts
+            fields.append({
+                "name": label,
+                "value": f"{pts:.1f}/{max_pts} pts ({raw:.0f}%)",
+                "inline": True
+            })
+
+        # Core total
+        fields.append({"name": "Core Total", "value": f"{core_total:.1f}/40 pts", "inline": True})
+
+        # Support data
+        if support_data:
+            sup = support_data
+            sup_parts = []
+            if 'rsi' in sup:
+                sup_parts.append(f"RSI: {sup['rsi']:.0f}")
+            if 'macd_diff' in sup:
+                sup_parts.append(f"MACD: {sup['macd_diff']:+.2f}")
+            if 'fear_greed' in sup:
+                sup_parts.append(f"F&G: {sup['fear_greed']:.0f}")
+            if 'volume_ratio' in sup:
+                sup_parts.append(f"Vol: {sup['volume_ratio']:.1f}x")
+            if 'prediction_1h' in sup:
+                p1 = "Bullish" if sup.get('1h_bullish') else "Bearish" if sup.get('1h_bearish') else "Neutral"
+                p4 = "Bullish" if sup.get('4h_bullish') else "Bearish" if sup.get('4h_bearish') else "Neutral"
+                sup_parts.append(f"1h: {p1}")
+                sup_parts.append(f"4h: {p4}")
+
+            if sup_parts:
+                sup_pts = 0
+                if total_points is not None:
+                    sup_pts = max(0, total_points - meta_pts - core_total)
+                fields.append({
+                    "name": "Support Inputs",
+                    "value": f"{sup_pts:.1f} pts | " + " | ".join(sup_parts),
+                    "inline": False
+                })
+
+        # Total Score
+        total = total_points if total_points is not None else (meta_pts + core_total)
+        total_text = f"{total:.0f}/100 pts"
+        if required is not None:
+            total_text += f" (Required: {required})"
+
+        fields.append({"name": "Total Score", "value": total_text, "inline": True})
+
+        # Profit (for SELL)
+        if profit_percent is not None:
+            profit_sign = "+" if profit_percent > 0 else ""
+            fields.append({"name": "Profit", "value": f"{profit_sign}{profit_percent:.1f}%", "inline": True})
+
+        # Reason
+        if reason:
+            fields.append({"name": "Reason", "value": reason, "inline": False})
+
+        title = f"ADVISOR REPORT - {signal_type.upper()}"
+
+        send_discord_embed(title, fields, color, webhook_url=CRITICAL_WEBHOOK)
+
+    except Exception as e:
+        print(f"⚠️ Advisor report error: {e}")
