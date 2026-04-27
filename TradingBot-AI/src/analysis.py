@@ -781,6 +781,7 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
         df['macd_signal']   = df['macd'].ewm(span=9, adjust=False).mean()
         df['macd_diff']     = df['macd'] - df['macd_signal']
         df['macd_histogram']= df['macd_diff']
+        df['macd_diff_pct']  = (df['macd_diff'] / df['close'].replace(0, 1)) * 100
 
         # ── ATR ──────────────────────────────────────
         tr        = pd.concat([
@@ -827,6 +828,7 @@ def get_market_analysis(exchange, symbol, limit=120, external_client=None):
             'macd'           : _safe(lr['macd'],           0.0),
             'macd_signal'    : _safe(lr['macd_signal'],    0.0),
             'macd_diff'      : _safe(lr['macd_diff'],      0.0),
+            'macd_diff_pct'  : _safe(lr['macd_diff_pct'],  0.0),
             'atr'            : _safe(lr['atr'],            0.0),
             'ema_9'          : _safe(lr['ema_9'],          _safe(lr['close'])),
             'ema_21'         : _safe(lr['ema_21'],         _safe(lr['close'])),
