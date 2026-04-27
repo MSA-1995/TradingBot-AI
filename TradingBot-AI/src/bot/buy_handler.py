@@ -238,6 +238,10 @@ def process_buy(result: dict, exchange, ctx: dict) -> bool:
             '1h_bearish': _ai.get('1h_bearish', False),
             '4h_bearish': _ai.get('4h_bearish', False),
             'prediction_1h': True,
+            'macro_key': _ai.get('macro_key', 'N/A'),
+            'macro_points': _ai.get('macro_buy_points', 0),
+            'macro_current': _ai.get('macro_prediction', {}).get('current', 'N/A'),
+            'macro_direction': _ai.get('macro_prediction', {}).get('direction', 'N/A'),
         }
 
         send_advisor_report(
