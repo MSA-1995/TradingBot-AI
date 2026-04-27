@@ -156,13 +156,10 @@ class BuyMixin:
         rsi_p = 0
         if   rsi < 30: rsi_p = ((30 - rsi) / 30) * 3
         elif rsi < 40: rsi_p = ((40 - rsi) / 10) * 1
+        macd_diff_pct = analysis_data.get('latest', {}).get('macd_diff_pct', 0.0)
         macd_p = 0
-        if macd_diff > 0:
-            macd_p = min(
-                (min(abs(macd_diff),100)/100)*2
-                if abs(macd_diff) >= 1.0
-                else (min(abs(macd_diff),0.01)/0.01)*2,
-                2.0)
+        if macd_diff_pct > 0:
+            macd_p = min((min(abs(macd_diff_pct), 0.5) / 0.5) * 2, 2.0)
         rsi_macd_p = min(rsi_p + macd_p, 5)
 
         # Fear & Greed (4)
