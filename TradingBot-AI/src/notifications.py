@@ -448,6 +448,17 @@ def send_advisor_report(signal_type, symbol, core_votes, meta_confidence,
         # Core total
         fields.append({"name": "Core Total", "value": f"{core_total:.1f}/40 pts", "inline": True})
 
+        # Macro data
+        macro_key    = support_data.get('macro_key', 'N/A') if support_data else 'N/A'
+        macro_pts    = support_data.get('macro_points', 0) if support_data else 0
+        macro_curr   = support_data.get('macro_current', 'N/A') if support_data else 'N/A'
+        macro_dir    = support_data.get('macro_direction', 'N/A') if support_data else 'N/A'
+        fields.append({
+            "name": "🌐 Macro Trend",
+            "value": f"Status: {macro_curr} | Predicted: {macro_dir} | Key: {macro_key} | Points: {macro_pts:+.0f}",
+            "inline": False
+        })
+
         # Support data
         if support_data:
             sup = support_data
