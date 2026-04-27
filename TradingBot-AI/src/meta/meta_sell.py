@@ -64,7 +64,7 @@ class SellMixin:
         profit_pct    = (((current_price - buy_price) / buy_price * 100)
                          if buy_price > 0 else 0.0)
         rsi          = analysis.get('rsi',          50)
-        macd_diff    = analysis.get('macd_diff',     0)
+        macd_diff_pct = analysis.get('latest', {}).get('macd_diff_pct', 0.0)
         volume_ratio = analysis.get('volume_ratio', 1.0)
 
         # ══════════════════════════════════════
@@ -216,7 +216,7 @@ class SellMixin:
 
         symbol_memory = self._get_symbol_memory(symbol)
         features = self._build_meta_features(
-            rsi=rsi, macd_diff=macd_diff,
+            rsi=rsi, macd_diff_pct=macd_diff_pct,
             volume_ratio=volume_ratio,
             price_momentum=analysis.get('price_momentum', 0),
             atr=analysis.get('atr', 2.5),
@@ -347,7 +347,7 @@ class SellMixin:
         # Wave Protection
         return self._wave_protection(
             symbol, analysis, candles, position,
-            ai, rsi, macd_diff, volume_ratio,
+            ai, rsi, macd_diff_pct, volume_ratio,
             profit_pct,
             analysis.get('peak', {}).get('confidence', 0),
             core_votes,
@@ -449,7 +449,7 @@ class SellMixin:
     # ─────────────────────────────────────────────
 
     def _wave_protection(self, symbol, analysis, candles,
-                          position, ai, rsi, macd_diff,
+                          position, ai, rsi, macd_diff_pct,
                           volume_ratio, profit_pct, peak_score,
                           sell_votes, sell_vote_count,
                           total_advisors):
@@ -471,7 +471,7 @@ class SellMixin:
                          min(self.STOP_TRAILING_MAX, threshold))
 
         c_fc, m_fc = self._calc_stop_forecasts(
-            ai, rsi, macd_diff, volume_ratio)
+            ai, rsi, macd_diff_pct, volume_ratio)
         threshold  = adjust_threshold_by_forecasts(
             threshold, c_fc, m_fc, drop)
 
@@ -575,13 +575,13 @@ class SellMixin:
             logger.warning(f"Realtime stop error: {e}")
         return threshold
 
-    def _calc_stop_forecasts(self, ai, rsi, macd_diff, volume_ratio):
+    def _calc_stop_forecasts(self, ai, rsi, macd_diff_pct, volume_ratio):
         c_fc = {'direction': 'neutral', 'confidence': 50}
         m_fc = {'direction': 'neutral', 'confidence': 50}
         try:
             if rsi < self.RSI_OVERSOLD and volume_ratio > 2.0:
                 c_fc = {'direction': 'bullish', 'confidence': 70}
-            elif rsi > self.RSI_OVERBOUGHT or macd_diff < -2:
+            elif rsi > self.RSI_OVERBOUGHT or macd_diff_pct < -0.05:
                 c_fc = {'direction': 'bearish', 'confidence': 75}
             mb = ai.get('macro_bear_signal', 0)
             ms = ai.get('macro_trend_sell',  50)
