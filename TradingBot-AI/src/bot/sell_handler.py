@@ -70,11 +70,33 @@ def process_sell(result, exchange, ctx):
         _reason = result.get('reason', '')
         if 'Peak Points' in _reason:
             _sell_votes = result.get('sell_votes', {})
+
+            # Prepare support_data (Macro & Indicators) same as BUY
+            _ai = result.get('advisors_intelligence', {})
+            _analysis = result.get('analysis', {})
+
+            _support_data = {
+                'rsi': _analysis.get('rsi', 50),
+                'macd_diff': _analysis.get('macd_diff', 0),
+                'volume_ratio': _analysis.get('volume_ratio', 1.0),
+                'fear_greed': _analysis.get('sentiment', {}).get('fear_greed', 50),
+                '1h_bullish': _ai.get('1h_bullish', False),
+                '4h_bullish': _ai.get('4h_bullish', False),
+                '1h_bearish': _ai.get('1h_bearish', False),
+                '4h_bearish': _ai.get('4h_bearish', False),
+                'prediction_1h': True,
+                'macro_key': _ai.get('macro_key', 'N/A'),
+                'macro_points': _ai.get('macro_sell_points', _ai.get('macro_points', 0)),
+                'macro_current': _ai.get('macro_prediction', {}).get('current', 'N/A'),
+                'macro_direction': _ai.get('macro_prediction', {}).get('direction', 'N/A'),
+            }
+
             send_advisor_report(
             signal_type='SELL',
             symbol=symbol,
             core_votes=_sell_votes,
             meta_confidence=result.get('confidence', 0),
+            support_data=_support_data,
             total_points=result.get('confidence', 0),
             profit_percent=result.get('profit', 0),
             reason=result.get('reason', ''),
