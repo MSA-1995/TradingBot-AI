@@ -54,7 +54,7 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
     PEAK_SCORE_HIGH      = 80
     PEAK_SCORE_MAX       = 95
     RSI_OVERBOUGHT       = 70
-    MACD_BEARISH         = -1.0
+    MACD_BEARISH         = -0.05  # نسبة % بدل دولار
 
 
 
@@ -265,7 +265,7 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
         return 0, ""
 
     def _get_symbol_pattern_score(self, symbol: str, rsi: float,
-                                   macd_diff: float,
+                                   macd_diff_pct: float,
                                    volume_ratio: float) -> tuple[float, str]:
         """رفع الثقة بناءً على أنماط ناجحة مشابهة"""
         try:
@@ -477,7 +477,7 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
     # بناء الميزات
     # ─────────────────────────────────────────────
 
-    def _build_meta_features(self, rsi: float, macd_diff: float,
+    def _build_meta_features(self, rsi: float, macd_diff_pct: float,
                               volume_ratio: float, price_momentum: float,
                               atr: float, analysis_data: dict,
                               advisors_intelligence: dict,
@@ -526,7 +526,7 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
 
         return [
             # Technical (5)
-            rsi, macd_diff, volume_ratio, price_momentum, atr,
+            rsi, macd_diff_pct, volume_ratio, price_momentum, atr,
             # News (6)
             news.get('news_score', 0),
             news.get('positive',   0),
