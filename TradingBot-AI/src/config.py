@@ -272,7 +272,6 @@ def get_prediction_modes(current_trend: str, predicted_trend: str) -> tuple:
 
     sell_modes = {
         'NORMAL': SELL_MODE_NORMAL,
-        'NORMAL': SELL_MODE_NORMAL,
         'SNIPER_EXIT': SELL_MODE_SNIPER_EXIT,
         'WAIT_RECOVERY': SELL_MODE_WAIT_RECOVERY,
         'CAUTIOUS': SELL_MODE_CAUTIOUS,
