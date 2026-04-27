@@ -84,7 +84,7 @@ class BuyMixin:
 
         # Indicators
         rsi            = analysis_data.get('rsi',           50)
-        macd_diff      = analysis_data.get('macd_diff',      0)
+        macd_diff_pct  = analysis_data.get('latest', {}).get('macd_diff_pct', 0.0)
         volume_ratio   = analysis_data.get('volume_ratio', 1.0)
         price_momentum = analysis_data.get('price_momentum', 0)
         atr            = analysis_data.get('atr',           2.5)
@@ -116,7 +116,7 @@ class BuyMixin:
         # ══════════════════════════════════════
         symbol_memory = self._get_symbol_memory(symbol)
         features = self._build_meta_features(
-            rsi=rsi, macd_diff=macd_diff,
+            rsi=rsi, macd_diff_pct=macd_diff_pct,
             volume_ratio=volume_ratio,
             price_momentum=price_momentum, atr=atr,
             analysis_data=analysis_data,
@@ -338,7 +338,7 @@ class BuyMixin:
                       + (MAX_TRADE_AMOUNT - MIN_TRADE_AMOUNT) * ratio)
             rsi    = analysis.get('rsi',           50)
             vr     = analysis.get('volume_ratio', 1.0)
-            md     = analysis.get('macd_diff',      0)
+            md     = analysis.get('latest', {}).get('macd_diff_pct', 0.0)
             fr     = (analysis.get('flash_crash_protection',{})
                       .get('risk_score', 0))
             mult   = 1.0
