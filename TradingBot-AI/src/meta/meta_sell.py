@@ -268,9 +268,10 @@ class SellMixin:
         elif ss < -1: fg_p = min(abs(ss) / 5 * 2, 2)
 
         # MACD Bearish (3)
+        macd_diff_pct = analysis.get('latest', {}).get('macd_diff_pct', 0.0)
         macd_p = 0
-        if macd_diff < 0:
-            macd_p = (min(abs(macd_diff), 10) / 10) * 3
+        if macd_diff_pct < 0:
+            macd_p = min((min(abs(macd_diff_pct), 0.5) / 0.5) * 3, 3.0)
 
         # MacroTrend (3) - replaced by MACRO_SELL_POINTS below
         macro_p = 0
