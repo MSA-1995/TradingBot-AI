@@ -532,7 +532,10 @@ class SellMixin:
                     'peak_score'         : peak_score,
                     'stop_loss_threshold': threshold,
                     'coin_forecast'      : c_fc,
-                    'market_forecast'    : m_fc
+                    'market_forecast'    : m_fc,
+                    'advisors_intelligence': ai,
+                    'analysis'           : analysis,
+                    'confidence'         : sell_points
                 }
 
         gc.collect()
