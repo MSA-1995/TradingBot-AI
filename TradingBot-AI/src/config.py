@@ -155,59 +155,78 @@ MACRO_BUY_POINTS = {
     # 🟢 Positive
     ('BULL', 'BULL', 'BULL') : +20,
     ('BULL', 'BULL', 'NEUT') : +10,
-    ('NEUT', 'BULL', 'BULL') : +10,
+    ('BULL', 'BULL', 'BEAR') : -10,
+
     ('BULL', 'NEUT', 'BULL') : +5,
     ('BULL', 'NEUT', 'NEUT') : 0,
-    ('NEUT', 'NEUT', 'NEUT') : 0,
-    ('NEUT', 'BULL', 'NEUT') : +5,
+    ('BULL', 'NEUT', 'BEAR') : -15,
 
-    ('BULL', 'BULL', 'BEAR') : -10,
     ('BULL', 'BEAR', 'BULL') : -5,
     ('BULL', 'BEAR', 'NEUT') : -15,
     ('BULL', 'BEAR', 'BEAR') : -20,
-    ('NEUT', 'BEAR', 'BEAR') : -20,
-    ('BEAR', 'BULL', 'BEAR') : -10,
-    ('BEAR', 'BEAR', 'NEUT') : -20,
-    ('BEAR', 'BEAR', 'BEAR') : -25,
-    ('BEAR', 'BULL', 'BULL') : +5,
 
-    # 🟢 Additional (missing)
+    ('NEUT', 'BULL', 'BULL') : +10,
+    ('NEUT', 'BULL', 'NEUT') : +5,
+    ('NEUT', 'BULL', 'BEAR') : -10,
+
     ('NEUT', 'NEUT', 'BULL') : +5,
+    ('NEUT', 'NEUT', 'NEUT') : 0,
     ('NEUT', 'NEUT', 'BEAR') : -20,
+
     ('NEUT', 'BEAR', 'BULL') : -10,
     ('NEUT', 'BEAR', 'NEUT') : -20,
+    ('NEUT', 'BEAR', 'BEAR') : -20,
+
+    ('BEAR', 'BULL', 'BULL') : +5,
+    ('BEAR', 'BULL', 'NEUT') : -10,
+    ('BEAR', 'BULL', 'BEAR') : -10,
+
     ('BEAR', 'NEUT', 'BULL') : -10,
     ('BEAR', 'NEUT', 'NEUT') : -20,
     ('BEAR', 'NEUT', 'BEAR') : -20,
+
+    ('BEAR', 'BEAR', 'BULL') : +5,
+    ('BEAR', 'BEAR', 'NEUT') : -20,
+    ('BEAR', 'BEAR', 'BEAR') : -25,
 }
 
 MACRO_SELL_POINTS = {
     # 🟢 Bullish = negative (sell-model hold / avoid sell)
     ('BULL', 'BULL', 'BULL') : -10,
     ('BULL', 'BULL', 'NEUT') : -5,
-    ('NEUT', 'BULL', 'BULL') : -5,
+    ('BULL', 'BULL', 'BEAR') : +5,
+
     ('BULL', 'NEUT', 'BULL') : -3,
     ('BULL', 'NEUT', 'NEUT') : 0,
-    ('NEUT', 'NEUT', 'NEUT') : 0,
-    ('NEUT', 'BULL', 'NEUT') : -3,
+    ('BULL', 'NEUT', 'BEAR') : +7,
 
-    ('BULL', 'BULL', 'BEAR') : +5,
     ('BULL', 'BEAR', 'BULL') : +3,
     ('BULL', 'BEAR', 'NEUT') : +7,
     ('BULL', 'BEAR', 'BEAR') : +10,
-    ('NEUT', 'BEAR', 'BEAR') : +10,
-    ('BEAR', 'BULL', 'BEAR') : +5,
-    ('BEAR', 'BEAR', 'NEUT') : +10,
-    ('BEAR', 'BEAR', 'BEAR') : +10,
 
-    # 🔴 Additional (missing)
+    ('NEUT', 'BULL', 'BULL') : -5,
+    ('NEUT', 'BULL', 'NEUT') : -3,
+    ('NEUT', 'BULL', 'BEAR') : +5,
+
     ('NEUT', 'NEUT', 'BULL') : -3,
+    ('NEUT', 'NEUT', 'NEUT') : 0,
     ('NEUT', 'NEUT', 'BEAR') : +10,
+
     ('NEUT', 'BEAR', 'BULL') : +5,
     ('NEUT', 'BEAR', 'NEUT') : +10,
+    ('NEUT', 'BEAR', 'BEAR') : +10,
+
+    ('BEAR', 'BULL', 'BULL') : +5,
+    ('BEAR', 'BULL', 'NEUT') : +5,
+    ('BEAR', 'BULL', 'BEAR') : +5,
+
     ('BEAR', 'NEUT', 'BULL') : -5,
     ('BEAR', 'NEUT', 'NEUT') : -10,
     ('BEAR', 'NEUT', 'BEAR') : +5,
+
+    ('BEAR', 'BEAR', 'BULL') : +5,
+    ('BEAR', 'BEAR', 'NEUT') : +10,
+    ('BEAR', 'BEAR', 'BEAR') : +10,
 }
 
 # =====================================================================
