@@ -44,8 +44,7 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
     MAX_PROFIT_HISTORY   = 5
 
     # ─── عتبات القفزات ───
-    SPIKE_POSITIVE_THRESHOLD = 3.0
-    SPIKE_NEGATIVE_THRESHOLD = -3.0
+    SPIKE_POSITIVE_THRESHOLD = 5.0
     SPIKE_TIME_WINDOW        = 20
 
     # ─── عتبات البيع ───
