@@ -182,12 +182,12 @@ MACRO_BUY_POINTS = {
     ('BEAR', 'BULL', 'BEAR') : -10,
 
     ('BEAR', 'NEUT', 'BULL') : -10,
-    ('BEAR', 'NEUT', 'NEUT') : -20,
+    ('BEAR', 'NEUT', 'NEUT') : -18,
     ('BEAR', 'NEUT', 'BEAR') : -20,
 
     ('BEAR', 'BEAR', 'BULL') : +5,
     ('BEAR', 'BEAR', 'NEUT') : -20,
-    ('BEAR', 'BEAR', 'BEAR') : -25,
+    ('BEAR', 'BEAR', 'BEAR') : -20,
 }
 
 MACRO_SELL_POINTS = {
