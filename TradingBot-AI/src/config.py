@@ -76,14 +76,6 @@ SELL_MODE_NORMAL = {
     'label': '👑 Normal',
 }
 
-SELL_MODE_NORMAL = {
-    'mode': 'NORMAL',
-    'stability_minutes': 0,
-    'min_sell_profit': 0.5,    # حد أدنى عمولة فقط - AI يقرر القمة
-    'stop_loss_mult': 0.8,
-    'label': '🎯 Sniper Profit',
-}
-
 SELL_MODE_SNIPER_EXIT = {
     'mode': 'SNIPER_EXIT',
     'stability_minutes': 0,
@@ -114,9 +106,9 @@ SELL_MODE_CAUTIOUS = {
 
 BUY_MODE_AGGRESSIVE = {
     'mode': 'AGGRESSIVE',
-    'min_confidence': 55,      # كان 50 ← منخفض جداً
+    'min_confidence': 60,
     'max_amount': 30,
-    'max_positions': 20,
+    'max_positions': 15,
     'label': '🟢🟢 Aggressive',
 }
 
@@ -138,17 +130,17 @@ BUY_MODE_CAUTIOUS = {
 
 BUY_MODE_MINIMAL = {
     'mode': 'MINIMAL',
-    'min_confidence': 70,      # ثقة عالية - فرص قوية فقط
-    'max_amount': 30,
-    'max_positions': 20,
+    'min_confidence': 70,
+    'max_amount': 20,
+    'max_positions': 10,
     'label': '⚠️ High Confidence',
 }
 
 BUY_MODE_NO_BUY = {
     'mode': 'NO_BUY',
-    'min_confidence': 80,       # ثقة عالية جداً - يشتري القاع الحقيقي فقط
-    'max_amount': 30,
-    'max_positions': 20,
+    'min_confidence': 80,
+    'max_amount': 12,
+    'max_positions': 5,
     'label': '🔴🔴 High Confidence Only',
 }
 
@@ -177,6 +169,7 @@ MACRO_BUY_POINTS = {
     ('BEAR', 'BULL', 'BEAR') : -10,
     ('BEAR', 'BEAR', 'NEUT') : -20,
     ('BEAR', 'BEAR', 'BEAR') : -25,
+    ('BEAR', 'BULL', 'BULL') :  +5,
 }
 
 MACRO_SELL_POINTS = {
@@ -233,7 +226,7 @@ PREDICTION_MATRIX = {
     # 🔴 Bearish now
     ('BEARISH', 'BULLISH'):   ('BALANCED', 'WAIT_RECOVERY'),
     ('BEARISH', 'NEUTRAL'):   ('CAUTIOUS_BUY', 'CAUTIOUS'),
-    ('BEARISH', 'BEARISH'):   ('MINIMAL', 'SNIPER_EXIT'),
+    ('BEARISH', 'BEARISH'):   ('NO_BUY', 'SNIPER_EXIT'),
     ('BEARISH', 'MIXED'):     ('CAUTIOUS_BUY', 'CAUTIOUS'),
 }
 
