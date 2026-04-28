@@ -4,6 +4,7 @@
 """
 
 import logging
+import time
 from datetime import datetime, timezone
 import pandas as pd
 
@@ -14,8 +15,230 @@ from config import (
 
 logger = logging.getLogger(__name__)
 
+# ──────────────────────────────────────────────
+# كاش الدعم الديناميكي (MemoryCache أو dict عادي)
+# ──────────────────────────────────────────────
+try:
+    import sys, os
+    _mem_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              '..', '..', 'memory')
+    if os.path.exists(_mem_path) and _mem_path not in sys.path:
+        sys.path.insert(0, _mem_path)
+    from memory_cache import MemoryCache
+    _dynamic_cache = MemoryCache(max_items=50)
+except Exception:
+    _dynamic_cache = {}
+
 
 class BuyMixin:
+
+    # ══════════════════════════════════════════════════════════════
+    # 🌐 الدعم الديناميكي للماكرو
+    # ══════════════════════════════════════════════════════════════
+
+    def _calculate_dynamic_macro_support(self,
+                                          symbol: str,
+                                          analysis_data: dict,
+                                          ai: dict) -> float:
+        """
+        يجمع البيانات الخارجية ويحسب دعماً إضافياً (+/- نقاط)
+        القواعد:
+          - خوف > 75       → -2 نقطة  (سوق خائف = لا تشتري)
+          - أخبار إيجابية  → +1 نقطة  (دعم للعملة)
+          - حيتان شراء     → +1.5 نقطة (الكبار يشترون)
+          - خوف < 25       → +1 نقطة  (طمع = زخم)
+          - أخبار سلبية    → -1 نقطة
+          - حيتان بيع      → -1.5 نقطة
+        """
+        # ── كاش 5 دقائق لكل عملة ──────────────────────────────
+        cache_key = f"dyn_macro_{symbol}"
+        try:
+            if isinstance(_dynamic_cache, dict):
+                cached = _dynamic_cache.get(cache_key)
+            else:
+                cached = _dynamic_cache.get(cache_key)
+
+            if cached:
+                val = cached if isinstance(cached, (int, float)) else cached.get('v', 0)
+                # تحقق من الوقت فقط إذا كان dict
+                if isinstance(cached, dict):
+                    if time.time() - cached.get('t', 0) < 300:
+                        ai['dynamic_macro_support'] = val
+                        ai['dynamic_macro_cached']  = True
+                        return val
+                else:
+                    ai['dynamic_macro_support'] = val
+                    ai['dynamic_macro_cached']  = True
+                    return val
+        except Exception:
+            pass
+
+        support = 0.0
+        details = []
+
+        try:
+            # ── 1. Fear & Greed ────────────────────────────────
+            fg = (analysis_data.get('sentiment', {}).get('fear_greed')
+                  or analysis_data.get('fear_greed_index')
+                  or ai.get('fear_greed', 50)
+                  or 50)
+            fg = float(fg)
+
+            if fg > 75:
+                support -= 2.0
+                details.append(f'😱 Fear={fg:.0f}→-2')
+            elif fg > 60:
+                support -= 1.0
+                details.append(f'😰 Fear={fg:.0f}→-1')
+            elif fg < 25:
+                support += 1.0
+                details.append(f'🤑 Greed={fg:.0f}→+1')
+
+            # ── 2. أخبار العملة ────────────────────────────────
+            pos_news = (analysis_data.get('external_impact', {})
+                        .get('positive_news_count', 0))
+            neg_news = (analysis_data.get('external_impact', {})
+                        .get('negative_news_count', 0))
+
+            # fallback من news_analyzer مباشرة
+            if pos_news == 0 and neg_news == 0:
+                try:
+                    na = (self.advisor_manager.get('NewsAnalyzer')
+                          if self.advisor_manager else None)
+                    if na:
+                        ns = na.get_news_sentiment(symbol)
+                        if ns:
+                            pos_news = ns.get('positive', 0)
+                            neg_news = ns.get('negative', 0)
+                except Exception:
+                    pass
+
+            if pos_news > neg_news and pos_news > 0:
+                support += 1.0
+                details.append(f'📰 PosNews={pos_news}→+1')
+            elif neg_news > pos_news and neg_news > 0:
+                support -= 1.0
+                details.append(f'📰 NegNews={neg_news}→-1')
+
+            # ── 3. حيتان (Whale) ───────────────────────────────
+            whale_conf = float(analysis_data.get('whale_confidence', 0) or 0)
+
+            if whale_conf > 15:
+                support += 1.5
+                details.append(f'🐋 WhaleBuy={whale_conf:.0f}→+1.5')
+            elif whale_conf > 5:
+                support += 0.75
+                details.append(f'🐳 WhaleLean={whale_conf:.0f}→+0.75')
+            elif whale_conf < -15:
+                support -= 1.5
+                details.append(f'🐋 WhaleSell={whale_conf:.0f}→-1.5')
+            elif whale_conf < -5:
+                support -= 0.75
+                details.append(f'🐳 WhaleDump={whale_conf:.0f}→-0.75')
+
+            # ── 4. ربط حالة الماكرو من config ──────────────────
+            _macro_pred = ai.get('macro_prediction', {})
+            _now        = str(_macro_pred.get('current', ''))
+            _1h         = str(_macro_pred.get('1h', 'NEUTRAL'))
+            _4h         = str(_macro_pred.get('4h', 'NEUTRAL'))
+
+            # إذا الماكرو الثابت سلبي جداً → خفف الدعم الديناميكي
+            def _ms(s):
+                if 'BULL' in s: return 'BULL'
+                if 'BEAR' in s: return 'BEAR'
+                return 'NEUT'
+
+            _key         = (_ms(_now), _ms(_1h), _ms(_4h))
+            macro_static = MACRO_BUY_POINTS.get(_key, 0)
+
+            # إذا الماكرو الثابت ≤ -8: الدعم الديناميكي الإيجابي يُقلّص
+            if macro_static <= -8 and support > 0:
+                support *= 0.5
+                details.append(f'⚠️ MacroStatic={macro_static}→dampened')
+
+            # ── 5. سيولة (Liquidity) من analysis ───────────────
+            liq = float(analysis_data.get('liquidity_score', 50) or 50)
+            if liq < 30:
+                support -= 0.5
+                details.append(f'💧 LowLiq={liq:.0f}→-0.5')
+            elif liq > 75:
+                support += 0.5
+                details.append(f'💧 HighLiq={liq:.0f}→+0.5')
+
+        except Exception as e:
+            logger.warning(f"dynamic_macro_support error: {e}")
+            support = 0.0
+
+        # ── حدود القيمة النهائية ───────────────────────────────
+        support = max(-5.0, min(5.0, support))
+
+        # ── تخزين في الكاش ────────────────────────────────────
+        try:
+            cache_val = {'v': support, 't': time.time()}
+            if isinstance(_dynamic_cache, dict):
+                _dynamic_cache[cache_key] = cache_val
+            else:
+                _dynamic_cache.set(cache_key, cache_val)
+        except Exception:
+            pass
+
+        # ── تخزين في ai للعرض ─────────────────────────────────
+        ai['dynamic_macro_support'] = support
+        ai['dynamic_macro_details'] = ' | '.join(details) if details else 'No signal'
+        ai['dynamic_macro_cached']  = False
+
+        return support
+
+    # ══════════════════════════════════════════════════════════════
+    # تحديث symbol_memory بعد الصفقة
+    # ══════════════════════════════════════════════════════════════
+
+    def _update_dynamic_support_memory(self,
+                                        symbol: str,
+                                        dynamic_support: float,
+                                        trade_success: bool) -> None:
+        """
+        بعد كل صفقة: حدّث symbol_memory بنتيجة الدعم الديناميكي
+        نجاح → زد وزن الدعم المشابه مستقبلاً
+        فشل  → قلّل وزنه لتجنب التكرار
+        """
+        try:
+            memory = self._get_symbol_memory(symbol)
+            if not isinstance(memory, dict):
+                return
+
+            prev_weight = float(memory.get('dynamic_support_weight', 1.0))
+
+            if trade_success:
+                # دعم إيجابي ونجاح → زد الوزن
+                if dynamic_support > 0:
+                    new_weight = min(prev_weight * 1.15, 2.0)
+                else:
+                    new_weight = prev_weight  # لا تغيير
+            else:
+                # فشل → قلّل الوزن إذا كان الدعم إيجابياً (كان مضللاً)
+                if dynamic_support > 0:
+                    new_weight = max(prev_weight * 0.85, 0.3)
+                else:
+                    new_weight = min(prev_weight * 1.05, 1.5)  # الدعم السلبي كان صح
+
+            memory['dynamic_support_weight']      = round(new_weight, 3)
+            memory['last_dynamic_support']        = dynamic_support
+            memory['last_dynamic_support_result'] = 'win' if trade_success else 'loss'
+
+            # حفظ في storage إذا متاح
+            if hasattr(self, 'storage') and self.storage:
+                try:
+                    self.storage.update_symbol_memory(symbol, memory)
+                except Exception:
+                    pass
+
+        except Exception as e:
+            logger.warning(f"update_dynamic_support_memory error: {e}")
+
+    # ══════════════════════════════════════════════════════════════
+    # should_buy - نفس الكود + إضافة الدعم الديناميكي
+    # ══════════════════════════════════════════════════════════════
 
     def should_buy(self, symbol: str, analysis: dict,
                    models_scores=None, candles=None,
@@ -101,7 +324,6 @@ class BuyMixin:
             return {'action':'DISPLAY',
                     'reason':'🛡️ High Liquidation Risk',
                     'confidence':0}
-
 
         # ══════════════════════════════════════
         # ENSURE buy_mode is ALWAYS set
@@ -197,7 +419,6 @@ class BuyMixin:
                    else 0.2 if ext_s >= 50
                    else 0.0)
 
-
         # Prediction Points (1h + 4h forecast)
         _pred = ai.get('macro_prediction', {})
         _1h_bull = ai.get('1h_bullish', False)
@@ -206,9 +427,6 @@ class BuyMixin:
         _4h_bear = ai.get('4h_bearish', False)
         _1h_conf = _pred.get('1h_confidence', 50) / 100.0
         _4h_conf = _pred.get('4h_confidence', 50) / 100.0
-
-        # Buy boost: future looks good = more points
-        # Buy penalty: future looks bad = less points
 
         # Reversal Analysis (bottom detection)
         _rev = analysis_data.get('reversal', {})
@@ -238,7 +456,7 @@ class BuyMixin:
         buy_points = min(meta_points + core_points + support_total, 100)
 
         # ══════════════════════════════════════
-        # 🌐 Macro Trend Voting = ±20 Points
+        # 🌐 Macro Trend Voting = ±10 Points (ثابت)
         # ══════════════════════════════════════
         try:
             _macro_pred  = ai.get('macro_prediction', {})
@@ -262,6 +480,36 @@ class BuyMixin:
             ai['macro_buy_points'] = 0
             ai['macro_key'] = 'ERROR'
 
+        # ══════════════════════════════════════
+        # 🚀 Dynamic Macro Support = ±5 نقاط
+        # يأتي بعد الماكرو الثابت - طبقة فوقه
+        # ══════════════════════════════════════
+        try:
+            dynamic_support = self._calculate_dynamic_macro_support(
+                symbol, analysis_data, ai)
+
+            # وزن من symbol_memory (يتعلم من الصفقات السابقة)
+            mem_weight = float(
+                symbol_memory.get('dynamic_support_weight', 1.0)
+                if isinstance(symbol_memory, dict) else 1.0
+            )
+            dynamic_points = dynamic_support * mem_weight
+
+            buy_points += dynamic_points
+            ai['dynamic_macro_points'] = round(dynamic_points, 2)
+
+
+        except Exception as e:
+            logger.warning(f"Dynamic macro support error: {e}")
+            dynamic_points  = 0
+            dynamic_support = 0
+            ai['dynamic_macro_points'] = 0
+
+        # ══════════════════════════════════════
+        # حد النهائي
+        # ══════════════════════════════════════
+        buy_points = max(0, buy_points)
+
         required = MIN_BUY_CONFIDENCE
         max_amt  = MAX_TRADE_AMOUNT
         if buy_mode:
@@ -278,7 +526,8 @@ class BuyMixin:
                 'reason'               : (
                     f'👑 Meta:{confidence:.1f}% | '
                     f'Points:{buy_points:.0f}/{required} | '
-                    f'Core:{core_points:.0f}/40'),
+                    f'Core:{core_points:.0f}/40 | '
+                    f'Dyn:{dynamic_points:+.1f}'),
                 'confidence'           : min(confidence, 99),
                 'amount'               : amount,
                 'advisors_intelligence': ai,
@@ -294,7 +543,8 @@ class BuyMixin:
                 f'👑 Meta:{confidence:.1f}% | '
                 f'Points:{buy_points:.0f} '
                 f'(need {required}+) | '
-                f'Core:{core_points:.0f}/40'),
+                f'Core:{core_points:.0f}/40 | '
+                f'Dyn:{dynamic_points:+.1f}'),
             'confidence'           : min(confidence, 99),
             'advisors_intelligence': ai,
             'buy_probability'      : buy_prob,
