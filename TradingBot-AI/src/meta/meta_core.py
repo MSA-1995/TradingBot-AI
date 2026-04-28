@@ -218,9 +218,9 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
                           / len(similar_wins))
 
             if len(similar_wins) == 1:
-                return round(min(avg_profit * 1.2, 8.0), 1)
+                return round(min(avg_profit * 1.2, 3.0), 1)
 
-            return round(min(avg_profit * 2.5, 18.0), 1)
+            return round(min(avg_profit * 2.5, 5.0), 1)
 
         except Exception as e:
             print(f"⚠️ Courage boost error: {e}")
@@ -243,12 +243,12 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
             if success >= 3 and fails == 0:
                 label = f"GoodHour({current_hour}h,{success}wins)"
                 print(f"⏰ Time Boost [{symbol}]: {label}")
-                return +10, label
+                return +5, label
 
             if total >= 4 and success / total >= 0.75:
                 label = f"GoodHour({current_hour}h,{int(success/total*100)}%)"
                 print(f"⏰ Time Boost [{symbol}]: {label}")
-                return +6, label
+                return +3, label
 
             if fails >= 2:
                 label = f"BadHour({current_hour}h,{fails}fails)"
@@ -287,7 +287,7 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
                 avg_profit = (sum(p.get('profit', 0) for p in matches)
                               / len(matches))
                 if avg_profit > 0.8:
-                    boost = min(avg_profit * 2.0, 14.0)
+                    boost = min(avg_profit * 2.0, 5.0)
                     label = f"Pattern({len(matches)}hits,avg{avg_profit:.1f}%)"
                     return round(boost, 1), label
 
@@ -318,10 +318,10 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
             if win_rate >= 0.80 and total >= 8:
                 label = f"WinRate({int(win_rate*100)}%,{total}trades)"
                 print(f"🏆 Win Rate Boost [{symbol}]: +10 — {label}")
-                return +10, label
+                return +5, label
             if win_rate >= 0.65 and total >= 5:
                 label = f"WinRate({int(win_rate*100)}%,{total}trades)"
-                return +5, label
+                return +2, label
             if win_rate < 0.35 and total >= 6:
                 label = f"LowWin({int(win_rate*100)}%,{total}trades)"
                 print(f"⚠️ Win Rate Penalty [{symbol}]: -8 — {label}")
@@ -450,8 +450,8 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
             if direction == 'buy':
                 if (coin_fc['direction'] == 'bullish'
                         and market_fc['direction'] == 'bullish'):
-                    confidence += ((coin_fc['confidence']
-                                    + market_fc['confidence']) / 20)
+                    # تقليل التعزيز ليكون أكثر واقعية (تقسيم على 50 بدل 20)
+                    confidence += ((coin_fc['confidence'] + market_fc['confidence']) / 50)
                 elif (coin_fc['direction'] == 'bearish'
                       or market_fc['direction'] == 'bearish'):
                     confidence -= ((coin_fc['confidence']
