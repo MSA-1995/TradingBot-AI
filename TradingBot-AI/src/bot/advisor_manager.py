@@ -57,7 +57,7 @@ class AdvisorManager:
             # النماذج الثابتة (غير مدربة - تبقى كما هي)
             'FibonacciAnalyzer':    lambda: FibonacciAnalyzer(),
             'NewsAnalyzer':         lambda: NewsAnalyzer(self._storage),
-            'MacroTrendAdvisor':    lambda: MacroTrendAdvisor(self._exchange),
+            'MacroTrendAdvisor':    lambda: self._create_macro_advisor(),
 
             # الأنظمة الحصرية الـ 5
             'AdaptiveIntelligence': lambda: AdaptiveIntelligence(self._storage),
@@ -67,6 +67,11 @@ class AdvisorManager:
         }
         pass  # silent
 
+    
+    def _create_macro_advisor(self):
+        advisor = MacroTrendAdvisor(self._exchange)
+        advisor.db = self._storage
+        return advisor
     def _create_ai_advisor(self, model_name):
         """
         ✅ إنشاء مستشار ذكي يستخدم النموذج المدرب من قاعدة البيانات
@@ -314,3 +319,5 @@ class AIAdvisorWrapper:
         except Exception as e:
             print(f"⚠️ AI Risk error: {e}")
             return base_amount
+
+
