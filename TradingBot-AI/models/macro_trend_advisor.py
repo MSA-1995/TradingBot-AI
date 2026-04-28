@@ -13,7 +13,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from models.volume_prediction_model import VolumePredictor
+from .volume_prediction_model import VolumePredictor
 
 # استيراد dl_client إذا كان متوفراً
 try:
