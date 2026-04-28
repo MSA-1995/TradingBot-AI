@@ -238,8 +238,9 @@ class MacroTrendAdvisor:
 
         # 2. RSI (weight 2)
         rsi = self._calculate_rsi(df['c'])
-        if   rsi > 75: bear_signals += 2
-        elif rsi > 60: bull_signals += 1
+        if   rsi > 80: bear_signals += 1
+        elif rsi > 65: bull_signals += 2
+        elif rsi > 55: bull_signals += 1
         elif rsi < 25: bull_signals += 2
         elif rsi < 40: bear_signals += 1
 
