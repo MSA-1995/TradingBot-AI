@@ -120,61 +120,65 @@ class MacroTrendAdvisor:
             # ⚡ التحقق السريع باستخدام نماذج DL المحملة من DB: إذا كان أكثر من 3 نماذج تشير إلى BULL، قلل الانتظار
             quick_verified = False
             if is_bull_signal:
-                quick_data = self._get_quick_verification_data()
-                if quick_data:
+                # جلب البيانات اللازمة للتحقق
+                q_df = self._get_quick_verification_df()
+                if q_df is not None:
                     try:
                         bull_votes = 0
                         total_models = 0
 
-                        # volume_pred (النموذج محمل ككائن LightGBM/XGBoost جاهز)
+                        # تحويل الصف الأخير لمصفوفة للنماذج
+                        features_array = q_df.tail(1).drop(columns=['ts'], errors='ignore').values
+
+                        # 1. نماذج الذكاء الاصطناعي من الكاش
                         if self.volume_predictor:
-                            spike_proba = self.volume_predictor.predict(quick_data)
-                            if spike_proba > 0.6: bull_votes += 1
+                            # predict ترجع مصفوفة احتمالات
+                            spike_proba = self.volume_predictor.predict(features_array)[0]
+                            if spike_proba > 0.6: bull_votes += 1 
                             total_models += 1
 
-                        # sentiment
                         if self.sentiment_analyzer:
-                            sent_score = self.sentiment_analyzer.predict(quick_data)
+                            sent_score = self.sentiment_analyzer.predict(features_array)[0]
                             if sent_score > 0.5: bull_votes += 1
                             total_models += 1
 
-                        # liquidity
                         if self.liquidity_analyzer:
-                            liq_score = self.liquidity_analyzer.predict(quick_data)
+                            liq_score = self.liquidity_analyzer.predict(features_array)[0]
                             if liq_score > 0.5: bull_votes += 1
                             total_models += 1
 
-                        # smart_money
                         if self.smart_money_tracker:
-                            sm_score = self.smart_money_tracker.predict(quick_data)
+                            sm_score = self.smart_money_tracker.predict(features_array)[0]
                             if sm_score > 0.5: bull_votes += 1
                             total_models += 1
 
-                        # crypto_news
                         if self.crypto_news_analyzer:
-                            news_score = self.crypto_news_analyzer.predict(quick_data)
+                            news_score = self.crypto_news_analyzer.predict(features_array)[0]
                             if news_score > 0.5: bull_votes += 1
                             total_models += 1
 
-                        # 2 كود ثابت إضافي
-                        # multi_timeframe_analyzer
+                        # 2. الأكواد الثابتة (Fixed Logic)
                         try:
                             from .multi_timeframe_analyzer import MultiTimeframeAnalyzer
                             mtf_analyzer = MultiTimeframeAnalyzer()
-                            # تحقق من bottom detection (إشارة BULL)
-                            bottom_conf = mtf_analyzer.analyze_bottom(quick_data).get('confidence', 0)
-                            if bottom_conf > 60:  # قاع قوي = BULL
+                            # تصحيح: تحليل القاع يحتاج بيانات شمعية
+                            # سنمرر نفس البيانات كإطار زمني افتراضي للتحقق
+                            mtf_res = mtf_analyzer.analyze_bottom(
+                                candles_5m=None, candles_15m=None, candles_1h=q_df.to_dict('records'),
+                                current_price=float(q_df['c'].iloc[-1])
+                            )
+                            if mtf_res.get('confidence', 0) > 60:
                                 bull_votes += 1
                             total_models += 1
                         except Exception:
                             pass
 
-                        # trend_early_detector
                         try:
                             from .trend_early_detector import TrendEarlyDetector
                             ted = TrendEarlyDetector()
-                            ted_result = ted.detect(quick_data)
-                            if ted_result.get('direction') == 'BULLISH' and ted_result.get('score', 0) > 40:
+                            # تصحيح: اسم الدالة detect_trend_birth
+                            ted_res = ted.detect_trend_birth(q_df)
+                            if ted_res.get('trend') == 'BULLISH' and ted_res.get('confidence', 0) > 50:
                                 bull_votes += 1
                             total_models += 1
                         except Exception:
@@ -546,52 +550,24 @@ class MacroTrendAdvisor:
     # Helpers
     # ─────────────────────────────────────────────
 
-    def _get_quick_verification_data(self) -> Optional[dict]:
-        """جمع البيانات للتحقق السريع"""
+    def _get_quick_verification_df(self) -> Optional[pd.DataFrame]:
+        """جلب DataFrame للتحقق السريع"""
         try:
             if not self.exchange:
                 return None
-
-            # جلب بيانات 1h لـ BTC/USDT
             ohlcv = self.exchange.fetch_ohlcv('BTC/USDT', '1h', limit=50)
             df = pd.DataFrame(ohlcv, columns=['ts', 'o', 'h', 'l', 'c', 'v'])
-
             if len(df) < 20:
                 return None
-
-            # حساب volume_ratio
-            avg_vol = float(df['v'].iloc[-20:].mean())
-            last_vol = float(df['v'].iloc[-1])
-            volume_ratio = last_vol / avg_vol if avg_vol > 0 else 1.0
-
-            # حساب price_change_1h (آخر ساعة)
-            price_change_1h = ((float(df['c'].iloc[-1]) - float(df['c'].iloc[-2])) / float(df['c'].iloc[-2])) * 100
-
-            # حساب momentum_strength (استخدام RSI كمقياس للزخم)
-            rsi = self._calculate_rsi(df['c'])
-            momentum_strength = rsi - 50  # مركزي حول 50
-
-            # حساب bullish_volume و bearish_volume
-            bullish_volume = 0
-            bearish_volume = 0
-            for i in range(-10, 0):  # آخر 10 شموع
-                if float(df['c'].iloc[i]) > float(df['o'].iloc[i]):
-                    bullish_volume += float(df['v'].iloc[i])
-                else:
-                    bearish_volume += float(df['v'].iloc[i])
-
-            return {
-                'volume_ratio': volume_ratio,
-                'price_change_1h': price_change_1h,
-                'momentum_strength': momentum_strength,
-                'bullish_volume': bullish_volume,
-                'bearish_volume': bearish_volume,
-                'rsi': rsi,
-                'macd_hist': 0,  # يمكن إضافة MACD إذا لزم الأمر
-            }
-
+            
+            # إضافة المؤشرات الأساسية التي قد تحتاجها النماذج
+            df['rsi'] = self._calculate_rsi(df['c'])
+            df['volume_ratio'] = df['v'] / df['v'].rolling(20).mean()
+            df['price_change'] = df['c'].pct_change() * 100
+            
+            return df
         except Exception as e:
-            print(f"⚠️ Quick verification data error: {e}")
+            print(f"⚠️ Quick verification DF error: {e}")
             return None
 
     def _get_historical_status(self, hours_ago: float = 2) -> Optional[str]:
