@@ -56,19 +56,30 @@ class MacroTrendAdvisor:
         try:
             pred = self.predict_market()
 
+            # استخدام combined المحسوب بدل جمع short + medium منفصلين
+            combined_dir = pred.get('combined', {}).get('direction', 'NEUTRAL')
+            combined_str = pred.get('combined', {}).get('strength',  'NEUTRAL')
+
+            if   combined_dir == 'BULLISH' and combined_str == 'STRONG': final_status = '🟢 BULL_MARKET'
+            elif combined_dir == 'BEARISH' and combined_str == 'STRONG': final_status = '🔴 BEAR_MARKET'
+            elif combined_dir == 'BULLISH':                               final_status = '🟢 MILD_BULL'
+            elif combined_dir == 'BEARISH':                               final_status = '🔴 MILD_BEAR'
+            elif combined_dir == 'MIXED'  and combined_str == 'CAUTION': final_status = '⚪ SIDEWAYS'
+            else:                                                          final_status = '⚪ SIDEWAYS'
+
+            # للعرض فقط
             short_bull  = pred.get('short',  {}).get('bull_score', 0)
             short_bear  = pred.get('short',  {}).get('bear_score', 0)
             medium_bull = pred.get('medium', {}).get('bull_score', 0)
             medium_bear = pred.get('medium', {}).get('bear_score', 0)
+            total_bull  = short_bull  + medium_bull
+            total_bear  = short_bear  + medium_bear
 
-            total_bull = short_bull  + medium_bull
-            total_bear = short_bear  + medium_bear
-
-            if   total_bull > total_bear * 1.5: final_status = '🟢 BULL_MARKET'
-            elif total_bear > total_bull * 1.5: final_status = '🔴 BEAR_MARKET'
-            elif total_bull > total_bear * 1.2: final_status = '🟢 MILD_BULL'
-            elif total_bear > total_bull * 1.2: final_status = '🔴 MILD_BEAR'
-            else:                               final_status = '⚪ SIDEWAYS'
+            # تحقق الداتابيز: لو BULL، قارن بالحالة المحفوظة قبل ساعتين
+            if 'BULL' in final_status:
+                historical = self._get_historical_status(hours_ago=2)
+                if historical and 'BEAR' in historical:
+                    final_status = '⚪ SIDEWAYS'  # تعارض مع الحالة السابقة
 
             short_p  = pred.get('short',  {}).get('prediction', '?')
             medium_p = pred.get('medium', {}).get('prediction', '?')
@@ -233,13 +244,14 @@ class MacroTrendAdvisor:
         elif rsi < 40: bear_signals += 1
 
         # 3. Volume (weight 2)
-        avg_vol   = float(df['v'].iloc[-6:].mean())
+        avg_vol   = float(df['v'].iloc[-20:].mean())
         last_vol  = float(df['v'].iloc[-1])
         vol_ratio = last_vol / avg_vol if avg_vol > 0 else 1.0
 
         if   vol_ratio > 1.5 and last_3_change > 0: bull_signals += 2
         elif vol_ratio > 1.5 and last_3_change < 0: bear_signals += 2
         elif vol_ratio < 0.5:                        bear_signals += 1
+        elif vol_ratio < 1.2 and last_3_change > 0: bear_signals += 3  # صعود وهمي بحجم خفيف
 
         # 4. MACD Direction (weight 2)
         macd         = df['c'].ewm(span=12).mean() - df['c'].ewm(span=26).mean()
@@ -286,6 +298,23 @@ class MacroTrendAdvisor:
 
         if total == 0:
             return {'prediction': 'NEUTRAL', 'confidence': 50, 'reason': '⚪ No signals'}
+
+        # شرط ثنين من ثلاثة: لازم عملتين على الأقل يتفقان على نفس الاتجاه
+        bull_count = sum(1 for p in predictions if p['bull'] > p['bear'])
+        bear_count = sum(1 for p in predictions if p['bear'] > p['bull'])
+        if bull_count < 2 and bear_count < 2:
+            details = ', '.join(
+                f"{p['symbol'].split('/')[0]}(🟢{p['bull']}/🔴{p['bear']})"
+                for p in predictions
+            )
+            return {
+                'prediction': 'NEUTRAL',
+                'confidence': 50,
+                'bull_score': total_bull,
+                'bear_score': total_bear,
+                'reason'    : f'⚪ No consensus (2/3 required) - {"Next 1h" if timeframe == "1h" else "Next 4h"}',
+                'details'   : details,
+            }
 
         bull_pct = total_bull / total * 100
         bear_pct = total_bear / total * 100
@@ -334,6 +363,51 @@ class MacroTrendAdvisor:
     # ─────────────────────────────────────────────
     # Helpers
     # ─────────────────────────────────────────────
+
+    def _get_historical_status(self, hours_ago: float = 2) -> Optional[str]:
+        """
+        يقرأ macro_status المحفوظة في bot_settings (key=bot_status)
+        ويرجع القيمة المحفوظة — تُستخدم للمقارنة قبل إرجاع BULL.
+        الربط: advisor.db = your_database_storage_instance
+        """
+        try:
+            if not hasattr(self, 'db') or self.db is None:
+                return None
+
+            raw = self.db.load_setting('bot_status')
+            if not raw:
+                return None
+
+            import json
+            data = json.loads(raw)
+
+            # تحقق الوقت — لو السجل أقدم من hours_ago + 30 دقيقة تجاهله
+            saved_time = data.get('time', '')          # مثال: "07:53:26"
+            macro      = data.get('macro_status', '')  # مثال: "🔴 BEAR_MARKET"
+
+            if not macro:
+                return None
+
+            # المقارنة بالوقت: bot_status يتحدث كل 5 دقائق
+            # لو الفرق بين الوقت الحالي والمحفوظ أكبر من (hours_ago * 60 + 30) دقيقة → تجاهل
+            if saved_time:
+                try:
+                    from datetime import datetime
+                    now       = datetime.now()
+                    saved_dt  = datetime.strptime(saved_time, "%H:%M:%S").replace(
+                        year=now.year, month=now.month, day=now.day
+                    )
+                    diff_mins = (now - saved_dt).total_seconds() / 60
+                    max_age   = hours_ago * 60 + 30
+                    if diff_mins < 0 or diff_mins > max_age:
+                        return None
+                except Exception:
+                    pass  # لو فشل تحليل الوقت نكمل بالقيمة
+
+            return macro
+
+        except Exception:
+            return None
 
     def _empty_prediction(self) -> dict:
         return {
