@@ -17,9 +17,9 @@ class MacroTrendAdvisor:
 
     MACRO_SYMBOLS = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']
 
-    CACHE_DURATION      = 300  # 5 دقائق - حالة السوق
-    PREDICTION_CACHE_1H = 300  # 5 دقائق - بيانات 1h
-    PREDICTION_CACHE_4H = 300  # 5 دقائق - بيانات 4h
+    CACHE_DURATION      = 900  # 15 دقيقة - حالة السوق (إشارات 1h/4h بطيئة، تحديث أسرع يعطي ضجيج)
+    PREDICTION_CACHE_1H = 900  # 15 دقيقة - بيانات 1h
+    PREDICTION_CACHE_4H = 900  # 15 دقيقة - بيانات 4h
 
     RSI_PERIOD        = 14
     MOMENTUM_LOOKBACK = 10
@@ -40,6 +40,8 @@ class MacroTrendAdvisor:
         self._last_1h_prediction_time : float = 0.0
         self._last_4h_prediction      : dict  = {}
         self._last_4h_prediction_time : float = 0.0
+        self._last_15m_prediction      : dict  = {}
+        self._last_15m_prediction_time : float = 0.0
 
     # ─────────────────────────────────────────────
     # Main Interface
@@ -60,12 +62,13 @@ class MacroTrendAdvisor:
             combined_dir = pred.get('combined', {}).get('direction', 'NEUTRAL')
             combined_str = pred.get('combined', {}).get('strength',  'NEUTRAL')
 
-            if   combined_dir == 'BULLISH' and combined_str == 'STRONG': final_status = '🟢 BULL_MARKET'
-            elif combined_dir == 'BEARISH' and combined_str == 'STRONG': final_status = '🔴 BEAR_MARKET'
-            elif combined_dir == 'BULLISH':                               final_status = '🟢 MILD_BULL'
-            elif combined_dir == 'BEARISH':                               final_status = '🔴 MILD_BEAR'
-            elif combined_dir == 'MIXED'  and combined_str == 'CAUTION': final_status = '⚪ SIDEWAYS'
-            else:                                                          final_status = '⚪ SIDEWAYS'
+            if   combined_dir == 'BULLISH' and combined_str == 'STRONG':  final_status = '🟢 BULL_MARKET'
+            elif combined_dir == 'BEARISH' and combined_str == 'STRONG':  final_status = '🔴 BEAR_MARKET'
+            elif combined_dir == 'BULLISH':                                final_status = '🟢 MILD_BULL'
+            elif combined_dir == 'BEARISH' and combined_str == 'CAUTION': final_status = '🔴 MILD_BEAR'   # ✅ FIX 2: كان SIDEWAYS
+            elif combined_dir == 'BEARISH':                                final_status = '🔴 MILD_BEAR'
+            elif combined_dir == 'MIXED'   and combined_str == 'CAUTION': final_status = '⚪ SIDEWAYS'
+            else:                                                           final_status = '⚪ SIDEWAYS'
 
             # للعرض فقط
             short_bull  = pred.get('short',  {}).get('bull_score', 0)
@@ -123,10 +126,11 @@ class MacroTrendAdvisor:
 
     def invalidate_cache(self) -> None:
         """إعادة ضبط كل الكاش"""
-        self._last_check_time         = 0.0
-        self._last_prediction_time    = 0.0
-        self._last_1h_prediction_time = 0.0
-        self._last_4h_prediction_time = 0.0
+        self._last_check_time          = 0.0
+        self._last_prediction_time     = 0.0
+        self._last_1h_prediction_time  = 0.0
+        self._last_4h_prediction_time  = 0.0
+        self._last_15m_prediction_time = 0.0
 
     # ─────────────────────────────────────────────
     # Indicators
@@ -158,11 +162,13 @@ class MacroTrendAdvisor:
             return self._last_prediction
 
         try:
-            short    = self._predict_timeframe('1h', 24)
-            medium   = self._predict_timeframe('4h', 24)
-            combined = self._combine_timeframes(short, medium)
+            fast     = self._predict_timeframe('15m', 48)   # فلتر سريع — آخر 12 ساعة
+            short    = self._predict_timeframe('1h',  24)
+            medium   = self._predict_timeframe('4h',  24)
+            combined = self._combine_timeframes(fast, short, medium)
 
             result = {
+                'fast'    : fast,
                 'short'   : short,
                 'medium'  : medium,
                 'combined': combined,
@@ -177,8 +183,12 @@ class MacroTrendAdvisor:
             return self._empty_prediction()
 
     def _predict_timeframe(self, timeframe: str, limit: int) -> dict:
-        """كل timeframe له كاش مستقل - كلهم 5 دقائق"""
-        if timeframe == '1h':
+        """كل timeframe له كاش مستقل"""
+        if timeframe == '15m':
+            cache_dur = 300  # 5 دقائق — فلتر سريع
+            last_time = self._last_15m_prediction_time
+            last_pred = self._last_15m_prediction
+        elif timeframe == '1h':
             cache_dur = self.PREDICTION_CACHE_1H
             last_time = self._last_1h_prediction_time
             last_pred = self._last_1h_prediction
@@ -207,7 +217,10 @@ class MacroTrendAdvisor:
         result = self._combine_predictions(predictions, timeframe)
 
         # حفظ في الكاش الصحيح
-        if timeframe == '1h':
+        if timeframe == '15m':
+            self._last_15m_prediction      = result
+            self._last_15m_prediction_time = time.time()
+        elif timeframe == '1h':
             self._last_1h_prediction      = result
             self._last_1h_prediction_time = time.time()
         else:
@@ -226,51 +239,74 @@ class MacroTrendAdvisor:
         bull_signals = 0
         bear_signals = 0
 
-        # 1. Last 3 candles direction (weight 3)
-        last_3_change = (
-            (float(df['c'].iloc[-1]) - float(df['c'].iloc[-4]))
-            / float(df['c'].iloc[-4]) * 100
+        # 1. الاتجاه الحقيقي - آخر 10 شموع بدلاً من 3 (weight 4)
+        last_10_change = (
+            (float(df['c'].iloc[-1]) - float(df['c'].iloc[-11]))
+            / float(df['c'].iloc[-11]) * 100
         )
-        if   last_3_change >  0.5: bull_signals += 3
-        elif last_3_change < -0.5: bear_signals += 3
-        elif last_3_change >  0:   bull_signals += 1
-        elif last_3_change <  0:   bear_signals += 1
+        # شرط أقوى: لازم يكون الصعود/الهبوط واضح
+        if   last_10_change >  1.5: bull_signals += 4  # صعود قوي
+        elif last_10_change >  0.5: bull_signals += 2  # صعود خفيف
+        elif last_10_change < -1.5: bear_signals += 4  # هبوط قوي
+        elif last_10_change < -0.5: bear_signals += 2  # هبوط خفيف
+        # لو التغيير بين -0.5% و +0.5% = سوق عرضي (لا نضيف نقاط)
 
-        # 2. RSI (weight 2)
+        # 2. RSI - تعديل الحدود (weight 3)
         rsi = self._calculate_rsi(df['c'])
-        if   rsi > 80: bear_signals += 1
-        elif rsi > 65: bull_signals += 2
-        elif rsi > 55: bull_signals += 1
-        elif rsi < 25: bull_signals += 2
-        elif rsi < 40: bear_signals += 1
+        if   rsi > 75: bear_signals += 3  # تشبع شرائي قوي
+        elif rsi > 65: bear_signals += 1  # تشبع شرائي خفيف
+        elif rsi > 55: bull_signals += 1  # زخم صاعد
+        elif rsi < 30: bull_signals += 3  # تشبع بيعي قوي
+        elif rsi < 40: bull_signals += 1  # تشبع بيعي خفيف
+        elif rsi > 45 and rsi < 55: pass  # منطقة محايدة
 
-        # 3. Volume (weight 2)
+        # 3. Volume - فلتر الصعود الوهمي (weight 3)
         avg_vol   = float(df['v'].iloc[-20:].mean())
         last_vol  = float(df['v'].iloc[-1])
         vol_ratio = last_vol / avg_vol if avg_vol > 0 else 1.0
 
-        if   vol_ratio > 1.5 and last_3_change > 0: bull_signals += 2
-        elif vol_ratio > 1.5 and last_3_change < 0: bear_signals += 2
-        elif vol_ratio < 0.5:                        bear_signals += 1
-        elif vol_ratio < 1.2 and last_3_change > 0: bear_signals += 3  # صعود وهمي بحجم خفيف
+        # ✅ الفلتر الأهم: صعود بحجم ضعيف = فخ!
+        if vol_ratio < 0.8 and last_10_change > 0.5:
+            bear_signals += 4  # صعود وهمي بحجم ضعيف = احتمال انعكاس
+        elif vol_ratio > 2.0 and last_10_change > 0:
+            bull_signals += 3  # صعود بحجم قوي = اتجاه حقيقي
+        elif vol_ratio > 2.0 and last_10_change < 0:
+            bear_signals += 3  # هبوط بحجم قوي = اتجاه حقيقي
+        elif vol_ratio < 0.5:
+            bear_signals += 1  # حجم ضعيف = ضعف السوق
 
-        # 4. MACD Direction (weight 2)
+        # 4. MACD - اتجاه الزخم (weight 2)
         macd         = df['c'].ewm(span=12).mean() - df['c'].ewm(span=26).mean()
-        macd_current = float(macd.iloc[-1])
-        macd_prev    = float(macd.iloc[-2])
+        macd_signal  = macd.ewm(span=9).mean()
+        macd_hist    = macd - macd_signal
+        hist_current = float(macd_hist.iloc[-1])
+        hist_prev    = float(macd_hist.iloc[-2])
 
-        if   macd_current > macd_prev and macd_current > 0: bull_signals += 2
-        elif macd_current > macd_prev:                       bull_signals += 1
-        elif macd_current < macd_prev and macd_current < 0: bear_signals += 2
-        elif macd_current < macd_prev:                       bear_signals += 1
+        # استخدام الهستوجرام بدلاً من MACD المباشر (أدق)
+        if   hist_current > 0 and hist_current > hist_prev: bull_signals += 2
+        elif hist_current > 0:                               bull_signals += 1
+        elif hist_current < 0 and hist_current < hist_prev: bear_signals += 2
+        elif hist_current < 0:                               bear_signals += 1
 
-        # 5. EMA Cross (weight 1)
+        # 5. EMA Cross قصير المدى (weight 1)
         ema_9  = float(df['c'].ewm(span=9).mean().iloc[-1])
         ema_21 = float(df['c'].ewm(span=21).mean().iloc[-1])
         if ema_9 > ema_21: bull_signals += 1
         else:              bear_signals += 1
 
-        # 6. Reversal candle (weight 2)
+        # 5b. فلتر الاتجاه الحقيقي EMA50/200 (weight 3) — يمنع الشراء في سوق هابط
+        # هذا الفلتر هو الأهم: لو السعر تحت EMA200 = سوق هابط بغض النظر عن الإشارات القصيرة
+        if len(df) >= 200:
+            ema_50  = float(df['c'].ewm(span=50,  adjust=False).mean().iloc[-1])
+            ema_200 = float(df['c'].ewm(span=200, adjust=False).mean().iloc[-1])
+            price   = float(df['c'].iloc[-1])
+
+            if   price > ema_200 and ema_50 > ema_200: bull_signals += 3  # اتجاه صاعد حقيقي
+            elif price < ema_200 and ema_50 < ema_200: bear_signals += 3  # اتجاه هابط حقيقي
+            elif price < ema_200:                       bear_signals += 2  # تحت EMA200 = خطر
+            elif ema_50 < ema_200:                      bear_signals += 1  # death cross وشيك
+
+        # 6. Reversal candle - شموع الانعكاس (weight 3)
         c_last       = float(df['c'].iloc[-1])
         o_last       = float(df['o'].iloc[-1])
         h_last       = float(df['h'].iloc[-1])
@@ -283,8 +319,11 @@ class MacroTrendAdvisor:
             upper_shadow = h_last - max(c_last, o_last)
             lower_shadow = min(c_last, o_last) - l_last
 
-            if   upper_shadow > candle_body * 2 and body_ratio < 0.3: bear_signals += 2
-            elif lower_shadow > candle_body * 2 and body_ratio < 0.3: bull_signals += 2
+            # شمعة دوجي أو شمعة ذيل طويل = انعكاس محتمل
+            if   upper_shadow > candle_body * 2.5 and body_ratio < 0.3: bear_signals += 3
+            elif lower_shadow > candle_body * 2.5 and body_ratio < 0.3: bull_signals += 3
+            elif upper_shadow > candle_body * 1.5: bear_signals += 1
+            elif lower_shadow > candle_body * 1.5: bull_signals += 1
 
         return {'symbol': symbol, 'bull': bull_signals, 'bear': bear_signals}
 
@@ -300,9 +339,9 @@ class MacroTrendAdvisor:
         if total == 0:
             return {'prediction': 'NEUTRAL', 'confidence': 50, 'reason': '⚪ No signals'}
 
-        # شرط ثنين من ثلاثة: لازم عملتين على الأقل يتفقان على نفس الاتجاه
-        bull_count = sum(1 for p in predictions if p['bull'] > p['bear'])
-        bear_count = sum(1 for p in predictions if p['bear'] > p['bull'])
+        # ✅ شرط أقوى: لازم عملتين على الأقل + فرق واضح بين النقاط
+        bull_count = sum(1 for p in predictions if p['bull'] > p['bear'] + 2)  # فرق نقطتين على الأقل
+        bear_count = sum(1 for p in predictions if p['bear'] > p['bull'] + 2)
         if bull_count < 2 and bear_count < 2:
             details = ', '.join(
                 f"{p['symbol'].split('/')[0]}(🟢{p['bull']}/🔴{p['bear']})"
@@ -341,25 +380,46 @@ class MacroTrendAdvisor:
             'details'   : details,
         }
 
-    def _combine_timeframes(self, short: dict, medium: dict) -> dict:
+    def _combine_timeframes(self, fast: dict, short: dict, medium: dict) -> dict:
+        fast_pred   = fast.get('prediction',   'NEUTRAL')
         short_pred  = short.get('prediction',  'NEUTRAL')
         medium_pred = medium.get('prediction', 'NEUTRAL')
 
+        is_fast_bear   = 'BEAR' in fast_pred
+        is_fast_bull   = 'BULL' in fast_pred
         is_short_bull  = 'BULL' in short_pred
         is_short_bear  = 'BEAR' in short_pred
         is_medium_bull = 'BULL' in medium_pred
         is_medium_bear = 'BEAR' in medium_pred
 
-        if   is_short_bull and is_medium_bull:
-            return {'direction': 'BULLISH', 'strength': 'STRONG',   'confidence': max(short['confidence'], medium['confidence']), 'reason': '🟢🟢 Confirmed Bullish (1h + 4h)'}
+        # ❌ فلتر الاتجاه: لو 15m هابط + 4h هابط = لا تشتري مهما كان 1h
+        if is_fast_bear and is_medium_bear:
+            return {'direction': 'BEARISH', 'strength': 'STRONG',
+                    'confidence': max(fast['confidence'], medium['confidence']),
+                    'reason': '🔴🔴 Bear Filter Active (15m + 4h Bearish — NO BUY)'}
+
+        if   is_short_bull and is_medium_bull and is_fast_bull:
+            return {'direction': 'BULLISH', 'strength': 'STRONG',
+                    'confidence': max(short['confidence'], medium['confidence']),
+                    'reason': '🟢🟢🟢 Confirmed Bullish (15m + 1h + 4h)'}
+        elif is_short_bull and is_medium_bull:
+            return {'direction': 'BULLISH', 'strength': 'STRONG',
+                    'confidence': max(short['confidence'], medium['confidence']),
+                    'reason': '🟢🟢 Confirmed Bullish (1h + 4h)'}
         elif is_short_bear and is_medium_bear:
-            return {'direction': 'BEARISH', 'strength': 'STRONG',   'confidence': max(short['confidence'], medium['confidence']), 'reason': '🔴🔴 Confirmed Bearish (1h + 4h)'}
+            return {'direction': 'BEARISH', 'strength': 'STRONG',
+                    'confidence': max(short['confidence'], medium['confidence']),
+                    'reason': '🔴🔴 Confirmed Bearish (1h + 4h)'}
         elif is_short_bull and is_medium_bear:
-            return {'direction': 'MIXED',   'strength': 'CAUTION',  'confidence': 50,                                             'reason': '⚠️ Short Bullish but Medium Bearish (Caution)'}
+            # ✅ FIX 1: 4h الهابط يتفوق على 1h الصاعد — الارتداد مؤقت فقط
+            return {'direction': 'BEARISH', 'strength': 'CAUTION',  'confidence': 55,
+                    'reason': '⚠️ 1h Bullish but 4h Bearish → 4h wins (Dead-cat bounce risk)'}
         elif is_short_bear and is_medium_bull:
-            return {'direction': 'MIXED',   'strength': 'RECOVERY', 'confidence': 55,                                             'reason': '⏳ Temp Dip then Recovery (Wait)'}
+            return {'direction': 'MIXED',   'strength': 'RECOVERY', 'confidence': 55,
+                    'reason': '⏳ Temp Dip then Recovery (Wait)'}
         else:
-            return {'direction': 'NEUTRAL', 'strength': 'NEUTRAL',  'confidence': 50,                                             'reason': '⚪ Market Unclear'}
+            return {'direction': 'NEUTRAL', 'strength': 'NEUTRAL',  'confidence': 50,
+                    'reason': '⚪ Market Unclear'}
 
     # ─────────────────────────────────────────────
     # Helpers
@@ -370,6 +430,10 @@ class MacroTrendAdvisor:
         يقرأ macro_status المحفوظة في bot_settings (key=bot_status)
         ويرجع القيمة المحفوظة — تُستخدم للمقارنة قبل إرجاع BULL.
         الربط: advisor.db = your_database_storage_instance
+
+        ✅ FIX 3: يستخدم 'timestamp' (unix) بدل 'time' (string) لتفادي
+                  خطأ عبور منتصف الليل حين يصبح الفرق سالباً.
+                  لو الداتابيز تحفظ 'time' فقط، نحسب التوافق بطريقة آمنة.
         """
         try:
             if not hasattr(self, 'db') or self.db is None:
@@ -382,28 +446,44 @@ class MacroTrendAdvisor:
             import json
             data = json.loads(raw)
 
-            # تحقق الوقت — لو السجل أقدم من hours_ago + 30 دقيقة تجاهله
-            saved_time = data.get('time', '')          # مثال: "07:53:26"
-            macro      = data.get('macro_status', '')  # مثال: "🔴 BEAR_MARKET"
-
+            macro = data.get('macro_status', '')
             if not macro:
                 return None
 
-            # المقارنة بالوقت: bot_status يتحدث كل 5 دقائق
-            # لو الفرق بين الوقت الحالي والمحفوظ أكبر من (hours_ago * 60 + 30) دقيقة → تجاهل
+            max_age_secs = hours_ago * 3600 + 1800  # hours_ago + 30 دقيقة هامش
+
+            # ── الطريقة الأولى: timestamp unix (الأفضل والأدق) ──────────────
+            saved_ts = data.get('timestamp')
+            if saved_ts:
+                try:
+                    diff_secs = time.time() - float(saved_ts)
+                    if diff_secs < 0 or diff_secs > max_age_secs:
+                        return None
+                    return macro
+                except Exception:
+                    pass  # نكمل للطريقة الثانية
+
+            # ── الطريقة الثانية: وقت النص "%H:%M:%S" (fallback آمن) ─────────
+            # ✅ نعالج حالة عبور منتصف الليل بأخذ القيمة المطلقة أو إضافة يوم
+            saved_time = data.get('time', '')
             if saved_time:
                 try:
-                    from datetime import datetime
-                    now       = datetime.now()
-                    saved_dt  = datetime.strptime(saved_time, "%H:%M:%S").replace(
+                    from datetime import datetime, timedelta
+                    now      = datetime.now()
+                    saved_dt = datetime.strptime(saved_time, "%H:%M:%S").replace(
                         year=now.year, month=now.month, day=now.day
                     )
-                    diff_mins = (now - saved_dt).total_seconds() / 60
-                    max_age   = hours_ago * 60 + 30
-                    if diff_mins < 0 or diff_mins > max_age:
+                    diff_secs = (now - saved_dt).total_seconds()
+
+                    # لو الفرق سالب = تجاوزنا منتصف الليل → نضيف يوم للسجل
+                    if diff_secs < 0:
+                        saved_dt  += timedelta(days=1)
+                        diff_secs  = (now - saved_dt).total_seconds()
+
+                    if diff_secs < 0 or diff_secs > max_age_secs:
                         return None
                 except Exception:
-                    pass  # لو فشل تحليل الوقت نكمل بالقيمة
+                    pass  # لو فشل تحليل الوقت نكمل بالقيمة كما هي
 
             return macro
 
@@ -412,6 +492,7 @@ class MacroTrendAdvisor:
 
     def _empty_prediction(self) -> dict:
         return {
+            'fast'    : {'prediction': 'NEUTRAL', 'confidence': 50, 'reason': '⚪ No data'},
             'short'   : {'prediction': 'NEUTRAL', 'confidence': 50, 'reason': '⚪ No data'},
             'medium'  : {'prediction': 'NEUTRAL', 'confidence': 50, 'reason': '⚪ No data'},
             'combined': {'direction': 'NEUTRAL', 'strength': 'NEUTRAL', 'confidence': 50, 'reason': '⚪ No data'},
