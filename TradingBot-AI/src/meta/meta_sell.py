@@ -5,6 +5,7 @@
 
 import gc
 import logging
+import time
 import pandas as pd
 from datetime import datetime, timezone
 from typing import Optional
@@ -17,8 +18,162 @@ from meta.meta_utils import adjust_threshold_by_forecasts, extract_volumes
 
 logger = logging.getLogger(__name__)
 
+# ──────────────────────────────────────────────
+# كاش الدعم الديناميكي للبيع
+# ──────────────────────────────────────────────
+try:
+    import sys, os
+    _mem_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              '..', '..', 'memory')
+    if os.path.exists(_mem_path) and _mem_path not in sys.path:
+        sys.path.insert(0, _mem_path)
+    from memory_cache import MemoryCache
+    _sell_dynamic_cache = MemoryCache(max_items=50)
+except Exception:
+    _sell_dynamic_cache = {}
+
 
 class SellMixin:
+
+    # ══════════════════════════════════════════════════════════════
+    # 🌐 الدعم الديناميكي للبيع
+    # ══════════════════════════════════════════════════════════════
+
+    def _calculate_dynamic_sell_support(self,
+                                         symbol: str,
+                                         analysis: dict,
+                                         ai: dict,
+                                         profit_pct: float) -> float:
+        """
+        يحسب دعماً ديناميكياً لقرار البيع (+نقاط = بيع أسرع)
+        القواعد:
+          - خوف > 75        → +2  (السوق خائف → اخرج)
+          - طمع > 75        → -1  (السوق جشع → امسك أكثر)
+          - حيتان بيع       → +1.5 (الكبار يبيعون → اخرج)
+          - حيتان شراء      → -1  (الكبار يشترون → امسك)
+          - أخبار سلبية     → +1  (أخبار سيئة → اخرج)
+          - أخبار إيجابية   → -0.5 (أخبار جيدة → امسك أكثر)
+          - ربح > 3% + خوف → +1  (احجز الربح قبل الانهيار)
+        """
+        cache_key = f"dyn_sell_{symbol}"
+        try:
+            cached = (_sell_dynamic_cache.get(cache_key)
+                      if not isinstance(_sell_dynamic_cache, dict)
+                      else _sell_dynamic_cache.get(cache_key))
+            if cached and isinstance(cached, dict):
+                if time.time() - cached.get('t', 0) < 300:
+                    val = cached.get('v', 0)
+                    ai['dynamic_sell_support'] = val
+                    ai['dynamic_sell_cached']  = True
+                    return val
+        except Exception:
+            pass
+
+        support = 0.0
+        details = []
+
+        try:
+            # ── 1. Fear & Greed ────────────────────────────────
+            fg = float(
+                analysis.get('sentiment', {}).get('fear_greed')
+                or analysis.get('fear_greed_index')
+                or 50
+            )
+
+            if fg > 75:
+                support += 2.0
+                details.append(f'😱 Fear={fg:.0f}→+2')
+            elif fg > 60:
+                support += 1.0
+                details.append(f'😰 Fear={fg:.0f}→+1')
+            elif fg < 25:
+                # طمع شديد = السوق متحمس = امسك أكثر
+                support -= 1.0
+                details.append(f'🤑 Greed={fg:.0f}→-1')
+
+            # ── 2. حيتان ───────────────────────────────────────
+            whale_conf = float(analysis.get('whale_confidence', 0) or 0)
+            whale_dump = analysis.get('whale_dumping', False)
+
+            if whale_dump:
+                support += 2.0
+                details.append('🐋 WhaleDump→+2')
+            elif whale_conf < -15:
+                support += 1.5
+                details.append(f'🐋 WhaleSell={whale_conf:.0f}→+1.5')
+            elif whale_conf < -5:
+                support += 0.75
+                details.append(f'🐳 WhaleLean={whale_conf:.0f}→+0.75')
+            elif whale_conf > 15:
+                support -= 1.0
+                details.append(f'🐋 WhaleBuy={whale_conf:.0f}→-1')
+
+            # ── 3. أخبار ───────────────────────────────────────
+            neg_news = (analysis.get('news', {}).get('negative', 0)
+                        or analysis.get('external_impact', {})
+                           .get('negative_news_count', 0))
+            pos_news = (analysis.get('news', {}).get('positive', 0)
+                        or analysis.get('external_impact', {})
+                           .get('positive_news_count', 0))
+
+            if neg_news > pos_news and neg_news > 0:
+                support += 1.0
+                details.append(f'📰 NegNews={neg_news}→+1')
+            elif pos_news > neg_news and pos_news > 0:
+                support -= 0.5
+                details.append(f'📰 PosNews={pos_news}→-0.5')
+
+            # ── 4. ربح + خوف = احجز ────────────────────────────
+            if profit_pct > 3.0 and fg > 65:
+                support += 1.0
+                details.append(f'💰 Profit={profit_pct:.1f}%+Fear→+1')
+
+            # ── 5. ربط حالة الماكرو الثابت ─────────────────────
+            _macro_pred  = ai.get('macro_prediction', {})
+            _now         = str(_macro_pred.get('current', ''))
+            _1h          = str(_macro_pred.get('1h', 'NEUTRAL'))
+            _4h          = str(_macro_pred.get('4h', 'NEUTRAL'))
+
+            def _ms(s):
+                if 'BULL' in s: return 'BULL'
+                if 'BEAR' in s: return 'BEAR'
+                return 'NEUT'
+
+            _key         = (_ms(_now), _ms(_1h), _ms(_4h))
+            macro_static = MACRO_SELL_POINTS.get(_key, 0)
+
+            # إذا الماكرو الثابت إيجابي جداً للبيع (≥ +8)
+            # الدعم الديناميكي السلبي (امسك) يُخفَّف
+            if macro_static >= 8 and support < 0:
+                support *= 0.5
+                details.append(f'⚠️ MacroSell={macro_static}→dampened')
+
+        except Exception as e:
+            logger.warning(f"dynamic_sell_support error: {e}")
+            support = 0.0
+
+        # ── حدود ±5 ────────────────────────────────────────────
+        support = max(-5.0, min(5.0, support))
+
+        # ── كاش ────────────────────────────────────────────────
+        try:
+            cache_val = {'v': support, 't': time.time()}
+            if isinstance(_sell_dynamic_cache, dict):
+                _sell_dynamic_cache[cache_key] = cache_val
+            else:
+                _sell_dynamic_cache.set(cache_key, cache_val)
+        except Exception:
+            pass
+
+        ai['dynamic_sell_support'] = support
+        ai['dynamic_sell_details'] = ' | '.join(details) if details else 'No signal'
+        ai['dynamic_sell_cached']  = False
+
+        return support
+
+    # ══════════════════════════════════════════════════════════════
+    # should_sell - نفس الكود + الدعم الديناميكي
+    # ══════════════════════════════════════════════════════════════
 
     def should_sell(self, symbol: str, position: dict,
                     current_price: float, analysis: dict,
@@ -32,16 +187,12 @@ class SellMixin:
             symbol, position, current_price)
 
         if spike.get('is_spike') == 1 and spike.get('spike_type') == 'POSITIVE':
-            buy_price  = float(position.get('buy_price', 0) or 0)
-            profit     = ((current_price - buy_price) / buy_price * 100
-                          if buy_price > 0 else 0)
-            emoji = '🚀'
-            label = 'PROFIT SPIKE'
-
-
+            buy_price = float(position.get('buy_price', 0) or 0)
+            profit    = ((current_price - buy_price) / buy_price * 100
+                         if buy_price > 0 else 0)
             return {
                 'action'    : 'SELL',
-                'reason'    : (f"{emoji} {label}: "
+                'reason'    : (f"🚀 PROFIT SPIKE: "
                                f"{spike.get('profit_jump',0):.1f}% in "
                                f"{spike.get('time_diff',0):.0f}s"),
                 'profit'    : profit,
@@ -63,9 +214,9 @@ class SellMixin:
         current_price = float(analysis.get('close', 0) or 0)
         profit_pct    = (((current_price - buy_price) / buy_price * 100)
                          if buy_price > 0 else 0.0)
-        rsi          = analysis.get('rsi',          50)
+        rsi           = analysis.get('rsi',          50)
         macd_diff_pct = analysis.get('latest', {}).get('macd_diff_pct', 0.0)
-        volume_ratio = analysis.get('volume_ratio', 1.0)
+        volume_ratio  = analysis.get('volume_ratio', 1.0)
 
         # ══════════════════════════════════════
         # MacroTrend
@@ -94,7 +245,6 @@ class SellMixin:
 
                 _, sell_mode = get_prediction_modes(macro_status, smart)
 
-                # Save predictions for Meta (1h + 4h + current)
                 ai['macro_prediction'] = {
                     'current': macro_status,
                     '1h': prediction.get('short', {}).get('prediction', 'NEUTRAL'),
@@ -114,7 +264,6 @@ class SellMixin:
         except Exception as e:
             logger.warning(f"Sell macro error: {e}")
 
-
         # ══════════════════════════════════════
         # ENSURE sell_mode is ALWAYS set
         # ══════════════════════════════════════
@@ -122,60 +271,40 @@ class SellMixin:
             from config import SELL_MODE_CAUTIOUS
             sell_mode = SELL_MODE_CAUTIOUS
 
-
-
-        # ══════════════════════════════════════
         # ══════════════════════════════════════
         # MARKET INTELLIGENCE for Sell (SMART)
         # ══════════════════════════════════════
-        _intel = analysis.get('market_intelligence', {})
-        _bullish = _intel.get('bullish_score', 50)
-        _adx = _intel.get('adx', 20)
-        _reversal = analysis.get('reversal', {})
-        _reversal_conf = _reversal.get('confidence', 0)
-        _reversal_signals = _reversal.get('reversal_signals', 0)
-        _flash = analysis.get('flash_crash_protection', {})
-        _flash_risk = _flash.get('risk_score', 0) if isinstance(_flash.get('risk_score'), (int, float)) else 0
+        _intel          = analysis.get('market_intelligence', {})
+        _bullish        = _intel.get('bullish_score', 50)
+        _reversal       = analysis.get('reversal', {})
+        _reversal_conf  = _reversal.get('confidence', 0)
+        _flash          = analysis.get('flash_crash_protection', {})
+        _flash_risk     = (_flash.get('risk_score', 0)
+                           if isinstance(_flash.get('risk_score'), (int, float))
+                           else 0)
         _1h_bull = ai.get('1h_bullish', False)
         _4h_bull = ai.get('4h_bullish', False)
         _1h_bear = ai.get('1h_bearish', False)
         _4h_bear = ai.get('4h_bearish', False)
 
-        # Smart multiplier from ALL indicators
         _factors = []
-
-        # 1. Market regime (bullish_score 0-100)
-        _factors.append(_bullish / 100.0)  # 0.0 to 1.0
-
-        # 2. Reversal signals (if coin shows bounce signs -> widen)
+        _factors.append(_bullish / 100.0)
         if _reversal_conf > 0:
-            _factors.append(_reversal_conf / 100.0)  # 0.0 to 1.0
-
-        # 3. Future prediction (1h + 4h)
-        if _1h_bull and _4h_bull:
-            _factors.append(1.0)  # future good -> widen
-        elif _1h_bull:
-            _factors.append(0.7)
-        elif _1h_bear and _4h_bear:
-            _factors.append(0.0)  # future bad -> tighten
-        elif _1h_bear:
-            _factors.append(0.3)
-        else:
-            _factors.append(0.5)  # neutral
-
-        # 4. Flash crash risk
+            _factors.append(_reversal_conf / 100.0)
+        if _1h_bull and _4h_bull:   _factors.append(1.0)
+        elif _1h_bull:              _factors.append(0.7)
+        elif _1h_bear and _4h_bear: _factors.append(0.0)
+        elif _1h_bear:              _factors.append(0.3)
+        else:                       _factors.append(0.5)
         if _flash_risk > 0:
             _factors.append(max(0, (100 - _flash_risk) / 100.0))
-
-        # 5. RSI (oversold = might bounce -> widen)
         _rsi = analysis.get('rsi', 50)
         _factors.append(_rsi / 100.0)
 
-        # Average all factors -> multiplier
-        _avg = sum(_factors) / len(_factors) if _factors else 0.5
-        # Scale: avg=0 -> mult=0.4, avg=0.5 -> mult=1.0, avg=1.0 -> mult=1.6
+        _avg         = sum(_factors) / len(_factors) if _factors else 0.5
         _market_mult = _avg * 1.6 + 0.4 * (1.0 - _avg)
 
+        # ══════════════════════════════════════
         # 2. Stop Loss - Instant
         # ══════════════════════════════════════
         sl   = self._calculate_stop_loss_features(
@@ -184,7 +313,7 @@ class SellMixin:
         slt  = sl.get('threshold',      0)
         if sell_mode:
             slt *= sell_mode.get('stop_loss_mult', 1.0)
-            slt *= _market_mult  # Market regime adjustment
+            slt *= _market_mult
         if drop >= slt:
             gc.collect()
             return {
@@ -206,7 +335,8 @@ class SellMixin:
                 reason = (f'🛡️ Stop Loss Zone: {profit_pct:.2f}% | SL Trigger: -{slt:.2f}%'
                           if profit_pct < -1.0
                           else f'⏳ Waiting: {profit_pct:.2f}% < {dyn_min:.1f}%')
-                return {'action':'HOLD','reason':reason,'profit':profit_pct,'stop_loss_threshold':slt}
+                return {'action':'HOLD','reason':reason,
+                        'profit':profit_pct,'stop_loss_threshold':slt}
 
         # ══════════════════════════════════════
         # Support Inputs
@@ -234,7 +364,7 @@ class SellMixin:
         meta_points = (meta_conf / 100) * 40
 
         # ══════════════════════════════════════
-        # 7 Peak Advisors = 60 Points (detect peak)
+        # 7 Peak Advisors = 40 Points
         # ══════════════════════════════════════
         core_votes = self._run_sell_core_voting(
             symbol, analysis,
@@ -273,35 +403,22 @@ class SellMixin:
         if macd_diff_pct < 0:
             macd_p = min((min(abs(macd_diff_pct), 0.5) / 0.5) * 3, 3.0)
 
-        # MacroTrend (3) - replaced by MACRO_SELL_POINTS below
-        macro_p = 0
-
-        # News Negative (3)
+        macro_p  = 0
         news_neg = analysis.get('news', {}).get('negative', 0)
         news_p   = min((news_neg / 10) * 3, 3)
+        anom_p   = (analysis.get('anomaly_score', 0) / 100) * 2
 
-        # Anomaly (2)
-        anom_p = (analysis.get('anomaly_score', 0) / 100) * 2
-
-
-        # Prediction Points (1h + 4h forecast)
-        _pred = ai.get('macro_prediction', {})
-        _1h_bull = ai.get('1h_bullish', False)
-        _4h_bull = ai.get('4h_bullish', False)
-        _1h_bear = ai.get('1h_bearish', False)
-        _4h_bear = ai.get('4h_bearish', False)
+        _pred    = ai.get('macro_prediction', {})
         _1h_conf = _pred.get('1h_confidence', 50) / 100.0
         _4h_conf = _pred.get('4h_confidence', 50) / 100.0
 
-        # Sell boost: future looks bad = sell faster
-        # Sell penalty: future looks good = hold more
         pred_p = 0
         if _1h_bear and _4h_bear:
-            pred_p = (_1h_conf + _4h_conf) * 2.5  # max ~5 (sell faster)
+            pred_p = (_1h_conf + _4h_conf) * 2.5
         elif _1h_bear:
             pred_p = _1h_conf * 2.0
         elif _1h_bull and _4h_bull:
-            pred_p = -(_1h_conf + _4h_conf) * 2.5  # max ~-5 (hold more)
+            pred_p = -(_1h_conf + _4h_conf) * 2.5
         elif _1h_bull:
             pred_p = -_1h_conf * 2.0
 
@@ -314,7 +431,7 @@ class SellMixin:
         sell_points = min(meta_points + core_points + support_total, 100)
 
         # ══════════════════════════════════════
-        # 🌐 Macro Trend Voting = ±10 Points
+        # 🌐 Macro Trend Voting = ±10 Points (ثابت)
         # ══════════════════════════════════════
         try:
             _macro_pred   = ai.get('macro_prediction', {})
@@ -336,15 +453,45 @@ class SellMixin:
             logger.warning('Macro sell points error: ' + str(e))
             macro_sell_points = 0
 
-        # Smart Sell - only for emergency modes (EXIT/RECOVERY)
+        # ══════════════════════════════════════
+        # 🚀 Dynamic Sell Support = ±5 نقاط
+        # يأتي بعد الماكرو الثابت
+        # ══════════════════════════════════════
+        try:
+            dynamic_sell = self._calculate_dynamic_sell_support(
+                symbol, analysis, ai, profit_pct)
+
+            # وزن من symbol_memory
+            mem_weight = float(
+                symbol_memory.get('dynamic_sell_weight', 1.0)
+                if isinstance(symbol_memory, dict) else 1.0
+            )
+            dynamic_sell_points = dynamic_sell * mem_weight
+
+            sell_points += dynamic_sell_points
+            ai['dynamic_sell_points'] = round(dynamic_sell_points, 2)
+
+
+        except Exception as e:
+            logger.warning(f"Dynamic sell support error: {e}")
+            dynamic_sell_points = 0
+            dynamic_sell        = 0
+            ai['dynamic_sell_points'] = 0
+
+        sell_points = max(0, sell_points)
+
+        # ══════════════════════════════════════
+        # Smart Sell - emergency modes
+        # ══════════════════════════════════════
         if sell_mode and sell_mode.get('mode') in ('SNIPER_EXIT', 'WAIT_RECOVERY', 'CAUTIOUS'):
             smart = self._smart_sell_check(
                 symbol, position, profit_pct, sell_mode)
             if smart:
                 return smart
-        
 
+        # ══════════════════════════════════════
         # Wave Protection
+        # ══════════════════════════════════════
         return self._wave_protection(
             symbol, analysis, candles, position,
             ai, rsi, macd_diff_pct, volume_ratio,
@@ -352,7 +499,8 @@ class SellMixin:
             analysis.get('peak', {}).get('confidence', 0),
             core_votes,
             sum(1 for v in core_votes.values() if v >= 50),
-            len(core_votes)
+            len(core_votes),
+            dynamic_sell_points=dynamic_sell_points
         )
 
     # ─────────────────────────────────────────────
@@ -366,7 +514,7 @@ class SellMixin:
         minp  = sell_mode.get('min_sell_profit',   MIN_SELL_PROFIT)
         label = sell_mode.get('label',             '')
         key   = f"{symbol}_smart_sell"
-        now   = __import__('time').time()
+        now   = time.time()
 
         if not hasattr(self, '_smart_sell_tracker'):
             self._smart_sell_tracker = {}
@@ -452,7 +600,7 @@ class SellMixin:
                           position, ai, rsi, macd_diff_pct,
                           volume_ratio, profit_pct, peak_score,
                           sell_votes, sell_vote_count,
-                          total_advisors):
+                          total_advisors, dynamic_sell_points=0):
         highest = position.get(
             'highest_price',
             float(position.get('buy_price', 0) or 0))
@@ -482,13 +630,25 @@ class SellMixin:
                 highest_price=highest,
                 threshold=threshold)
 
-        # 🛡️ Stop Loss - drop from peak
+        # الدعم الديناميكي يؤثر على threshold:
+        # دعم إيجابي (خوف/حيتان بيع) → ضيّق الـ threshold = اخرج أسرع
+        if dynamic_sell_points > 0:
+            threshold = max(
+                self.STOP_TRAILING_MIN,
+                threshold * (1 - dynamic_sell_points * 0.04))
+        elif dynamic_sell_points < 0:
+            threshold = min(
+                self.STOP_TRAILING_MAX,
+                threshold * (1 + abs(dynamic_sell_points) * 0.03))
+
+        # 🛡️ Stop Loss
         if drop >= threshold:
             gc.collect()
             return {
                 'action'             : 'SELL',
                 'reason'             : (f'🛡️ Wave Stop: {drop:.1f}%>='
-                                        f'{threshold:.1f}%'),
+                                        f'{threshold:.1f}% | '
+                                        f'Dyn:{dynamic_sell_points:+.1f}'),
                 'profit'             : profit_pct,
                 'sell_votes'         : sell_votes,
                 'peak_score'         : peak_score,
@@ -497,13 +657,12 @@ class SellMixin:
                 'market_forecast'    : m_fc
             }
 
-        # 🎯 Smart Peak Sell - points system (like buy but reversed)
+        # 🎯 Smart Peak Sell
+        dyn_min = MIN_SELL_PROFIT
         if profit_pct >= dyn_min:
-            # Meta: 20 points max (less trust for selling)
             meta_sell_conf = sell_votes.get('meta_trading', 0)
-            meta_points = (meta_sell_conf / 100) * 20
+            meta_points_w  = (meta_sell_conf / 100) * 20
 
-            # Advisors: 60 points max (they detect the peak)
             candle_p  = (sell_votes.get('candle_expert',   0) / 100) * 12
             chart_p   = (sell_votes.get('chart_cnn',       0) / 100) * 12
             rtpa_p    = (sell_votes.get('realtime_pa',     0) / 100) * 12
@@ -511,22 +670,21 @@ class SellMixin:
             trend_p   = (sell_votes.get('trend_detector',  0) / 100) * 8
             whale_p   = (sell_votes.get('smart_money',     0) / 100) * 5
             vol_p     = (sell_votes.get('volume_forecast', 0) / 100) * 3
-            core_points = candle_p + chart_p + rtpa_p + mtf_p + trend_p + whale_p + vol_p
+            core_pts  = (candle_p + chart_p + rtpa_p + mtf_p
+                         + trend_p + whale_p + vol_p)
 
-            # Support: 20 points max
-            support_points = min(peak_score / 100 * 20, 20)
+            support_pts = min(peak_score / 100 * 20, 20)
+            sell_pts    = min(meta_points_w + core_pts + support_pts
+                              + dynamic_sell_points, 100)
+            required    = 60
 
-            # Total
-            sell_points = min(meta_points + core_points + support_points, 100)
-            required = 60
-
-            if sell_points >= required:
+            if sell_pts >= required:
                 gc.collect()
                 return {
-                    'action'             : 'SELL',
-                    'reason'             : (f'🎯 Peak Points: {sell_points:.0f}/{required}pts | '
-                                            f'Core:{core_points:.0f}/60 | '
-                                            f'Peak:{peak_score}'),
+                    'action'    : 'SELL',
+                    'reason'    : (f'🎯 Peak: {sell_pts:.0f}/{required}pts | '
+                                   f'Core:{core_pts:.0f} | '
+                                   f'Dyn:{dynamic_sell_points:+.1f}'),
                     'profit'             : profit_pct,
                     'sell_votes'         : sell_votes,
                     'peak_score'         : peak_score,
@@ -535,7 +693,7 @@ class SellMixin:
                     'market_forecast'    : m_fc,
                     'advisors_intelligence': ai,
                     'analysis'           : analysis,
-                    'confidence'         : sell_points
+                    'confidence'         : sell_pts
                 }
 
         gc.collect()
@@ -544,8 +702,7 @@ class SellMixin:
             'reason'             : (f'Wave Riding | '
                                     f'Profit:{profit_pct:+.1f}% | '
                                     f'Peak:{peak_score} | '
-                                    f'Votes:{sell_vote_count}/'
-                                    f'{total_advisors}'),
+                                    f'Dyn:{dynamic_sell_points:+.1f}'),
             'profit'             : profit_pct,
             'sell_votes'         : sell_votes,
             'peak_score'         : peak_score,
