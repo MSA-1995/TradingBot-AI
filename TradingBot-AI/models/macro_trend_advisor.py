@@ -4,7 +4,7 @@ Determines current market state and predicts next direction
 """
 
 import sys
-sys.path.insert(0, r'C:\Users\MSA\myfile\BTC\MSA-DeepLearning-Trainer')
+
 
 import time
 import os
