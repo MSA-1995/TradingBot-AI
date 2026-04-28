@@ -669,10 +669,11 @@ class SellMixin:
             rtpa_p    = (sell_votes.get('realtime_pa',     0) / 100) * 12
             mtf_p     = (sell_votes.get('multitimeframe',  0) / 100) * 8
             trend_p   = (sell_votes.get('trend_detector',  0) / 100) * 8
+            fib_p     = (sell_votes.get('fibonacci',       0) / 100) * 5
             whale_p   = (sell_votes.get('smart_money',     0) / 100) * 5
             vol_p     = (sell_votes.get('volume_forecast', 0) / 100) * 3
             core_pts  = (candle_p + chart_p + rtpa_p + mtf_p
-                         + trend_p + whale_p + vol_p)
+                         + trend_p + whale_p + vol_p + fib_p)
 
             support_pts = min(peak_score / 100 * 20, 20)
             sell_pts    = min(meta_points_w + core_pts + support_pts
