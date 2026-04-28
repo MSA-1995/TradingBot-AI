@@ -332,6 +332,11 @@ def analyze_reversal(df, rsi):
         total_score += momentum_score
         score_breakdown['momentum_reversal'] = momentum_score
 
+        from datetime import datetime, timezone
+        _now = datetime.now(timezone.utc)
+        _hour = _now.hour
+        is_quiet_time = (0 <= _hour < 8)
+
         vol_score      = 0
         volume_reversal = False
         if len(df) >= 4:
@@ -341,17 +346,21 @@ def analyze_reversal(df, rsi):
             is_bullish  = last_candle['close'] > last_candle['open']
             was_bearish = prev_candle['close'] < prev_candle['open']
 
-            if current_vol > 2.0 and is_bullish and was_bearish:
+            threshold_high = 1.5 if is_quiet_time else 2.0
+            threshold_mid  = 1.2 if is_quiet_time else 1.5
+            threshold_low  = 1.0 if is_quiet_time else 1.2
+
+            if current_vol > threshold_high and is_bullish and was_bearish:
                 vol_score = 20
                 reasons.append(f"Vol Bullish Reversal {current_vol:.1f}x (+20)")
                 volume_reversal = True
                 reversal_signals += 1
-            elif current_vol > 1.5 and is_bullish:
+            elif current_vol > threshold_mid and is_bullish:
                 vol_score = 12
                 reasons.append(f"Vol Bullish {current_vol:.1f}x (+12)")
                 volume_reversal = True
                 reversal_signals += 1
-            elif current_vol > 1.2 and is_bullish:
+            elif current_vol > threshold_low and is_bullish:
                 vol_score = 6
                 reasons.append(f"Vol Rising on Bounce {current_vol:.1f}x (+6)")
 
@@ -571,6 +580,11 @@ def analyze_peak(df, rsi):
         total_score += momentum_score
         score_breakdown['momentum_reversal'] = momentum_score
 
+        from datetime import datetime, timezone
+        _now = datetime.now(timezone.utc)
+        _hour = _now.hour
+        is_quiet_time = (0 <= _hour < 8)
+
         vol_score       = 0
         volume_reversal = False
         if len(df) >= 4:
@@ -580,12 +594,13 @@ def analyze_peak(df, rsi):
             is_bearish  = last_candle['close'] < last_candle['open']
             was_bullish = prev_candle['close'] > prev_candle['open']
 
-            if current_vol > 2.0 and is_bearish and was_bullish:
+            threshold_high = 1.5 if is_quiet_time else 2.0
+            threshold_mid  = 1.2 if is_quiet_time else 1.5
+            if current_vol > threshold_high and is_bearish and was_bullish:
                 vol_score = 20
                 reasons.append(f"Vol Bearish Reversal {current_vol:.1f}x (+20)")
                 volume_reversal = True
-                reversal_signals += 1
-            elif current_vol > 1.5 and is_bearish:
+            elif current_vol > threshold_mid and is_bearish:
                 vol_score = 12
                 reasons.append(f"Vol Bearish {current_vol:.1f}x (+12)")
                 volume_reversal = True
@@ -673,7 +688,7 @@ def analyze_peak(df, rsi):
         current_price      = df.iloc[-1]['close']
         drop_percent       = ((high_n - current_price) / high_n) * 100 if high_n > 0 else 0
         confidence_percent = min(total_score, 140)
-        is_candle_signal   = (confidence_percent >= MIN_SELL_CONFIDENCE and reversal_signals >= 2)
+        is_candle_signal   = (confidence_percent >= MIN_SELL_CONFIDENCE and reversal_signals >= 3)
 
         if trap_is_filter and is_candle_signal:
             is_candle_signal = False
@@ -681,7 +696,7 @@ def analyze_peak(df, rsi):
 
         if confidence_percent >= MIN_SELL_CONFIDENCE and reversal_signals >= 3:
             reasons.append(f"✅ STRONG PEAK ({total_score}/140, {reversal_signals} signals)")
-        elif confidence_percent >= MIN_SELL_CONFIDENCE and reversal_signals >= 2:
+        elif confidence_percent >= MIN_SELL_CONFIDENCE and reversal_signals >= 3:
             reasons.append(f"✅ PEAK SIGNAL ({total_score}/140, {reversal_signals} signals)")
         elif total_score >= 40:
             reasons.append(f"⏳ WEAK ({total_score}/140, {reversal_signals} signals)")
