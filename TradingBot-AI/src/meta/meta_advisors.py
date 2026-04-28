@@ -227,7 +227,22 @@ class AdvisorsMixin:
             print(f"⚠️ smart_money sell error: {e}")
             votes['smart_money'] = 0
 
-        # 7️⃣ VolumeForecastEngine
+        # 7️⃣ Fibonacci Resistance
+        try:
+            votes['fibonacci'] = 0
+            fib = (self.advisor_manager.get('FibonacciAnalyzer')
+                   if self.advisor_manager else None)
+            if fib:
+                is_res, boost = fib.is_at_resistance(
+                    current_price=current_price,
+                    analysis=analysis,
+                    symbol=symbol)
+                votes['fibonacci'] = boost if is_res else 0
+        except Exception as e:
+            print(f"⚠️ fibonacci sell error: {e}")
+            votes['fibonacci'] = 0
+
+        # 8️⃣ VolumeForecastEngine
         try:
             votes['volume_forecast'] = 0
             ve = (self.advisor_manager.get('VolumeForecastEngine')
