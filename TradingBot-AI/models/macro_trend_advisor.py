@@ -4,8 +4,6 @@ Determines current market state and predicts next direction
 """
 
 import sys
-
-
 import time
 import os
 from typing import Optional
@@ -36,8 +34,9 @@ class MacroTrendAdvisor:
     RSI_PERIOD        = 14
     MOMENTUM_LOOKBACK = 10
 
-    def __init__(self, exchange=None, dl_client=None):
+    def __init__(self, exchange=None, dl_client=None, storage=None):
         self.exchange = exchange
+        self.db = storage  # ربط كائن التخزين للوصول لقاعدة البيانات
 
         # حالة السوق
         self._last_status     : str   = '⚪ NEUTRAL'
