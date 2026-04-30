@@ -219,7 +219,8 @@ def get_market_sentiment_global(self):
                 data   = response.json().get('data', {})
                 result = {
                     'market_cap_change': data.get('market_cap_change_percentage_24h_usd', 0),
-                    'btc_dominance':     data.get('market_cap_percentage', {}).get('btc', 0)
+                    'btc_dominance':     data.get('market_cap_percentage', {}).get('btc', 0),
+                    'total_volume':      data.get('total_volume', {}).get('usd', 0)
                 }
                 self._cache_set(cache_key, result, expiry_seconds=300)
                 return result
@@ -319,7 +320,15 @@ def get_market_sentiment_global(self):
     def get_global_liquidity(self):
         """جلب بيانات السيولة العالمية للماركت"""
         data = self.get_global_data()
-        return data.get('market_cap_change', 0)
+        market_cap_change = data.get('market_cap_change', 0)
+        total_volume = data.get('total_volume', 0)
+        if total_volume > 80_000_000_000:
+            outflow_signal = -15
+        elif total_volume > 50_000_000_000:
+            outflow_signal = 0
+        else:
+            outflow_signal = +10
+        return market_cap_change + outflow_signal
 
 
 # ═══════════════════════════════════════════════════
@@ -348,3 +357,4 @@ def get_external_atr(symbol):
     """دالة مستقلة لجلب ATR من مصدر خارجي"""
     client = get_global_external_client()  # ✅ Singleton
     return client.get_external_atr(symbol)
+
