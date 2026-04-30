@@ -520,10 +520,15 @@ class MacroTrendAdvisor:
                 data = self._external_client.get_global_data() or {}
                 mc = float(data.get("market_cap_change", 0) or 0)
                 dominance = float(data.get("btc_dominance", 0) or 0)
+                total_vol = float(data.get("total_volume", 0) or 0)
                 if mc > 1.0:
                     score += 3
                 elif mc < -1.0:
                     score -= 3
+                if total_vol > 80_000_000_000:
+                    score -= 5
+                elif total_vol < 50_000_000_000:
+                    score += 5
                 details.append(f"MC:{mc:+.2f}% Dom:{dominance:.1f}")
             else:
                 details.append("External neutral")
