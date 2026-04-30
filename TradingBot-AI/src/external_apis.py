@@ -11,17 +11,19 @@ import threading
 # Global lock للـ Fear & Greed - مرة واحدة فقط بين كل الـ threads
 _fear_greed_lock   = threading.Lock()
 _fear_greed_shared = {'value': None, 'classification': 'Neutral', 'timestamp': 0}
+
 # إضافة كاش مضغوط لنتائج external APIs
 try:
     import sys
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(current_dir)
+    parent_dir  = os.path.dirname(current_dir)
     memory_path = os.path.join(parent_dir, 'memory')
     if os.path.exists(memory_path) and memory_path not in sys.path:
         sys.path.insert(0, memory_path)
     from memory_cache import MemoryCache
 except Exception:
     MemoryCache = None
+
 
 # Rate Limiter لتجنب API Limits
 class RateLimiter:
@@ -46,14 +48,6 @@ class ExternalAPIClient:
         self.alpha_key    = os.getenv("ALPHA_VANTAGE_API_KEY")
         self.api_cache    = MemoryCache(max_items=30) if MemoryCache else {}
         self.rate_limiter = RateLimiter(calls_per_minute=60)
-    def analyze_impact(self, symbol: str = None, **kwargs) -> dict:
-        """stub - غير مفعّلة حالياً"""
-        return {
-            'bullish': 0,
-            'bearish': 0,
-            'score':   50,
-            'impact':  'neutral'
-        }
 
     # ─────────────────────────────────────────────
     def _cache_get(self, key):
@@ -127,23 +121,13 @@ class ExternalAPIClient:
             return []
 
     # ─────────────────────────────────────────────
-def get_market_sentiment_global(self):
-    """جلب مؤشر الخوف والطمع - مرة واحدة فقط بالـ lock"""
-    global _fear_greed_shared
+    def get_market_sentiment_global(self):
+        """جلب مؤشر الخوف والطمع - مرة واحدة فقط بالـ lock"""
+        global _fear_greed_shared
 
-    now = time.time()
-
-    # قراءة سريعة بدون lock
-    if (_fear_greed_shared['value'] is not None and
-            (now - _fear_greed_shared['timestamp']) < 600):
-        return {
-            'value':          _fear_greed_shared['value'],
-            'classification': _fear_greed_shared['classification']
-        }
-
-    # تحديث مع lock - مرة واحدة فقط!
-    with _fear_greed_lock:
         now = time.time()
+
+        # قراءة سريعة بدون lock
         if (_fear_greed_shared['value'] is not None and
                 (now - _fear_greed_shared['timestamp']) < 600):
             return {
@@ -151,25 +135,35 @@ def get_market_sentiment_global(self):
                 'classification': _fear_greed_shared['classification']
             }
 
-        self.rate_limiter.wait_if_needed()
-        url = "https://api.alternative.me/fng/"
-        try:
-            response = requests.get(url, timeout=5)
-            if response.status_code == 200:
-                data   = response.json().get('data', [{}])[0]
-                result = {
-                    'value':          int(data.get('value', 50)),
-                    'classification': data.get('value_classification', 'Neutral')
+        # تحديث مع lock - مرة واحدة فقط!
+        with _fear_greed_lock:
+            now = time.time()
+            if (_fear_greed_shared['value'] is not None and
+                    (now - _fear_greed_shared['timestamp']) < 600):
+                return {
+                    'value':          _fear_greed_shared['value'],
+                    'classification': _fear_greed_shared['classification']
                 }
-                _fear_greed_shared['value']          = result['value']
-                _fear_greed_shared['classification'] = result['classification']
-                _fear_greed_shared['timestamp']      = time.time()
-                self._cache_set("fear_greed", result, expiry_seconds=600)
-                return result
-        except Exception as e:
-            pass
 
-        return {'value': 50, 'classification': 'Neutral'}
+            self.rate_limiter.wait_if_needed()
+            url = "https://api.alternative.me/fng/"
+            try:
+                response = requests.get(url, timeout=5)
+                if response.status_code == 200:
+                    data   = response.json().get('data', [{}])[0]
+                    result = {
+                        'value':          int(data.get('value', 50)),
+                        'classification': data.get('value_classification', 'Neutral')
+                    }
+                    _fear_greed_shared['value']          = result['value']
+                    _fear_greed_shared['classification'] = result['classification']
+                    _fear_greed_shared['timestamp']      = time.time()
+                    self._cache_set("fear_greed", result, expiry_seconds=600)
+                    return result
+            except Exception as e:
+                pass
+
+            return {'value': 50, 'classification': 'Neutral'}
 
     # ─────────────────────────────────────────────
     def get_global_price_check(self, symbol):
@@ -188,7 +182,7 @@ def get_market_sentiment_global(self):
                 return cached
 
             self.rate_limiter.wait_if_needed()
-            url      = (
+            url = (
                 f"https://api.coingecko.com/api/v3/simple/price"
                 f"?ids={cg_id}&vs_currencies=usd"
             )
@@ -230,26 +224,25 @@ def get_market_sentiment_global(self):
             return {}
 
     # ─────────────────────────────────────────────
-    def analyze_impact(self, symbol):
+    def analyze_impact(self, symbol=None, **kwargs):
         """تحليل شامل لتأثير البيانات الخارجية على عملة معينة"""
         try:
-            news         = self.get_crypto_news(symbol)
+            news         = self.get_crypto_news(symbol) if symbol else []
             fng          = self.get_market_sentiment_global()
             global_data  = self.get_global_data()
-            global_price = self.get_global_price_check(symbol)
+            global_price = self.get_global_price_check(symbol) if symbol else None
 
             impact_score = 50  # نقطة التعادل
 
             fng_value = fng.get('value', 50) if isinstance(fng, dict) else 50
             if fng_value > 70:
-                impact_score += 10   # طمع عالي
+                impact_score += 10
             if fng_value < 30:
-                impact_score -= 15   # خوف شديد
+                impact_score -= 15
 
             if global_data.get('market_cap_change', 0) > 0:
                 impact_score += 5
 
-            # تحليل بسيط للأخبار
             positive_keywords = ['bullish', 'surge', 'rally', 'gain', 'up', 'high', 'record']
             negative_keywords = ['bearish', 'crash', 'drop', 'fall', 'down', 'low', 'ban']
             positive_count = 0
@@ -319,9 +312,9 @@ def get_market_sentiment_global(self):
     # ─────────────────────────────────────────────
     def get_global_liquidity(self):
         """جلب بيانات السيولة العالمية للماركت"""
-        data = self.get_global_data()
+        data              = self.get_global_data()
         market_cap_change = data.get('market_cap_change', 0)
-        total_volume = data.get('total_volume', 0)
+        total_volume      = data.get('total_volume', 0)
         if total_volume > 80_000_000_000:
             outflow_signal = -15
         elif total_volume > 50_000_000_000:
@@ -349,12 +342,11 @@ def get_global_external_client():
 # ═══════════════════════════════════════════════════
 def get_external_news_sentiment(symbol):
     """دالة مستقلة لجلب المشاعر للأخبار الخارجية"""
-    client = get_global_external_client()  # ✅ Singleton
+    client = get_global_external_client()
     return client.analyze_impact(symbol)
 
 
 def get_external_atr(symbol):
     """دالة مستقلة لجلب ATR من مصدر خارجي"""
-    client = get_global_external_client()  # ✅ Singleton
+    client = get_global_external_client()
     return client.get_external_atr(symbol)
-
