@@ -29,7 +29,7 @@ class MarketRegimeDetector:
     def __init__(self):
         self.adx_period = 14
         self.atr_period = 14
-        self.atr_lookback = 50
+        self.atr_lookback = 100  # زيادة المدى ليكون المقياس المرجعي للتقلب أكثر دقة
     
     def detect(self, df):
         """ يحلل البيانات ويرجع حالة السوق """
@@ -79,12 +79,13 @@ class MarketRegimeDetector:
             tr3 = abs(low - close.shift())
             tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
             
-            atr = tr.rolling(self.atr_period).mean()
-            plus_di = 100 * (pd.Series(plus_dm, index=df.index).rolling(self.adx_period).mean() / atr)
-            minus_di = 100 * (pd.Series(minus_dm, index=df.index).rolling(self.adx_period).mean() / atr)
+            # استخدام التنعيم الأسي لسرعة الاستجابة (Wilder's Smoothing)
+            atr = tr.ewm(alpha=1/self.atr_period, adjust=False).mean()
+            plus_di = 100 * (pd.Series(plus_dm, index=df.index).ewm(alpha=1/self.adx_period, adjust=False).mean() / atr)
+            minus_di = 100 * (pd.Series(minus_dm, index=df.index).ewm(alpha=1/self.adx_period, adjust=False).mean() / atr)
             
             dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di + 1e-10)
-            adx = dx.rolling(self.adx_period).mean()
+            adx = dx.ewm(alpha=1/self.adx_period, adjust=False).mean()
 
             return adx if not adx.empty else pd.Series([20], index=df.index)
         except Exception as e:
@@ -132,13 +133,22 @@ class MarketRegimeDetector:
     
     def _classify_regime(self, adx, adx_slope, atr, atr_avg, trend_strength):
         """تصنيف حالة السوق"""
+        # 🛡️ أولوية قصوى لرصد بداية الزخم (Momentum Detection)
+        # التحقق هنا قبل التقلبات يضمن أننا نركب الموجة في بدايتها بدقة
+        if adx_slope > 0.2:  # خفض العتبة قليلاً لزيادة الحساسية لرصد بداية الانفجار
+            return {
+                'name': 'TREND_STARTING',
+                'description': 'خروج من النطاق العرضي - بداية زخم جديد',
+                'advice': {'position_size': 0.4, 'stop_multiplier': 2.0, 'can_trade': False, 'preferred_action': 'WAIT', 'caution': 'متوسط'}
+            }
+
         volatility_ratio = atr / atr_avg if atr_avg > 0 else 1
         
         if volatility_ratio > 1.5:
             return {
                 'name': 'HIGH_VOLATILITY',
                 'description': 'تقلبات عالية - السوق متقلب',
-                'advice': {'position_size': 0.5, 'stop_multiplier': 2.5, 'can_trade': True, 'caution': 'عالي'}
+                'advice': {'position_size': 0.3, 'stop_multiplier': 2.5, 'can_trade': False, 'preferred_action': 'WAIT', 'caution': 'عالي'}
             }
         
         if volatility_ratio < 0.7:
@@ -152,8 +162,8 @@ class MarketRegimeDetector:
             if 'up' in trend_strength and adx_slope > 0:
                 return {
                     'name': 'LOCAL_MOMENTUM_UP',
-                    'description': 'ترند صاعد قوي ومتسارع',
-                    'advice': {'position_size': 1.2, 'stop_multiplier': 2.0, 'can_trade': True, 'preferred_action': 'BUY', 'caution': 'منخفض'}
+                    'description': 'زخم محلي صاعد - يتطلب حذر',
+                    'advice': {'position_size': 0.7, 'stop_multiplier': 2.0, 'can_trade': True, 'preferred_action': 'CAUTIOUS_BUY', 'caution': 'متوسط'}
                 }
             elif 'down' in trend_strength:
                 return {
@@ -172,7 +182,7 @@ class MarketRegimeDetector:
         return {
             'name': 'RANGING',
             'description': 'سوق ثابت (سائد واي)',
-            'advice': {'position_size': 0.7, 'stop_multiplier': 1.5, 'can_trade': True, 'preferred_action': 'BUY_LOW_SELL_HIGH', 'caution': 'متوسط'}
+            'advice': {'position_size': 0.0, 'stop_multiplier': 1.5, 'can_trade': False, 'preferred_action': 'WAIT', 'caution': 'متوسط'}
         }
     
     def _default_regime(self):
@@ -308,23 +318,23 @@ class FlashCrashDetector:
         """حساب درجة المخاطرة"""
         score = 0
         if flash_crash['detected']:
-            score += 50 if flash_crash['severity'] == 'CRITICAL' else 30
+            score += 65 if flash_crash['severity'] == 'CRITICAL' else 40
         if whale_dump['detected']:
-            score += 30
+            score += 35
         cascade_scores = {'HIGH': 30, 'MEDIUM': 15, 'LOW': 0}
         score += cascade_scores.get(cascade_risk['risk'], 0)
         return min(score, 100)
     
     def _get_risk_level(self, score):
         """تحويل درجة المخاطرة لمستوى"""
-        if score >= 70: return 'CRITICAL'
+        if score >= 60: return 'CRITICAL'
         elif score >= 50: return 'HIGH'
         elif score >= 30: return 'MEDIUM'
         return 'LOW'
     
     def _get_recommendation(self, score):
         """توصية بناءً على درجة المخاطرة"""
-        if score >= 70:
+        if score >= 60:
             return {'action': 'STOP_ALL', 'message': '🚨 مخاطرة حرجة', 'can_buy': False, 'can_sell': True, 'position_action': 'REDUCE_75'}
         elif score >= 50:
             return {'action': 'REDUCE_ONLY', 'message': '⚠️ مخاطرة عالية', 'can_buy': False, 'can_sell': True, 'position_action': 'REDUCE_50'}
