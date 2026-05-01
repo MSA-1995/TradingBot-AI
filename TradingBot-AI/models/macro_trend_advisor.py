@@ -88,6 +88,9 @@ class MacroTrendAdvisor:
 
         try:
             result = self._analyze_all()
+            status = self._resolve_status(result)
+            self._finalize(status, result)
+            result["combined"] = self._combined
             self._last_analysis = result
             self._last_analysis_time = time.time()
             return result
@@ -177,9 +180,17 @@ class MacroTrendAdvisor:
 
         # كاندل وهمي: ذيل علوي كبير مع حجم عالي = توزيع
         fake_signal = (
-            upper_wick / candle_range > 0.5
-            and volume_ratio >= 1.4
-            and close_strength < 0.5
+            upper_wick / candle_range > 0.55
+            and close_strength < 0.35
+            and volume_ratio < 1.3
+        )
+
+        # ── كشف البامب ودامب ──
+        recent_change30 = float(close.iloc[-1] - close.iloc[-30]) / float(close.iloc[-30]) * 100 if len(close) > 30 else 0
+        prev_high40 = float(high.iloc[-40:-5].max()) if len(high) > 40 else float(high.max())
+        pump_then_dump = (
+            prev_high40 > float(close.iloc[-1]) * 1.05
+            and recent_change30 < -3.0
         )
 
         # ── التحديد النهائي ──
@@ -223,7 +234,9 @@ class MacroTrendAdvisor:
         if fake_signal:
             bear_points += 1  # عقوبة إضافية للوهمي
 
-        if fake_signal:
+        if pump_then_dump:
+            status = "BEARISH"
+        elif fake_signal:
             status = "NEUTRAL" if bull_points > bear_points else "BEARISH"
         elif bull_points >= bear_points + 3 and bull_points >= 5:
             status = "BULLISH"
@@ -279,10 +292,24 @@ class MacroTrendAdvisor:
             for s, r in result.get("symbols", {}).items()
         }
 
+        # ── combined للتوافق مع meta_buy.py ──
+        if bull >= 3:
+            direction = "BULLISH"
+            strength  = "STRONG" if bull == 4 else "NORMAL"
+        elif bear >= 3:
+            direction = "BEARISH"
+            strength  = "STRONG" if bear == 4 else "NORMAL"
+        else:
+            direction = "NEUTRAL"
+            strength  = "NEUTRAL"
+
+        self._combined = {"direction": direction, "strength": strength}
+
         self._display_info = {
             "status": status,
             "total_bull": bull,
             "total_bear": bear,
+            "combined": self._combined,
             "detail": f"Bull:{bull}/4 Bear:{bear}/4 | {symbols_summary}",
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
