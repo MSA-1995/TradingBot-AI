@@ -122,7 +122,7 @@ BUY_MODE_BALANCED = {
 
 BUY_MODE_CAUTIOUS = {
     'mode': 'CAUTIOUS_BUY',
-    'min_confidence': 70,
+    'min_confidence': 75,
     'max_amount': 18,
     'max_positions': 12,
     'label': '⏳ Cautious',
@@ -130,7 +130,7 @@ BUY_MODE_CAUTIOUS = {
 
 BUY_MODE_MINIMAL = {
     'mode': 'MINIMAL',
-    'min_confidence': 70,
+    'min_confidence': 75,
     'max_amount': 17,
     'max_positions': 12,
     'label': '⚠️ High Confidence',
@@ -186,19 +186,19 @@ MARKET_MODE_MATRIX = {
     ('BULLISH', 'BULLISH'):   ('AGGRESSIVE', 'NORMAL'),
     ('BULLISH', 'NEUTRAL'):   ('BALANCED', 'NORMAL'),
     ('BULLISH', 'BEARISH'):   ('CAUTIOUS_BUY', 'SNIPER_EXIT'),
-    ('BULLISH', 'MIXED'):     ('BALANCED', 'NORMAL'),
+
 
     # ⚪ Neutral now
     ('NEUTRAL', 'BULLISH'):   ('BALANCED', 'NORMAL'),
-    ('NEUTRAL', 'NEUTRAL'):   ('BALANCED', 'NORMAL'),
+    ('NEUTRAL', 'NEUTRAL'):   ('BALANCED', 'CAUTIOUS'),
     ('NEUTRAL', 'BEARISH'):   ('CAUTIOUS_BUY', 'SNIPER_EXIT'),
-    ('NEUTRAL', 'MIXED'):     ('BALANCED', 'CAUTIOUS'),
+
 
     # 🔴 Bearish now
     ('BEARISH', 'BULLISH'):   ('BALANCED', 'WAIT_RECOVERY'),
-    ('BEARISH', 'NEUTRAL'):   ('CAUTIOUS_BUY', 'CAUTIOUS'),
+    ('BEARISH', 'NEUTRAL'):   ('MINIMAL', 'CAUTIOUS'),
     ('BEARISH', 'BEARISH'):   ('NO_BUY', 'SNIPER_EXIT'),
-    ('BEARISH', 'MIXED'):     ('CAUTIOUS_BUY', 'CAUTIOUS'),
+
 }
 
 
