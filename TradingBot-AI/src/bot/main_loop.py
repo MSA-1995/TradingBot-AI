@@ -215,7 +215,7 @@ def run_main_loop(exchange, ctx):
 
                     print(
                         f"{line_color}{profit_emoji} {symbol:12} {format_price(result['price'])} "
-                        f"| Profit:{profit:+7.1f}% "
+                        f"| Profit:{profit:+7.2f}% "
                         f"| Buy:{format_price(result.get('buy_price', 0))} "
                         f"| High:{format_price(result.get('highest', 0))} "
                         f"| {result.get('reason', '')}{forecast_text}{Style.RESET_ALL}"
