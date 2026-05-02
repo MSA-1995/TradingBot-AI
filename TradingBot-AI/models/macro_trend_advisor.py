@@ -1,7 +1,5 @@
 """
 📊 Macro Trend Advisor - Simple & Clean
-يقرأ 4 عملات قيادية ويحدد حالة السوق بدون تعقيد
-3/4 صاعد = BULL | 2/4 = NEUT | 1/4 أو أقل = BEAR
 """
 
 import time
@@ -28,7 +26,7 @@ class MacroTrendAdvisor:
     - invalidate_cache() -> None
     """
 
-    LEADERS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"]
+    LEADERS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "BNB/USDT"]
     CACHE_DURATION = 90  # ثواني
 
     def __init__(self, exchange=None, dl_client=None, storage=None):
@@ -260,30 +258,45 @@ class MacroTrendAdvisor:
 
     def _resolve_status(self, result: dict) -> str:
         """
-        3/4 أو 4/4 صاعدين → BULL
-        2/4             → NEUT
-        0/4 أو 1/4      → BEAR
-        Sticky: لا تغير الحالة إلا إذا تكررت مرتين متتاليتين
+        3/5 صاعدين + زخم إيجابي + حجم داعم → BULL
+        3/5 هابطين + زخم سلبي              → BEAR
+        غير ذلك                            → SIDEWAYS
+        Sticky: 3 مرات متتالية للتأكيد
         """
-        bull = result["bull_count"]
-        bear = result["bear_count"]
+        bull    = result["bull_count"]
+        bear    = result["bear_count"]
+        symbols = result.get("symbols", {})
 
-        if bull >= 3:
-            new_status = "🟢 BULL_MARKET" if bull == 4 else "🟢 MILD_BULL"
-        elif bear >= 3:
-            new_status = "🔴 BEAR_MARKET" if bear == 4 else "🔴 MILD_BEAR"
+        # مجموع الزخم والحجم للـ 5 عملات
+        momentums    = [d.get("change_10",    0.0) for d in symbols.values()]
+        volumes      = [d.get("volume_ratio", 1.0) for d in symbols.values()]
+        avg_momentum = sum(momentums) / len(momentums) if momentums else 0.0
+        avg_volume   = sum(volumes)   / len(volumes)   if volumes   else 1.0
+
+        # القرار
+        if bull >= 3 and avg_momentum > 0.3 and avg_volume >= 1.1:
+            new_status = "🟢 BULL_MARKET" if bull >= 4 else "🟢 MILD_BULL"
+        elif bear >= 3 and avg_momentum < -0.3:
+            new_status = "🔴 BEAR_MARKET" if bear >= 4 else "🔴 MILD_BEAR"
         else:
             new_status = "⚪ SIDEWAYS"
 
+        # Sticky: 3 مرات متتالية
         if new_status != self._last_status:
             if new_status == getattr(self, "_pending_status", None):
-                self._pending_status = None
-                return new_status
+                self._pending_count = getattr(self, "_pending_count", 0) + 1
+                if self._pending_count >= 2:
+                    self._pending_status = None
+                    self._pending_count  = 0
+                    return new_status
+                return self._last_status
             else:
                 self._pending_status = new_status
+                self._pending_count  = 1
                 return self._last_status
 
         self._pending_status = None
+        self._pending_count  = 0
         return new_status
 
     # ─────────────────────────────────────────────
@@ -376,3 +389,5 @@ class MacroTrendAdvisor:
             "neutral_count": 0,
             "total": 0,
         }
+
+
