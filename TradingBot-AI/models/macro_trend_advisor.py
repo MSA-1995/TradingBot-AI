@@ -263,16 +263,28 @@ class MacroTrendAdvisor:
         3/4 أو 4/4 صاعدين → BULL
         2/4             → NEUT
         0/4 أو 1/4      → BEAR
+        Sticky: لا تغير الحالة إلا إذا تكررت مرتين متتاليتين
         """
         bull = result["bull_count"]
         bear = result["bear_count"]
 
         if bull >= 3:
-            return "🟢 BULL_MARKET" if bull == 4 else "🟢 MILD_BULL"
+            new_status = "🟢 BULL_MARKET" if bull == 4 else "🟢 MILD_BULL"
         elif bear >= 3:
-            return "🔴 BEAR_MARKET" if bear == 4 else "🔴 MILD_BEAR"
+            new_status = "🔴 BEAR_MARKET" if bear == 4 else "🔴 MILD_BEAR"
         else:
-            return "⚪ SIDEWAYS"
+            new_status = "⚪ SIDEWAYS"
+
+        if new_status != self._last_status:
+            if new_status == getattr(self, "_pending_status", None):
+                self._pending_status = None
+                return new_status
+            else:
+                self._pending_status = new_status
+                return self._last_status
+
+        self._pending_status = None
+        return new_status
 
     # ─────────────────────────────────────────────
     # Finalize & Save to DB
