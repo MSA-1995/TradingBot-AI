@@ -199,6 +199,19 @@ class SellMixin:
                 'sell_votes': {}
             }
 
+        if spike.get('is_spike') == 1 and spike.get('spike_type') == 'NEGATIVE':
+            buy_price = float(position.get('buy_price', 0) or 0)
+            profit    = ((current_price - buy_price) / buy_price * 100
+                         if buy_price > 0 else 0)
+            return {
+                'action'    : 'SELL',
+                'reason'    : (f"💥 LOSS SPIKE: "
+                               f"{spike.get('profit_jump',0):.1f}% in "
+                               f"{spike.get('time_diff',0):.0f}s (Instant Sell)"),
+                'profit'    : profit,
+                'sell_votes': {}
+            }
+
         # ══════════════════════════════════════
         # Setup
         # ══════════════════════════════════════
