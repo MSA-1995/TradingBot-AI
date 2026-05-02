@@ -227,7 +227,8 @@ class MacroTrendAdvisor:
             bull_points += 1
         elif volume_ratio < 0.7 and change_10 > 0.5:
             bear_points += 2  # صعود بدون حجم = وهمي
-
+        elif change_10 > 3.0 and volume_ratio < 0.95:
+            bear_points += 2  # قفزة مفاجئة بدون حجم كافٍ = وهمي
         # التحديد
         if fake_signal:
             bear_points += 1  # عقوبة إضافية للوهمي
@@ -236,8 +237,8 @@ class MacroTrendAdvisor:
             status = "BEARISH"
         elif fake_signal:
             status = "NEUTRAL" if bull_points > bear_points else "BEARISH"
-        elif bull_points >= bear_points + 3 and bull_points >= 5:
-            status = "BULLISH"
+        elif bull_points >= bear_points + 3 and bull_points >= 5 and volume_ratio >= 0.95:
+            status = 'BULLISH'
         elif bear_points >= bull_points + 3 and bear_points >= 5:
             status = "BEARISH"
         else:
