@@ -44,6 +44,7 @@ class Meta(AdvisorsMixin, BuyMixin, SellMixin, LearningMixin):
 
     # ─── عتبات القفزات ───
     SPIKE_POSITIVE_THRESHOLD = 5.0
+    SPIKE_NEGATIVE_THRESHOLD = -5.0
     SPIKE_TIME_WINDOW        = 20
 
     # ─── عتبات البيع ───
