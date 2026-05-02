@@ -321,7 +321,7 @@ def run_main_loop(exchange, ctx):
                             f"| Vol:{vol_status} {min(vol, 100):.0f}x "
                             f"| MACD:{macd:>+6.1f} "
                             f"| Macro:{macro_p:>+.0f} "
-                            f"{news_display} | Macro:{_macro_pts} | {result.get('reason', '')}{forecast_text}"
+                            f"{news_display} | {result.get('reason', '')}{forecast_text}"
                         )
                     continue
 
