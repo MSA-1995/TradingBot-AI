@@ -190,7 +190,7 @@ def send_sell_notification(symbol, amount, price, value, profit_percent, reason,
         {"name": "Quantity",    "value": amount_format,                          "inline": True},
         {"name": "Price",       "value": _fmt_price(price),                      "inline": True},
         {"name": "Total Value", "value": f"${value:.2f}",                       "inline": True},
-        {"name": "Profit",      "value": f"{profit_sign}{profit_percent:.1f}%", "inline": True},
+        {"name": "Profit",      "value": f"{profit_sign}{profit_percent:.2f}%", "inline": True},
         {"name": "Reason",      "value": reason,                                "inline": False}
     ]
     
@@ -495,7 +495,7 @@ def send_advisor_report(signal_type, symbol, core_votes, meta_confidence,
         # Profit (for SELL)
         if profit_percent is not None:
             profit_sign = "+" if profit_percent > 0 else ""
-            fields.append({"name": "Profit", "value": f"{profit_sign}{profit_percent:.1f}%", "inline": True})
+            fields.append({"name": "Profit", "value": f"{profit_sign}{profit_percent:.2f}%", "inline": True})
 
         # Reason
         if reason:
