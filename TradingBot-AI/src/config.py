@@ -108,22 +108,22 @@ BUY_MODE_AGGRESSIVE = {
     'mode': 'AGGRESSIVE',
     'min_confidence': 60,
     'max_amount': 30,
-    'max_positions': 15,
+    'max_positions': 12,
     'label': '🟢🟢 Aggressive',
 }
 
 BUY_MODE_BALANCED = {
     'mode': 'BALANCED',
-    'min_confidence': 60,
-    'max_amount': 25,
-    'max_positions': 15,
+    'min_confidence': 70,
+    'max_amount': 20,
+    'max_positions': 12,
     'label': '⚪ Balanced',
 }
 
 BUY_MODE_CAUTIOUS = {
     'mode': 'CAUTIOUS_BUY',
-    'min_confidence': 65,
-    'max_amount': 22,
+    'min_confidence': 70,
+    'max_amount': 18,
     'max_positions': 12,
     'label': '⏳ Cautious',
 }
@@ -131,8 +131,8 @@ BUY_MODE_CAUTIOUS = {
 BUY_MODE_MINIMAL = {
     'mode': 'MINIMAL',
     'min_confidence': 70,
-    'max_amount': 20,
-    'max_positions': 10,
+    'max_amount': 17,
+    'max_positions': 12,
     'label': '⚠️ High Confidence',
 }
 
@@ -140,7 +140,7 @@ BUY_MODE_NO_BUY = {
     'mode': 'NO_BUY',
     'min_confidence': 80,
     'max_amount': 12,
-    'max_positions': 5,
+    'max_positions': 12,
     'label': '🔴🔴 High Confidence Only',
 }
 
