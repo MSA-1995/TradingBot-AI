@@ -421,18 +421,12 @@ class SellMixin:
         if macd_diff_pct < 0:
             macd_p = min((min(abs(macd_diff_pct), 0.5) / 0.5) * 3, 3.0)
 
-        _macro_now = str(ai.get('macro_status', ''))
-        if   'BULL' in _macro_now: _mk = 'BULL'
-        elif 'BEAR' in _macro_now: _mk = 'BEAR'
-        else:                       _mk = 'NEUT'
-        from config import MACRO_SELL_POINTS as _MSP
-        macro_p = (_MSP.get(_mk, 0) / 10) * 5
         news_neg = analysis.get('news', {}).get('negative', 0)
         news_p   = min((news_neg / 10) * 3, 3)
         anom_p   = (analysis.get('anomaly_score', 0) / 100) * 2
 
         support_total = min(
-            rsi_p + fg_p + macd_p + macro_p + news_p + anom_p, 25)
+            rsi_p + fg_p + macd_p + news_p + anom_p, 25)
 
         meta_conf = self._calibrate_meta_confidence(
             confidence=meta_conf,
