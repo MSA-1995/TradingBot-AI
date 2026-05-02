@@ -215,6 +215,12 @@ class MultiTimeframeAnalyzer:
                     reasons.append("Sell wall")
 
             return {
+            # 5. RSI Overbought
+            rsi = analysis.get('rsi', 50) if analysis else 50
+            if rsi > 70:
+                confidence += min(20, (rsi - 70) * 0.5)
+                reasons.append(f'RSI:{rsi:.0f} OB')
+
                 'is_peak':    confidence >= self.SINGLE_TF_MIN_CONFIDENCE,
                 'confidence': confidence,
                 'reason':     ', '.join(reasons) if reasons else 'No signals'
@@ -265,6 +271,12 @@ class MultiTimeframeAnalyzer:
                     reasons.append("Buy wall")
 
             return {
+            # 5. RSI Oversold
+            rsi = analysis.get('rsi', 50) if analysis else 50
+            if rsi < 30:
+                confidence += min(20, (30 - rsi) * 0.5)
+                reasons.append(f'RSI:{rsi:.0f} OS')
+
                 'is_bottom':  confidence >= self.SINGLE_TF_MIN_CONFIDENCE,
                 'confidence': confidence,
                 'reason':     ', '.join(reasons) if reasons else 'No signals'
@@ -360,3 +372,6 @@ class MultiTimeframeAnalyzer:
             'market_context': macro_status,
             'threshold_used': MultiTimeframeAnalyzer.DEFAULT_THRESHOLD
         }
+
+
+
