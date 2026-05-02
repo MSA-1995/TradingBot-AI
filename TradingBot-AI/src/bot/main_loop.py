@@ -213,12 +213,16 @@ def run_main_loop(exchange, ctx):
                         market_emoji  = "🟢" if market_dir == 'bullish' else "🔴" if market_dir == 'bearish' else "⚪"
                         forecast_text = f" | Coin{coin_emoji} Market{market_emoji}"
 
+                    _macro_st = result.get('advisors_intelligence', {}).get('macro_status', '') or ''
+                    if   'BULL' in _macro_st: _macro_pts = '+10'
+                    elif 'BEAR' in _macro_st: _macro_pts = '-10'
+                    else:                     _macro_pts = '0'
                     print(
                         f"{line_color}{profit_emoji} {symbol:12} {format_price(result['price'])} "
                         f"| Profit:{profit:+7.2f}% "
                         f"| Buy:{format_price(result.get('buy_price', 0))} "
                         f"| High:{format_price(result.get('highest', 0))} "
-                        f"| {result.get('reason', '')}{forecast_text}{Style.RESET_ALL}"
+                        f"| Macro:{_macro_pts} | {result.get('reason', '')}{forecast_text}{Style.RESET_ALL}"
                     )
                     continue
 
@@ -285,7 +289,7 @@ def run_main_loop(exchange, ctx):
                         f"| Vol:{vol_status} {min(vol, 100):.0f}x "
                         f"| MACD:{macd:>+6.1f} "
                         f"| Conf:{result.get('confidence', 0):.0f}/100"
-                        f"{news_display} | {result.get('reason', '')}{forecast_text}{Style.RESET_ALL}"
+                        f"{news_display} | Macro:{_macro_pts} | {result.get('reason', '')}{forecast_text}{Style.RESET_ALL}"
                     )
                     continue
 
@@ -317,7 +321,7 @@ def run_main_loop(exchange, ctx):
                             f"| Vol:{vol_status} {min(vol, 100):.0f}x "
                             f"| MACD:{macd:>+6.1f} "
                             f"| Macro:{macro_p:>+.0f} "
-                            f"{news_display} | {result.get('reason', '')}{forecast_text}"
+                            f"{news_display} | Macro:{_macro_pts} | {result.get('reason', '')}{forecast_text}"
                         )
                     continue
 
