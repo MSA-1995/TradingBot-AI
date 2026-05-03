@@ -8,17 +8,10 @@ All bot settings and constants
 MIN_SELL_CONFIDENCE = 60
 
 
-
 MIN_BUY_CONFIDENCE = 60
 MACRO_CANDLE_THRESHOLD = 85
 MAX_POSITIONS = 20
 TOTAL_COINS_TO_SCAN = 20
-
-# =====================================================================
-
-
-
-
 
 # =====================================================================
 # 👑 Meta Decision Thresholds
@@ -119,8 +112,6 @@ BUY_MODE_NO_BUY = {
     'max_positions': 12,
     'label': '🔴 High Confidence Only',
 }
-
-
 
 # =====================================================================
 # 🌐 Macro Trend Voting Points
