@@ -25,7 +25,7 @@ META_BUY_CANDLE = 70
 META_BUY_SUPPORT = 50
 META_BUY_HISTORY = 55
 META_BUY_CONSENSUS = 50
-META_DISPLAY_THRESHOLD = 0 #الحد الادنى لنقاط عرض العملة الضعيفة
+META_DISPLAY_THRESHOLD = 40 #الحد الادنى لنقاط عرض العملة الضعيفة
 
 # Capital Management
 MAX_CAPITAL = 1000
