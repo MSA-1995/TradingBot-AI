@@ -73,23 +73,7 @@ SELL_MODE_NORMAL = {
     'stability_minutes': 0,
     'min_sell_profit': 0.5,    # حد أدنى عمولة فقط
     'stop_loss_mult': 1.2,
-    'label': '👑 Normal',
-}
-
-SELL_MODE_SNIPER_EXIT = {
-    'mode': 'SNIPER_EXIT',
-    'stability_minutes': 0,
-    'min_sell_profit': 0.5,    # حد أدنى عمولة فقط - AI يقرر القمة
-    'stop_loss_mult': 0.5,
-    'label': '🛡️ Sniper Exit',
-}
-
-SELL_MODE_WAIT_RECOVERY = {
-    'mode': 'WAIT_RECOVERY',
-    'stability_minutes': 0,
-    'min_sell_profit': 0.5,    # حد أدنى عمولة فقط - AI يقرر القمة
-    'stop_loss_mult': 1.0,
-    'label': '⏳ Wait Recovery',
+    'label': '🟢 Normal',
 }
 
 SELL_MODE_CAUTIOUS = {
@@ -98,6 +82,14 @@ SELL_MODE_CAUTIOUS = {
     'min_sell_profit': 0.5,    # حد أدنى عمولة فقط - AI يقرر القمة
     'stop_loss_mult': 0.8,
     'label': '⚪ Cautious',
+}
+
+SELL_MODE_SNIPER_EXIT = {
+    'mode': 'SNIPER_EXIT',
+    'stability_minutes': 0,
+    'min_sell_profit': 0.5,    # حد أدنى عمولة فقط - AI يقرر القمة
+    'stop_loss_mult': 0.5,
+    'label': '🔴 Sniper Exit',
 }
 
 # =====================================================================
@@ -109,7 +101,7 @@ BUY_MODE_AGGRESSIVE = {
     'min_confidence': 60,
     'max_amount': 30,
     'max_positions': 12,
-    'label': '🟢🟢 Aggressive',
+    'label': '🟢 Aggressive',
 }
 
 BUY_MODE_BALANCED = {
@@ -120,28 +112,12 @@ BUY_MODE_BALANCED = {
     'label': '⚪ Balanced',
 }
 
-BUY_MODE_CAUTIOUS = {
-    'mode': 'CAUTIOUS_BUY',
-    'min_confidence': 75,
-    'max_amount': 18,
-    'max_positions': 12,
-    'label': '⏳ Cautious',
-}
-
-BUY_MODE_MINIMAL = {
-    'mode': 'MINIMAL',
-    'min_confidence': 75,
-    'max_amount': 17,
-    'max_positions': 12,
-    'label': '⚠️ High Confidence',
-}
-
 BUY_MODE_NO_BUY = {
     'mode': 'NO_BUY',
     'min_confidence': 80,
     'max_amount': 12,
     'max_positions': 12,
-    'label': '🔴🔴 High Confidence Only',
+    'label': '🔴 High Confidence Only',
 }
 
 
@@ -165,91 +141,51 @@ MACRO_SELL_POINTS = {
 
 # =====================================================================
 # 🌐 Market Regime Decision Matrix
-# (Macro Status, Current Market Direction) -> (Buy_Mode, Sell_Mode)
+# Macro Status -> (Buy_Mode, Sell_Mode)
 #
-# 🟢→🟢 = 50%+ \$30 | Buy strong + Sell at peak
-# 🟢→⚪ = 60%+ \$25 | Normal buy + Sell at peak
-# 🟢→🔴 = 90%+ \$12 | Almost no buy + Sniper profit
-# 🟢→🔄 = 60%+ \$25 | Normal buy + Sell at peak
-# ⚪→🟢 = 60%+ \$25 | Good signal + Normal sell
-# ⚪→⚪ = 60%+ \$25 | Normal + Normal
-# ⚪→🔴 = 90%+ \$12 | Almost no buy + Sniper profit
-# ⚪→🔄 = 60%+ \$25 | Normal + Normal
-# 🔴→🟢 = 70%+ \$15 | Careful buy + Wait recovery
-# 🔴→⚪ = 70%+ \$15 | Careful + Cautious sell
-# 🔴→🔴 = 90%+ \$12 | No buy + Exit fast
-# 🔴→🔄 = 70%+ \$15 | Careful + Cautious sell
+# 🟢 BULLISH = AGGRESSIVE $30 | NORMAL Sell
+# ⚪ NEUTRAL = BALANCED   $20 | CAUTIOUS Sell
+# 🔴 BEARISH = NO_BUY     $12 | SNIPER_EXIT Sell
 # =====================================================================
 
 MARKET_MODE_MATRIX = {
-    # 🟢 Bullish now
-    ('BULLISH', 'BULLISH'):   ('AGGRESSIVE', 'NORMAL'),
-    ('BULLISH', 'NEUTRAL'):   ('BALANCED', 'NORMAL'),
-    ('BULLISH', 'BEARISH'):   ('CAUTIOUS_BUY', 'SNIPER_EXIT'),
-
-
-    # ⚪ Neutral now
-    ('NEUTRAL', 'BULLISH'):   ('BALANCED', 'NORMAL'),
-    ('NEUTRAL', 'NEUTRAL'):   ('BALANCED', 'CAUTIOUS'),
-    ('NEUTRAL', 'BEARISH'):   ('CAUTIOUS_BUY', 'SNIPER_EXIT'),
-
-
-    # 🔴 Bearish now
-    ('BEARISH', 'BULLISH'):   ('BALANCED', 'WAIT_RECOVERY'),
-    ('BEARISH', 'NEUTRAL'):   ('MINIMAL', 'CAUTIOUS'),
-    ('BEARISH', 'BEARISH'):   ('NO_BUY', 'SNIPER_EXIT'),
-
+    'BULLISH': ('AGGRESSIVE', 'NORMAL'),
+    'NEUTRAL': ('BALANCED',   'CAUTIOUS'),
+    'BEARISH': ('NO_BUY',     'SNIPER_EXIT'),
 }
 
 
-def get_market_modes(current_trend: str, market_direction: str) -> tuple:
+def get_market_modes(current_trend: str, market_direction: str = None) -> tuple:
     """
-    Get buy/sell modes based on macro status and current market direction.
+    Get buy/sell modes based on macro status only.
     Returns: (buy_mode_dict, sell_mode_dict)
     """
     current_trend = str(current_trend or 'NEUTRAL')
-    market_direction = str(market_direction or 'NEUTRAL')
 
-    # Simplify current trend
     if 'BULL' in current_trend:
-        current = 'BULLISH'
+        key = 'BULLISH'
     elif 'BEAR' in current_trend:
-        current = 'BEARISH'
+        key = 'BEARISH'
     else:
-        current = 'NEUTRAL'
+        key = 'NEUTRAL'
 
-    # Simplify current market direction from MacroTrendAdvisor combined state
-    if 'BULL' in market_direction:
-        direction = 'BULLISH'
-    elif 'BEAR' in market_direction:
-        direction = 'BEARISH'
-    elif market_direction == 'MIXED':
-        direction = 'MIXED'
-    else:
-        direction = 'NEUTRAL'
-
-    buy_mode_key, sell_mode_key = MARKET_MODE_MATRIX.get(
-        (current, direction), ('BALANCED', 'NORMAL')
-    )
+    buy_mode_key, sell_mode_key = MARKET_MODE_MATRIX.get(key, ('BALANCED', 'CAUTIOUS'))
 
     buy_modes = {
         'AGGRESSIVE': BUY_MODE_AGGRESSIVE,
-        'BALANCED': BUY_MODE_BALANCED,
-        'CAUTIOUS_BUY': BUY_MODE_CAUTIOUS,
-        'MINIMAL': BUY_MODE_MINIMAL,
-        'NO_BUY': BUY_MODE_NO_BUY,
+        'BALANCED':   BUY_MODE_BALANCED,
+        'NO_BUY':     BUY_MODE_NO_BUY,
     }
 
     sell_modes = {
-        'NORMAL': SELL_MODE_NORMAL,
+        'NORMAL':      SELL_MODE_NORMAL,
+        'CAUTIOUS':    SELL_MODE_CAUTIOUS,
         'SNIPER_EXIT': SELL_MODE_SNIPER_EXIT,
-        'WAIT_RECOVERY': SELL_MODE_WAIT_RECOVERY,
-        'CAUTIOUS': SELL_MODE_CAUTIOUS,
     }
 
     return (
         buy_modes.get(buy_mode_key, BUY_MODE_BALANCED),
-        sell_modes.get(sell_mode_key, SELL_MODE_NORMAL),
+        sell_modes.get(sell_mode_key, SELL_MODE_CAUTIOUS),
     )
 
 
