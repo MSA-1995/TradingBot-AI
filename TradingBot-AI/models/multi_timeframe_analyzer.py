@@ -42,6 +42,7 @@ class MultiTimeframeAnalyzer:
     ORDER_BOOK_DEPTH          = 10
     VOLUME_LOOKBACK           = 5
     SINGLE_TF_MIN_CONFIDENCE  = 50
+    RSI_PERIOD                = 14
 
     # معاملات تعديل الثقة حسب السوق
     BULL_PEAK_MULTIPLIER      = 0.9
@@ -215,7 +216,7 @@ class MultiTimeframeAnalyzer:
                     reasons.append("Sell wall")
 
             # 5. RSI Overbought
-            rsi = analysis.get('rsi', 50) if analysis else 50
+            rsi = self._calculate_rsi(candles)
             if rsi > 70:
                 confidence += min(20, (rsi - 70) * 0.5)
                 reasons.append(f'RSI:{rsi:.0f} OB')
@@ -271,7 +272,7 @@ class MultiTimeframeAnalyzer:
                     reasons.append("Buy wall")
 
             # 5. RSI Oversold
-            rsi = analysis.get('rsi', 50) if analysis else 50
+            rsi = self._calculate_rsi(candles)
             if rsi < 30:
                 confidence += min(20, (30 - rsi) * 0.5)
                 reasons.append(f'RSI:{rsi:.0f} OS')
@@ -310,6 +311,31 @@ class MultiTimeframeAnalyzer:
             return REALTIME_BOTTOM_BEAR_CONFIDENCE, REALTIME_BOTTOM_BEAR_CONFIRMATIONS
         else:
             return REALTIME_BOTTOM_SIDEWAYS_CONFIDENCE, REALTIME_BOTTOM_BASE_CONFIRMATIONS
+
+    def _calculate_rsi(self, candles: list) -> float:
+        """حساب RSI داخلي لكل إطار زمني لضمان دقة التحليل"""
+        try:
+            period = self.RSI_PERIOD
+            if not candles or len(candles) <= period:
+                return 50.0
+
+            gains = []
+            losses = []
+            for i in range(-period, 0):
+                change = candles[i].get('close', 0) - candles[i - 1].get('close', 0)
+                gains.append(max(0.0, change))
+                losses.append(max(0.0, -change))
+
+            avg_gain = sum(gains) / period
+            avg_loss = sum(losses) / period
+
+            if avg_loss == 0:
+                return 100.0
+
+            rs = avg_gain / avg_loss
+            return 100.0 - (100.0 / (1 + rs))
+        except Exception:
+            return 50.0
 
     def _weighted_confidence(self, c5m: float, c15m: float, c1h: float) -> float:
         """حساب الثقة الموزونة للأطر الثلاثة"""
@@ -372,6 +398,3 @@ class MultiTimeframeAnalyzer:
             'market_context': macro_status,
             'threshold_used': MultiTimeframeAnalyzer.DEFAULT_THRESHOLD
         }
-
-
-
