@@ -273,6 +273,7 @@ class MacroTrendAdvisor:
                 if self._pending_count >= 2:
                     self._pending_status = None
                     self._pending_count  = 0
+                    self._last_status = new_status
                     return new_status
                 return self._last_status
             else:
