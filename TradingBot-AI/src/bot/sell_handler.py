@@ -67,7 +67,7 @@ def process_sell(result, exchange, ctx):
     # 📊 Send Advisor Report (only Peak Points)
     try:
         _reason = result.get('reason', '')
-        if 'Peak Points' in _reason:
+        if 'Peak' in _reason:
             _sell_votes = result.get('sell_votes', {})
 
             # Prepare support_data (Macro & Indicators) same as BUY
