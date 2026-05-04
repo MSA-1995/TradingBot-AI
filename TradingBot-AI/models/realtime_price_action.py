@@ -548,6 +548,8 @@ class RealTimePriceAction:
             for c in candles[-lookback:]:
                 high   = c.get('high', 0)
                 close  = c.get('close', 0)
+                total_range = high - c.get('low', 0)
+                if total_range == 0: continue
                 open_p = c.get('open', 0)
                 total  = high - c.get('low', 0)
 
