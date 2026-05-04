@@ -187,8 +187,7 @@ def calculate_dynamic_confidence(analysis, mtf_analysis):
         confidence += trend_score
         reasons.append(f"Bullish trend ({mtf_analysis.get('total', 0)}/3)")
     
-    return confidence, reasons
-
+    return min(confidence, 100), reasons
 def get_active_positions_count(symbols_dict):
     """Count active positions"""
     return sum(1 for data in symbols_dict.values() if data['position'] is not None)
