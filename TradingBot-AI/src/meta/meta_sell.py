@@ -688,7 +688,7 @@ class SellMixin:
             support_pts = min(peak_score / 100 * 20, 20)
             sell_pts    = min(meta_points_w + core_pts + support_pts
                               + dynamic_sell_points, 100)
-            required    = 60
+            required    = 0
 
             if sell_pts >= required:
                 gc.collect()
