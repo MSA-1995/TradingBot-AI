@@ -35,9 +35,9 @@ def run_main_loop(exchange, ctx):
     try:
         import psutil
         memory_usage = psutil.virtual_memory().percent
-        print(f" start - Memory: {memory_usage:.1f}% - Time: {time.strftime('%H:%M:%S')}")
-    except ImportError:
-        print(f"🔍 Loop start - No psutil - Time: {time.strftime('%H:%M:%S')}")
+        from datetime import datetime, timezone, timedelta
+        _now = datetime.now(timezone(timedelta(hours=3))).strftime('%H:%M:%S')
+        print(f' start - Memory: {memory_usage:.1f}% - Time: {_now}')
     except Exception as e:
         print(f"⚠️ Diagnostic error: {e}")
 
