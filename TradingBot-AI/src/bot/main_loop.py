@@ -377,16 +377,16 @@ def run_main_loop(exchange, ctx):
                                 # ✅ تحديث نقاط الماكرو حسب الحالة الحالية للسوق
                                 current_macro_status = "NEUTRAL"
                                 try:
-                                    # استخدم market_regime من position_data المخزن أو ai_data
-                                    _mr = ai_data.get('market_regime', position_data.get('market_regime', {}))
-                                    if isinstance(_mr, dict):
-                                        _regime_val = _mr.get('regime', 'NEUTRAL')
+                                    # استخدم macro_market مثل الشراء (موجود في ai_data)
+                                    macro_market = ai_data.get('macro_market', {})
+                                    if isinstance(macro_market, dict):
+                                        current_macro_str = macro_market.get('current', 'NEUTRAL')
                                     else:
-                                        _regime_val = str(_mr)
-                                    _regime_upper = str(_regime_val).upper()
-                                    if 'UPTREND' in _regime_upper:
+                                        current_macro_str = str(macro_market)
+                                    current_macro_upper = str(current_macro_str).upper()
+                                    if 'BULL' in current_macro_upper:
                                         current_macro_status = "BULL"
-                                    elif 'DOWNTREND' in _regime_upper:
+                                    elif 'BEAR' in current_macro_upper:
                                         current_macro_status = "BEAR"
                                     else:
                                         current_macro_status = "NEUTRAL"
