@@ -402,41 +402,7 @@ def run_main_loop(exchange, ctx):
             except Exception as e:
                 print(f"⚠️ Memory optimizer error: {e}")
 
-            # ========== RISK / ANOMALY / PATTERN REPORTS ==========
-            if should_send_report(last_report_time, REPORT_INTERVAL):
-                risk_manager       = preloaded_advisors.get('RiskManager')
-                anomaly_detector   = preloaded_advisors.get('AnomalyDetector')
-                pattern_recognizer = preloaded_advisors.get('EnhancedPatternRecognition')
-
-                if risk_manager:
-                    try:
-                        risk_report = risk_manager.get_risk_report()
-                        if risk_report:
-                            stop_check = risk_manager.should_stop_trading()
-                            if stop_check['stop']:
-                                print(f"\n⚠️ {Fore.RED}RISK ALERT: {stop_check['reason']}{Style.RESET_ALL}")
-                                print(f"Severity: {stop_check['severity']}")
-                                if stop_check['severity'] == 'CRITICAL':
-                                    print(f"🛑 Stopping bot for safety...")
-                                    break
-                    except Exception as e:
-                        print(f"⚠️ Risk report error: {e}")
-
-                if anomaly_detector:
-                    try:
-                        anomaly_report = anomaly_detector.get_anomaly_report()
-                        if anomaly_report and anomaly_report.get('total_anomalies', 0) > 0:
-                            pass
-                    except Exception as e:
-                        print(f"⚠️ Anomaly report error: {e}")
-
-                if pattern_recognizer:
-                    try:
-                        pattern_stats = pattern_recognizer.get_pattern_statistics()
-                        if pattern_stats:
-                            pass
-                    except Exception as e:
-                        print(f"⚠️ Pattern stats error: {e}")
+            # ========== RISK / ANOMALY / PATTERN REPORTS (disabled) ==========
 
             # ========== SAVE BOT STATUS TO DB ==========
             try:
