@@ -321,7 +321,9 @@ class SellMixin:
                                         ''),
                 'profit'             : profit_pct,
                 'sell_votes'         : {},
-                'stop_loss_threshold': slt
+                'stop_loss_threshold': slt,
+                'advisors_intelligence': ai,
+                'analysis'           : analysis
             }
 
         # ══════════════════════════════════════
@@ -584,7 +586,7 @@ class SellMixin:
             support_pts = min(peak_score / 100 * 20, 20)
             sell_pts    = min(meta_points_w + core_pts + support_pts
                               + dynamic_sell_points, 100)
-            required    = 0
+            required    = dyn_min
 
             if sell_pts >= required:
                 gc.collect()
@@ -730,4 +732,6 @@ class SellMixin:
         except Exception as e:
             logger.warning(f"SL features error: {e}")
             return {'drop_from_peak':0,'threshold':0,'is_stop_loss':0}
+
+
 
