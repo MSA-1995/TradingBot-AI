@@ -501,7 +501,7 @@ class SellMixin:
             core_votes,
             sum(1 for v in core_votes.values() if v >= 50),
             len(core_votes),
-            dyn_min=sell_mode.get('min_sell_points', 70),
+            dyn_min=dyn_min,
             dynamic_sell_points=dynamic_sell_points
         )
 
