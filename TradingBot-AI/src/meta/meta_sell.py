@@ -12,7 +12,8 @@ from typing import Optional
 
 from config import (
     MIN_SELL_CONFIDENCE,
-    get_market_modes, MACRO_SELL_POINTS
+    get_market_modes, MACRO_SELL_POINTS,
+    SELL_MODE_CAUTIOUS
 )
 from meta.meta_utils import adjust_threshold_by_forecasts, extract_volumes
 
@@ -275,8 +276,7 @@ class SellMixin:
         # ══════════════════════════════════════
         # ENSURE sell_mode is ALWAYS set
         # ══════════════════════════════════════
-        if sell_mode is None or sell_mode == SELL_MODE_CAUTIOUS:
-            from config import SELL_MODE_CAUTIOUS
+        if sell_mode is None:
             sell_mode = SELL_MODE_CAUTIOUS
             dyn_min   = sell_mode.get('min_sell_points', MIN_SELL_CONFIDENCE)
 
