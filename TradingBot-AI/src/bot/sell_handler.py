@@ -79,8 +79,8 @@ def process_sell(result, exchange, ctx):
                 'macd_diff': _analysis.get('macd_diff', 0),
                 'volume_ratio': _analysis.get('volume_ratio', 1.0),
                 'fear_greed': _analysis.get('sentiment', {}).get('fear_greed', 50),
-                'macro_key': _ai.get('macro_sell_key', _ai.get('macro_key', 'N/A')),
-                'macro_points': _ai.get('macro_sell_points', _ai.get('macro_points', 0)),
+                'macro_key': _ai.get('macro_sell_key', 'N/A'),
+                'macro_points': _ai.get('macro_sell_points', 0),
                 'macro_current': _ai.get('macro_market', {}).get('current', 'N/A'),
                 'macro_direction': _ai.get('macro_market', {}).get('direction', 'N/A'),
                 'macro_strength': _ai.get('macro_market', {}).get('strength', 'N/A'),
@@ -338,6 +338,7 @@ def process_sell(result, exchange, ctx):
         print(f"⚠️ Error deleting {symbol} from database: {e}")
 
     return True
+
 
 
 
