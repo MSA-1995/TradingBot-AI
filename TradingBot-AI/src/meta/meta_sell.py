@@ -614,7 +614,6 @@ class SellMixin:
         return {
             'action'             : 'HOLD',
             'reason'             : (f'Wave Riding | '
-                                    f'Profit:{profit_pct:+.1f}% | '
                                     f'Peak:{peak_score} | '
                                     f'Dyn:{dynamic_sell_points:+.1f} | '
                                     ''),
