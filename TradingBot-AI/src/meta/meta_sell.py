@@ -195,7 +195,7 @@ class SellMixin:
                 'reason'    : (f"🚀 PROFIT SPIKE: "
                                 f"{spike.get('profit_jump',0):.1f}% in "
                                 f"{spike.get('time_diff',0):.0f}s | "
-                                f"{sell_mode.get('label', '')}"),
+                                ''),
                 'profit'    : profit,
                 'sell_votes': {}
             }
@@ -209,7 +209,7 @@ class SellMixin:
                 'reason'    : (f"💥 LOSS SPIKE: "
                                 f"{spike.get('profit_jump',0):.1f}% in "
                                 f"{spike.get('time_diff',0):.0f}s (Instant Sell) | "
-                                f"{sell_mode.get('label', '')}"),
+                                ''),
                 'profit'    : profit,
                 'sell_votes': {}
             }
@@ -321,7 +321,7 @@ class SellMixin:
                 'action'             : 'SELL',
                 'reason'             : (f'🛡️ Stop Loss: {drop:.1f}%>='
                                         f'{slt:.1f}% | '
-                                        f'{sell_mode.get("label", "")}'),
+                                        ''),
                 'profit'             : profit_pct,
                 'sell_votes'         : {},
                 'stop_loss_threshold': slt
@@ -546,7 +546,7 @@ class SellMixin:
                 self._smart_sell_tracker.pop(key, None)
                 return {'action': 'SELL',
                         'reason': (f'🛡️ Rescue: Bounce |'
-                                    f' {profit_pct:.2f}% | {sell_mode.get("label", "")}'),
+                                    f' {profit_pct:.2f}% | {(sell_mode if "sell_mode" in locals() else {}).get("label", "")}'),
                         'profit': profit_pct, 'sell_votes': {}}
             elif abs(profit_pct - tr.get('last_profit', profit_pct)) < 0.1:
                 stable = (now - tr.get('stable_since', now)) / 60
@@ -702,7 +702,7 @@ class SellMixin:
                     'reason'    : (f'🎯 Peak: {sell_pts:.0f}/{required}pts | '
                                     f'Core:{core_pts:.0f} | '
                                     f'Dyn:{dynamic_sell_points:+.1f} | '
-                                    f'{sell_mode.get("label", "")}'),
+                                    ''),
                     'profit'             : profit_pct,
                     'sell_votes'         : sell_votes,
                     'peak_score'         : peak_score,
@@ -721,7 +721,7 @@ class SellMixin:
                                     f'Profit:{profit_pct:+.1f}% | '
                                     f'Peak:{peak_score} | '
                                     f'Dyn:{dynamic_sell_points:+.1f} | '
-                                    f'{sell_mode.get("label", "")}'),
+                                    ''),
             'profit'             : profit_pct,
             'sell_votes'         : sell_votes,
             'peak_score'         : peak_score,
