@@ -239,6 +239,7 @@ class SellMixin:
         # ══════════════════════════════════════
         sell_mode    = None
         macro_status = '⚪ NEUTRAL'
+        dyn_min      = MIN_SELL_CONFIDENCE
 
         try:
             macro = (self.advisor_manager.get('MacroTrendAdvisor')
@@ -267,7 +268,7 @@ class SellMixin:
                     'direction': pd_dir,
                     'strength': pd_str,
                 }
-                dyn_min = sell_mode.get('min_sell_points', 70)
+                dyn_min = sell_mode.get('min_sell_points', MIN_SELL_CONFIDENCE)
         except Exception as e:
             logger.warning(f"Sell macro error: {e}")
 
@@ -277,6 +278,7 @@ class SellMixin:
         if sell_mode is None:
             from config import SELL_MODE_CAUTIOUS
             sell_mode = SELL_MODE_CAUTIOUS
+            dyn_min   = sell_mode.get('min_sell_points', MIN_SELL_CONFIDENCE)
 
         # ══════════════════════════════════════
         # MARKET INTELLIGENCE for Sell (SMART)
@@ -511,7 +513,7 @@ class SellMixin:
                           position, ai, rsi, macd_diff_pct,
                           volume_ratio, profit_pct, peak_score,
                           sell_votes, sell_vote_count,
-                          total_advisors, dyn_min=70, dynamic_sell_points=0):
+                          total_advisors, dyn_min, dynamic_sell_points=0):
         highest = position.get(
             'highest_price',
             float(position.get('buy_price', 0) or 0))
