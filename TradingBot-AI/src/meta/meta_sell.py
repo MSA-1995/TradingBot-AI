@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from config import (
-    MIN_SELL_CONFIDENCE, MIN_SELL_PROFIT,
+    MIN_SELL_CONFIDENCE,
     get_market_modes, MACRO_SELL_POINTS
 )
 from meta.meta_utils import adjust_threshold_by_forecasts, extract_volumes
@@ -239,7 +239,6 @@ class SellMixin:
         # ══════════════════════════════════════
         sell_mode    = None
         macro_status = '⚪ NEUTRAL'
-        dyn_min      = MIN_SELL_PROFIT
 
         try:
             macro = (self.advisor_manager.get('MacroTrendAdvisor')
@@ -268,9 +267,7 @@ class SellMixin:
                     'direction': pd_dir,
                     'strength': pd_str,
                 }
-                dyn_min = max(
-                    sell_mode.get('min_sell_profit', MIN_SELL_PROFIT),
-                    MIN_SELL_PROFIT)
+                dyn_min = sell_mode.get('min_sell_points', 70)
         except Exception as e:
             logger.warning(f"Sell macro error: {e}")
 
@@ -328,17 +325,9 @@ class SellMixin:
             }
 
         # ══════════════════════════════════════
-        # 3. Minimum Profit Threshold
+        # 3. Points Threshold (Market-Based)
         # ══════════════════════════════════════
-        if profit_pct < dyn_min:
-            if sl.get('is_stop_loss') == 1:
-                pass
-            else:
-                reason = (f'🛡️ Stop Loss Zone: {profit_pct:.2f}% | SL Trigger: -{slt:.2f}%'
-                          if profit_pct < -1.0
-                          else f'⏳ Waiting: {profit_pct:.2f}% < {dyn_min:.1f}%')
-                return {'action':'HOLD','reason':reason,
-                        'profit':profit_pct,'stop_loss_threshold':slt}
+        # dyn_min = نقاط البيع المطلوبة (80/70/60) - تُستخدم في _wave_protection
 
         # ══ Fibonacci + RSI Filter ══════════════════════
         try:
@@ -496,14 +485,6 @@ class SellMixin:
 
         sell_points = max(0, min(100, sell_points))
 
-        # ══════════════════════════════════════
-        # Smart Sell - emergency modes
-        # ══════════════════════════════════════
-        if sell_mode and sell_mode.get('mode') in ('SNIPER_EXIT', 'WAIT_RECOVERY', 'CAUTIOUS'):
-            smart = self._smart_sell_check(
-                symbol, position, profit_pct, sell_mode)
-            if smart:
-                return smart
 
         # ══════════════════════════════════════
         # Wave Protection
@@ -527,7 +508,7 @@ class SellMixin:
                            profit_pct, sell_mode):
         mode  = sell_mode.get('mode',              'NORMAL')
         stab  = sell_mode.get('stability_minutes', 5)
-        minp  = sell_mode.get('min_sell_profit',   MIN_SELL_PROFIT)
+        minp  = sell_mode.get('min_sell_points', 70)
         label = sell_mode.get('label',             '')
         key   = f"{symbol}_smart_sell"
         now   = time.time()
@@ -674,8 +655,7 @@ class SellMixin:
             }
 
         # 🎯 Smart Peak Sell
-        dyn_min = MIN_SELL_PROFIT
-        if profit_pct >= dyn_min:
+        if True:  # نقاط البيع تتحكم عبر dyn_min في should_sell
             meta_sell_conf = sell_votes.get('meta_trading', 0)
             meta_points_w  = (meta_sell_conf / 100) * 20
 
@@ -839,6 +819,3 @@ class SellMixin:
         except Exception as e:
             logger.warning(f"SL features error: {e}")
             return {'drop_from_peak':0,'threshold':0,'is_stop_loss':0}
-
-
-
