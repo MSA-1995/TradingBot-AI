@@ -597,7 +597,7 @@ class SellMixin:
                 gc.collect()
                 return {
                     'action'    : 'SELL',
-                    'reason'    : (f'🎯 Peak: {sell_pts:.0f}/{required}pts | '
+                    'reason'    : (f'Points: {sell_pts:.0f} (need {required:.0f}+) | '
                                     f'Core:{core_pts:.0f} | '
                                     f'Dyn:{dynamic_sell_points:+.1f} | '
                                     f'{sell_mode.get("label", "")}'),
@@ -616,7 +616,7 @@ class SellMixin:
         return {
             'action'             : 'HOLD',
             'reason'             : (f'Wave Riding | '
-                                    f'Peak:{peak_score} | '
+                                    f'Points:{sell_pts:.0f} (need {dyn_min:.0f}+) | '
                                     f'Dyn:{dynamic_sell_points:+.1f} | '
                                     f'{sell_mode.get("label", "")}'),
             'profit'             : profit_pct,
