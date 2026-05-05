@@ -195,7 +195,7 @@ class SellMixin:
                 'reason'    : (f"🚀 PROFIT SPIKE: "
                                 f"{spike.get('profit_jump',0):.1f}% in "
                                 f"{spike.get('time_diff',0):.0f}s | "
-                                ''),
+                                f'{sell_mode.get("label", "")}'),
                 'profit'    : profit,
                 'sell_votes': {}
             }
@@ -209,7 +209,7 @@ class SellMixin:
                 'reason'    : (f"💥 LOSS SPIKE: "
                                 f"{spike.get('profit_jump',0):.1f}% in "
                                 f"{spike.get('time_diff',0):.0f}s (Instant Sell) | "
-                                ''),
+                                f'{sell_mode.get("label", "")}'),
                 'profit'    : profit,
                 'sell_votes': {}
             }
@@ -320,7 +320,7 @@ class SellMixin:
                 'action'             : 'SELL',
                 'reason'             : (f'🛡️ Stop Loss: {drop:.1f}%>='
                                         f'{slt:.1f}% | '
-                                        ''),
+                                        f'{sell_mode.get("label", "")}'),
                 'profit'             : profit_pct,
                 'sell_votes'         : {},
                 'stop_loss_threshold': slt,
@@ -561,7 +561,8 @@ class SellMixin:
                 'action'             : 'SELL',
                 'reason'             : (f'🛡️ Wave Stop: {drop:.1f}%>='
                                         f'{threshold:.1f}% | '
-                                        f'Dyn:{dynamic_sell_points:+.1f}'),
+                                        f'Dyn:{dynamic_sell_points:+.1f} | '
+                                        f'{sell_mode.get("label", "")}'),
                 'profit'             : profit_pct,
                 'sell_votes'         : sell_votes,
                 'peak_score'         : peak_score,
@@ -598,7 +599,7 @@ class SellMixin:
                     'reason'    : (f'🎯 Peak: {sell_pts:.0f}/{required}pts | '
                                     f'Core:{core_pts:.0f} | '
                                     f'Dyn:{dynamic_sell_points:+.1f} | '
-                                    ''),
+                                    f'{sell_mode.get("label", "")}'),
                     'profit'             : profit_pct,
                     'sell_votes'         : sell_votes,
                     'peak_score'         : peak_score,
@@ -616,7 +617,7 @@ class SellMixin:
             'reason'             : (f'Wave Riding | '
                                     f'Peak:{peak_score} | '
                                     f'Dyn:{dynamic_sell_points:+.1f} | '
-                                    ''),
+                                    f'{sell_mode.get("label", "")}'),
             'profit'             : profit_pct,
             'sell_votes'         : sell_votes,
             'peak_score'         : peak_score,
