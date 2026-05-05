@@ -221,7 +221,7 @@ class MacroTrendAdvisor:
         if pump_then_dump:
             status = "BEARISH"
         elif fake_signal:
-            status = "NEUTRAL" if bull_points > bear_points else "BEARISH"
+            status = "BEARISH"
         elif bull_points >= bear_points + 3 and bull_points >= 5 and volume_ratio >= 0.95:
             status = 'BULLISH'
         elif bear_points >= bull_points + 3 and bear_points >= 5:
@@ -304,12 +304,12 @@ class MacroTrendAdvisor:
         }
 
         # ── combined للتوافق مع meta_buy.py ──
-        if bull >= 3:
+        if bull >= 2:
             direction = "BULLISH"
-            strength  = "STRONG" if bull == 4 else "NORMAL"
-        elif bear >= 3:
+            strength  = "STRONG" if bull >= 3 else "NORMAL"
+        elif bear >= 2:
             direction = "BEARISH"
-            strength  = "STRONG" if bear == 4 else "NORMAL"
+            strength  = "STRONG" if bear >= 3 else "NORMAL"
         else:
             direction = "NEUTRAL"
             strength  = "NEUTRAL"
@@ -375,6 +375,3 @@ class MacroTrendAdvisor:
             "neutral_count": 0,
             "total": 0,
         }
-
-
-
