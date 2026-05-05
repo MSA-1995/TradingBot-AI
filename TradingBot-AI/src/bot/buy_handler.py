@@ -282,6 +282,8 @@ def process_buy(result: dict, exchange, ctx: dict) -> bool:
             'rsi':             result.get('rsi', 50),
             'volume_ratio':    result.get('volume_ratio', 1.0),
             'whale_confidence': result.get('analysis', {}).get('whale_confidence', 0),
+            # حفظ macro_market لاستخدامه في الصفقات المفتوحة
+            'macro_market': result.get('advisors_intelligence', {}).get('macro_market', {}),
         })
 
         # Add liquidity metrics
@@ -321,6 +323,3 @@ def process_buy(result: dict, exchange, ctx: dict) -> bool:
     )
 
     return True
-
-
-
