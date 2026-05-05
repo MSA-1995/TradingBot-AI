@@ -501,6 +501,23 @@ class SellMixin:
         )
 
     # ─────────────────────────────────────────────
+    # Wave Protection
+    # ─────────────────────────────────────────────
+
+    def _wave_protection(self, symbol, analysis, candles,
+                          position, ai, rsi, macd_diff_pct,
+                          volume_ratio, profit_pct, peak_score,
+                          sell_votes, sell_vote_count,
+                          total_advisors, dynamic_sell_points=0):
+        highest = position.get(
+            'highest_price',
+            float(position.get('buy_price', 0) or 0))
+        current = float(analysis.get('close', 0))
+        drop    = ((highest - current) / highest * 100
+                   if highest > 0 else 0)
+
+        atr       = analysis.get('atr', 0) or 0
+        threshold = max(ai.get('risk_level', 50) / 25,
                         atr * self.STOP_ATR_MULT)
         threshold += (ai.get('risk_level', 50) - 50) / 100 * 3
         threshold -= (ai.get('whale_tracking_score', 0) / 200) * 2
@@ -713,3 +730,4 @@ class SellMixin:
         except Exception as e:
             logger.warning(f"SL features error: {e}")
             return {'drop_from_peak':0,'threshold':0,'is_stop_loss':0}
+
