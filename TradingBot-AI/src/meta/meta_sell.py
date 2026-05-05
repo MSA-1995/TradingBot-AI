@@ -195,7 +195,7 @@ class SellMixin:
                 'reason'    : (f"🚀 PROFIT SPIKE: "
                                 f"{spike.get('profit_jump',0):.1f}% in "
                                 f"{spike.get('time_diff',0):.0f}s | "
-                                f'{sell_mode.get("label", "")}'),
+                                'UNKNOWN'),
                 'profit'    : profit,
                 'sell_votes': {}
             }
@@ -209,7 +209,7 @@ class SellMixin:
                 'reason'    : (f"💥 LOSS SPIKE: "
                                 f"{spike.get('profit_jump',0):.1f}% in "
                                 f"{spike.get('time_diff',0):.0f}s (Instant Sell) | "
-                                f'{sell_mode.get("label", "")}'),
+                                'UNKNOWN'),
                 'profit'    : profit,
                 'sell_votes': {}
             }
@@ -275,7 +275,7 @@ class SellMixin:
         # ══════════════════════════════════════
         # ENSURE sell_mode is ALWAYS set
         # ══════════════════════════════════════
-        if sell_mode is None:
+        if sell_mode is None or sell_mode == SELL_MODE_CAUTIOUS:
             from config import SELL_MODE_CAUTIOUS
             sell_mode = SELL_MODE_CAUTIOUS
             dyn_min   = sell_mode.get('min_sell_points', MIN_SELL_CONFIDENCE)
@@ -502,7 +502,8 @@ class SellMixin:
             sum(1 for v in core_votes.values() if v >= 50),
             len(core_votes),
             dyn_min=dyn_min,
-            dynamic_sell_points=dynamic_sell_points
+            dynamic_sell_points=dynamic_sell_points,
+            sell_mode=sell_mode
         )
 
     # ─────────────────────────────────────────────
@@ -510,10 +511,10 @@ class SellMixin:
     # ─────────────────────────────────────────────
 
     def _wave_protection(self, symbol, analysis, candles,
-                          position, ai, rsi, macd_diff_pct,
-                          volume_ratio, profit_pct, peak_score,
-                          sell_votes, sell_vote_count,
-                          total_advisors, dyn_min, dynamic_sell_points=0):
+                           position, ai, rsi, macd_diff_pct,
+                           volume_ratio, profit_pct, peak_score,
+                           sell_votes, sell_vote_count,
+                           total_advisors, dyn_min, dynamic_sell_points=0, sell_mode=None):
         highest = position.get(
             'highest_price',
             float(position.get('buy_price', 0) or 0))
