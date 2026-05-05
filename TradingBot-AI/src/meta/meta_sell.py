@@ -499,6 +499,7 @@ class SellMixin:
             core_votes,
             sum(1 for v in core_votes.values() if v >= 50),
             len(core_votes),
+            dyn_min=sell_mode.get('min_sell_points', 70),
             dynamic_sell_points=dynamic_sell_points
         )
 
@@ -510,7 +511,7 @@ class SellMixin:
                           position, ai, rsi, macd_diff_pct,
                           volume_ratio, profit_pct, peak_score,
                           sell_votes, sell_vote_count,
-                          total_advisors, dynamic_sell_points=0):
+                          total_advisors, dyn_min=70, dynamic_sell_points=0):
         highest = position.get(
             'highest_price',
             float(position.get('buy_price', 0) or 0))
@@ -732,6 +733,3 @@ class SellMixin:
         except Exception as e:
             logger.warning(f"SL features error: {e}")
             return {'drop_from_peak':0,'threshold':0,'is_stop_loss':0}
-
-
-
