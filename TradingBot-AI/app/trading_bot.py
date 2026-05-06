@@ -1,4 +1,4 @@
-﻿"""
+"""
 🤖 MSA Smart Trading Bot - Main File
 Lightweight main loop that imports from organized modules
 """
@@ -113,14 +113,9 @@ exchange_config = {
 exchange = ccxt.binance(exchange_config)
 exchange.set_sandbox_mode(True)
 
-# Sandbox/testnet can return very short OHLCV history after maintenance.
-# Keep orders on sandbox, but read public market data from live Binance.
-market_exchange = ccxt.binance({
-    'timeout': 5000,
-    'enableRateLimit': True,
-    'options': {'defaultType': 'spot', 'adjustForTimeDifference': True}
-})
-print("📊 Market data: Binance live public | Trading: Binance sandbox")
+# Using sandbox for both trading and market data
+market_exchange = exchange
+print("📊 Market data: Binance sandbox | Trading: Binance sandbox")
 
 # ========== STORAGE ==========
 storage = StorageManager()
