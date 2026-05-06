@@ -309,14 +309,12 @@ def run_main_loop(exchange, ctx):
                             market_emoji  = "🟢" if market_dir == 'bullish' else "🔴" if market_dir == 'bearish' else "⚪"
                             forecast_text = f" | Coin{coin_emoji} Market{market_emoji}"
 
-                        macro_p   = result.get('advisors_intelligence', {}).get('macro_buy_points', 0)
-                        macro_key = result.get('advisors_intelligence', {}).get('macro_key', 'N/A')
                         print(
                             f"📊 {symbol:12} ${result.get('price', 0):>8.2f} "
                             f"| RSI:{rsi:>5.1f} "
                             f"| Vol:{vol_status} {min(vol, 100):.0f}x "
                             f"| MACD:{macd:>+6.1f} "
-                            f"| Macro:{macro_p:>+.0f} "
+                            
                             f"{news_display} | {result.get('reason', '')}{forecast_text}"
                         )
                     continue
