@@ -1,0 +1,14 @@
+psutil
+ccxt
+lightgbm
+scikit-learn
+cryptography
+requests
+pandas
+numpy
+ta
+colorama
+psycopg2-binary
+python-dotenv
+flask
+gunicorn

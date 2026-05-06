@@ -1,0 +1,2 @@
+worker: python app/trading_bot.py
+web: gunicorn dashboard:app --bind 0.0.0.0:$PORT
