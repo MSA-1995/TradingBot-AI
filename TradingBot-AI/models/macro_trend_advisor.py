@@ -98,8 +98,8 @@ class MacroTrendAdvisor:
         bear_count = 0
 
         for symbol in self.LEADERS:
-            df = self._fetch_df(symbol, '1h', 80)
-            if df is None or len(df) < 30:
+            df = self._fetch_df(symbol, '1h', 40)
+            if df is None or len(df) < 20:
                 results[symbol] = {'status': 'NEUTRAL', 'reason': 'no data'}
                 continue
 
