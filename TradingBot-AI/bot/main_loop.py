@@ -55,18 +55,9 @@ def run_main_loop(exchange, ctx):
     get_dynamic_symbols_fn = ctx['get_dynamic_symbols_fn']
     advisor_manager        = ctx['advisor_manager']
 
-    # ========== PRE-LOAD ADVISORS ==========
-    advisors_to_preload = [
-        'SmartMoneyTracker', 'FibonacciAnalyzer',
-        'NewsAnalyzer', 'LiquidityAnalyzer', 'AnomalyDetector',
-        'EnhancedPatternRecognition', 'RiskManager', 'ExitStrategyModel'
-    ]
+    # ========== PRE-LOAD ADVISORS - Lazy (fix OOM) ==========
+    # لا نحمل المستشارين مقدماً - يتحملون عند الطلب فقط
     preloaded_advisors = {}
-    for name in advisors_to_preload:
-        try:
-            preloaded_advisors[name] = advisor_manager.get(name)
-        except Exception as e:
-            print(f"  ❌ Failed to pre-load {name}: {e}")
 
     try:
         loop_count       = 0
