@@ -62,7 +62,7 @@ REPORT_INTERVAL = 3600     #تقرير الديسكورد 3600 ثانيه = 1 س
 SELL_MODE_NORMAL = {
     'mode': 'NORMAL',
     'stability_minutes': 0,
-    'min_sell_points': 65,     # نقاط البيع - سوق صاعد (بعد خصم الماكرو -10 = 72 فعلي)
+    'min_sell_points': 60,     # نقاط البيع - سوق صاعد (بعد خصم الماكرو -10 = 72 فعلي)
     'stop_loss_mult': 1.2,
     'label': '🟢 Normal',
 }
@@ -70,7 +70,7 @@ SELL_MODE_NORMAL = {
 SELL_MODE_CAUTIOUS = {
     'mode': 'CAUTIOUS',
     'stability_minutes': 0,    # AI يقرر بدون وقت ثابت
-    'min_sell_points': 60,     # نقاط البيع - سوق محايد
+    'min_sell_points': 55,     # نقاط البيع - سوق محايد
     'stop_loss_mult': 0.8,
     'label': '⚪ Cautious',
 }
