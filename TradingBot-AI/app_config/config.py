@@ -62,7 +62,7 @@ REPORT_INTERVAL = 3600     #تقرير الديسكورد 3600 ثانيه = 1 س
 SELL_MODE_NORMAL = {
     'mode': 'NORMAL',
     'stability_minutes': 0,
-    'min_sell_points': 62,     # نقاط البيع - سوق صاعد (بعد خصم الماكرو -10 = 72 فعلي)
+    'min_sell_points': 65,     # نقاط البيع - سوق صاعد (بعد خصم الماكرو -10 = 72 فعلي)
     'stop_loss_mult': 1.2,
     'label': '🟢 Normal',
 }
