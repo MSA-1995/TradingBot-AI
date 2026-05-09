@@ -125,7 +125,7 @@ MACRO_BUY_POINTS = {
 }
 
 MACRO_SELL_POINTS = {
-    'BULL': -5,   # خفيف - نبيع في القمة حتى في Bull
+    'BULL': -10,   # خفيف - نبيع في القمة حتى في Bull
     'NEUT': +5,
     'BEAR': +10,
 }
