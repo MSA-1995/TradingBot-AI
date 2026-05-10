@@ -350,10 +350,12 @@ class SellMixin:
             _fd     = {'high_24h': _high, 'low_24h': _low, 'rsi': _rsi}
             _at_sup, _ = _fib.is_at_support(_price, _fd, tolerance=1.0, volume_ratio=_vr, symbol=symbol)
             if _at_sup and _rsi < 30:
-                return {'action':'HOLD','reason':f'☠️ SELL PAUSED [{symbol}]: Fibonacci Support + RSI={_rsi:.1f} Oversold','profit':profit_pct,'stop_loss_threshold':slt}
+                if not position.get("_fib_paused_once", False):
+                    position["_fib_paused_once"] = True
+                    return {"action":"HOLD","reason":f"☠️ SELL PAUSED [{symbol}]: Fibonacci Support + RSI={_rsi:.1f} Oversold","profit":profit_pct,"stop_loss_threshold":slt}
+                # مرة ثانية → تجاهل الفيبوناتشي وكمل للبيع
         except Exception as _fe:
-            logger.warning(f'Fibonacci sell filter error: {_fe}')
-
+            logger.warning(f"Fibonacci sell filter error: {_fe}")
         # ══════════════════════════════════════
         # Support Inputs
         # ══════════════════════════════════════
@@ -748,7 +750,3 @@ class SellMixin:
         except Exception as e:
             logger.warning(f"SL features error: {e}")
             return {'drop_from_peak':0,'threshold':0,'is_stop_loss':0}
-
-
-
-
