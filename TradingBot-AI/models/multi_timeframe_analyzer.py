@@ -199,6 +199,26 @@ class MultiTimeframeAnalyzer:
             if bearish >= 2:
                 confidence += 25
                 reasons.append(f"{bearish} bearish candles")
+            elif bearish == 1:
+                confidence += 10
+                reasons.append("1 bearish candle")
+            # 2b. ضعف الزخم
+            if len(candles) >= 3:
+                last_body = abs(candles[-1].get("close",0) - candles[-1].get("open",0))
+                prev_body = abs(candles[-2].get("close",0) - candles[-2].get("open",0))
+                if prev_body > 0 and last_body < prev_body * 0.5:
+                    confidence += 15
+                    reasons.append("Momentum weakening")
+            # 2c. Upper Wick طويل
+            last  = candles[-1]
+            high  = last.get("high", 0)
+            close = last.get("close", 0)
+            open_ = last.get("open", 0)
+            body  = abs(close - open_)
+            upper_wick = high - max(close, open_)
+            if body > 0 and upper_wick > body * 1.5:
+                confidence += 20
+                reasons.append("Long upper wick - rejection")
 
             # 3. انخفاض الحجم
             if volume_data and len(volume_data) >= self.MIN_CANDLES:
