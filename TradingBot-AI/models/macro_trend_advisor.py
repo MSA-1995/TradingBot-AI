@@ -36,7 +36,7 @@ class MacroTrendAdvisor:
     # Expanded coin list (sectors: large cap, DeFi, L1, Meme)
     LEADERS = [
         'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT',
-        'DOGE/USDT', 'ADA/USDT', 'AVAX/USDT', 'MATIC/USDT', 'LINK/USDT'
+        'DOGE/USDT', 'ADA/USDT', 'AVAX/USDT', 'TRX/USDT', 'LINK/USDT'
     ]
     TIMEFRAMES = ['1h', '4h', '1d']
     TIMEFRAME_WEIGHTS = {'1d': 0.50, '4h': 0.30, '1h': 0.20}
