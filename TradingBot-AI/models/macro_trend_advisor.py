@@ -205,7 +205,7 @@ class MacroTrendAdvisor:
 
         if pump_dump or fake_detected:
             status = 'BEARISH'
-        elif rsi_avg > 75:
+        elif rsi_avg > 80:
             status = 'BEARISH'  # overbought without confirmation
         elif total_bull >= total_bear + required_lead and total_bull >= min_bull_points:
             status = 'BULLISH'
@@ -337,7 +337,7 @@ class MacroTrendAdvisor:
 
         # RSI influence
         if rsi_value > 70:
-            bear_points += 1  # overbought caution
+            bear_points += 0.5  # overbought caution
         elif rsi_value < 30:
             bull_points += 1  # oversold bounce potential
 
@@ -403,25 +403,27 @@ class MacroTrendAdvisor:
         bear = result['bear_count']
         symbols = result.get('symbols', {})
         momentums = [d.get("change_10", 0.0) for d in symbols.values() if isinstance(d, dict)]
-        volumes = [d.get("volume_ratio", 1.0) for d in symbols.values() if isinstance(d, dict)]
+        volumes = [d.get("volume_ratio", 0.0) for d in symbols.values() if isinstance(d, dict)]
         avg_momentum = sum(momentums) / len(momentums) if momentums else 0.0
         avg_volume = sum(volumes) / len(volumes) if volumes else 1.0
 
-        # Use 70% of coins as threshold
         bull_threshold = int(len(self.LEADERS) * 0.3)
+
         mild_threshold = int(len(self.LEADERS) * 0.2)
-
-        if bull >= bull_threshold and avg_momentum > 0.2 and avg_volume >= 1.1:
-            new_status = '🟢 BULL_MARKET'
-        elif bull >= mild_threshold and avg_momentum > 0.1:
-            new_status = '🟢 MILD_BULL'
+        if avg_volume < 0.6 and avg_momentum > 15:
+            new_status = "🔴 BEAR_MARKET"
+        elif bull >= bull_threshold and avg_momentum > 0.2 and avg_volume >= 1.1:
+            new_status = "🟢 BULL_MARKET"
+        elif bull >= bull_threshold and avg_momentum > 0.5 and avg_volume >= 0.7:
+            new_status = "🟢 BULL_MARKET"
+        elif bull >= mild_threshold and avg_momentum > 0.1 and avg_volume >= 0.65:
+            new_status = "🟢 MILD_BULL"
         elif bear >= bull_threshold and avg_momentum < -0.2:
-            new_status = '🔴 BEAR_MARKET'
+            new_status = "🔴 BEAR_MARKET"
         elif bear >= mild_threshold and avg_momentum < -0.1:
-            new_status = '🔴 MILD_BEAR'
+            new_status = "🔴 MILD_BEAR"
         else:
-            new_status = '⚪ SIDEWAYS'
-
+            new_status = "⚪ SIDEWAYS"
         # Sticky logic
         if new_status != self._last_status:
             if new_status == self._pending_status:
