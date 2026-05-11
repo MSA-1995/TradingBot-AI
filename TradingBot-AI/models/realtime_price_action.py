@@ -17,19 +17,19 @@ class RealTimePriceAction:
     MACD_SIGNAL  = 9
 
     # ─── عتبات القمة ───
-    PEAK_MIN_CONFIDENCE     = 55       # خفضنا من 65 → 55 علشان يكشف أبكر
-    PEAK_MIN_SIGNALS        = 2        # خفضنا من 3 → 2
+    PEAK_MIN_CONFIDENCE     = 65       # قمة حقيقية - 3 إشارات مطلوبة
+    PEAK_MIN_SIGNALS        = 3        # قمة حقيقية - 3 إشارات مطلوبة
     PEAK_DISTANCE_MAX       = 2.0
     PEAK_DISTANCE_MIN       = 0.5
     PEAK_CONFIDENCE_BOOST   = 20
-    UPPER_WICK_THRESHOLD    = 50       # خفضنا من 60 → 50 (أحس أسرع)
+    UPPER_WICK_THRESHOLD    = 60       # قمة حقيقية - ظل علوي قوي
     RSI_OVERBOUGHT          = 70
     VOLUME_DROP_THRESHOLD   = 30
     SELL_WALL_RATIO         = 150
 
     # ─── عتبات القاع ───
     BOTTOM_MIN_CONFIDENCE   = 55       # خفضنا من 65 → 55
-    BOTTOM_MIN_SIGNALS      = 2        # خفضنا من 3 → 2
+    BOTTOM_MIN_SIGNALS      = 2        # قمة حقيقية - 3 إشارات مطلوبة
     LOWER_WICK_THRESHOLD    = 50       # خفضنا من 60 → 50
     RSI_OVERSOLD            = 30
     VOLUME_SPIKE_THRESHOLD  = 50
@@ -108,7 +108,7 @@ class RealTimePriceAction:
         # 10. Doji عند القمة (تردد)
         doji = self._detect_doji(candles[-1])
         if doji['detected'] and confidence > 20:
-            signals.append(f"✝️ Doji at Peak: {doji['strength']:.0f}%")
+            signals.append(f"⭕ Doji at Peak: {doji['strength']:.0f}%")
             confidence += doji['strength'] * 0.2
 
         # 11. ظلال علوية متتالية (أقوى إشارة!)
