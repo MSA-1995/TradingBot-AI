@@ -410,7 +410,7 @@ class MacroTrendAdvisor:
         bull_threshold = int(len(self.LEADERS) * 0.3)
 
         mild_threshold = int(len(self.LEADERS) * 0.2)
-        if avg_volume < 0.6 and avg_momentum > 15:
+        if avg_volume < 0.6 and avg_momentum < -15 and bear >= bull_threshold:
             new_status = "🔴 BEAR_MARKET"
         elif bull >= bull_threshold and avg_momentum > 0.2 and avg_volume >= 1.1:
             new_status = "🟢 BULL_MARKET"
@@ -418,7 +418,7 @@ class MacroTrendAdvisor:
             new_status = "🟢 BULL_MARKET"
         elif bull >= mild_threshold and avg_momentum > 0.1 and avg_volume >= 0.65:
             new_status = "🟢 MILD_BULL"
-        elif bear >= bull_threshold and avg_momentum < -0.2:
+        elif bear >= bull_threshold and avg_momentum < -0.2 and bear > 0:
             new_status = "🔴 BEAR_MARKET"
         elif bear >= mild_threshold and avg_momentum < -0.1:
             new_status = "🔴 MILD_BEAR"
