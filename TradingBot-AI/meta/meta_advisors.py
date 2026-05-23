@@ -279,8 +279,10 @@ class AdvisorsMixin:
                     order_book=analysis.get('order_book'),
                     macro_status=analysis.get('macro_status', 'NEUTRAL')
                 )
-                if r and r.get('is_peak'):
-                    votes['multitimeframe'] = r.get('confidence', 0)
+                if r and r.get('confidence', 0) > 20:
+                    conf = r.get('confirmations', 1)
+                    votes['multitimeframe'] = (
+                        r['confidence'] * (max(conf, 1) / 3))
         except Exception as e:
             print(f"⚠️ multitimeframe sell error: {e}")
             votes['multitimeframe'] = 0
