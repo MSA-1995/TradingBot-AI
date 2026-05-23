@@ -186,8 +186,10 @@ class MacroTrendAdvisor:
         min_bull_points = max(3, int(5 * volatility_factor))  # low vol: lower threshold
 
         # Final decision
-        fake_detected = any(details[tf].get('fake_signal', False) for tf in details if details[tf])
+        fake_bull_detected = any(details[tf].get('fake_bull', False) for tf in details if details[tf])
+        fake_bear_detected = any(details[tf].get('fake_bear', False) for tf in details if details[tf])
         pump_dump = any(details[tf].get('pump_then_dump', False) for tf in details if details[tf])
+        dump_pump = any(details[tf].get('dump_then_pump', False) for tf in details if details[tf])
         rsi_avg = np.mean([details[tf].get('rsi', 50) for tf in details if details[tf]])
 
         # Funding rate adjustment: negative funding = bearish pressure
@@ -203,8 +205,10 @@ class MacroTrendAdvisor:
         total_bull += funding_adjust if funding_adjust > 0 else 0
         total_bear += abs(funding_adjust) if funding_adjust < 0 else 0
 
-        if pump_dump or fake_detected:
+        if pump_dump or fake_bull_detected:
             status = 'BEARISH'
+        elif dump_pump or fake_bear_detected:
+            status = 'BULLISH'
         elif rsi_avg > 80:
             status = 'BEARISH'  # overbought without confirmation
         elif total_bull >= total_bear + required_lead and total_bull >= min_bull_points:
@@ -224,7 +228,7 @@ class MacroTrendAdvisor:
             'change_10': base.get('change_10', 0),
             'volume_ratio': base.get('volume_ratio', 1.0),
             'real_candle': base.get('real_candle', False),
-            'fake_signal': fake_detected,
+            'fake_signal': fake_bull_detected or fake_bear_detected,
             'close_strength': base.get('close_strength', 0.5),
             'rsi': round(rsi_avg, 1),
             'funding_rate': funding_rate,
@@ -232,7 +236,13 @@ class MacroTrendAdvisor:
         }
 
     def _analyze_timeframe(self, df: pd.DataFrame, tf: str, funding_rate: float) -> dict:
-        """Analyze a single timeframe's OHLCV."""
+        """
+        Analyze a single timeframe's OHLCV.
+        v2: يكتشف الاتجاه الحقيقي (بطيء أو سريع) ويتجاهل الوهمي.
+        
+        الحقيقي = تراكمي + مدعوم بـ EMAs + هيكل Lower Highs/Higher Lows
+        الوهمي = spike لحظي + wick طويل + بدون تأكيد Volume أو EMA
+        """
         close = df['close']
         high = df['high']
         low = df['low']
@@ -256,103 +266,228 @@ class MacroTrendAdvisor:
         rsi = 100 - (100 / (1 + rs))
         rsi_value = float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50.0
 
-        # Price change over 10 candles
-        prev_price = float(close.iloc[-11]) if len(close) > 11 else price
-        change_10 = ((price - prev_price) / prev_price * 100) if prev_price > 0 else 0
+        # ═══ Multi-period momentum (يكتشف الهبوط/الصعود البطيء) ═══
+        change_5 = self._safe_pct_change(close, 5)
+        change_10 = self._safe_pct_change(close, 10)
+        change_20 = self._safe_pct_change(close, 20)
 
-        # Volume ratio
+        # ═══ Structure Analysis (Lower Highs / Higher Lows) ═══
+        structure = self._analyze_price_structure(high, low, close)
+
+        # ═══ Volume Analysis ═══
         avg_vol_20 = float(volume.tail(20).mean())
         recent_vol = float(volume.tail(3).mean())
         volume_ratio = recent_vol / avg_vol_20 if avg_vol_20 > 0 else 1.0
 
-        # Candle quality
+        # ═══ Candle quality ═══
         last = df.iloc[-1]
         candle_range = float(last["high"]) - float(last["low"])
         candle_range = max(candle_range, 1e-12)
         body = abs(float(last["close"]) - float(last["open"]))
         upper_wick = float(last["high"]) - max(float(last["open"]), float(last["close"]))
+        lower_wick = min(float(last["open"]), float(last["close"])) - float(last["low"])
         close_strength = (float(last["close"]) - float(last["low"])) / candle_range
 
-        real_candle = (
-            body / candle_range >= 0.4
-            and close_strength >= 0.55
-            and upper_wick / candle_range < 0.45
+        # ═══ Fake Signal Detection (إشارات وهمية) ═══
+        # وهمي صعود: spike لحظي + wick علوي طويل + السعر رجع + Volume ما أكد
+        fake_bull = (
+            upper_wick / candle_range > 0.50
+            and close_strength < 0.40
+            and volume_ratio < 1.2
+            and change_5 < 0.5  # ما في صعود حقيقي على 5 شموع
         )
-        fake_signal = (
-            upper_wick / candle_range > 0.55
-            and close_strength < 0.35
-            and volume_ratio < 1.3
-        )
-
-        # Pump then dump detection
-        recent_change30 = float(close.iloc[-1] - close.iloc[-30]) / float(close.iloc[-30]) * 100 if len(close) > 30 else 0
-        prev_high40 = float(high.iloc[-40:-5].max()) if len(high) > 40 else float(high.max())
-        pump_then_dump = (
-            prev_high40 > float(close.iloc[-1]) * 1.05
-            and recent_change30 < -3.0
+        # وهمي هبوط: spike هبوط لحظي + wick سفلي + السعر ارتد
+        fake_bear = (
+            lower_wick / candle_range > 0.50
+            and close_strength > 0.60
+            and volume_ratio < 1.2
+            and change_5 > -0.5  # ما في هبوط حقيقي على 5 شموع
         )
 
-        # Scoring
-        bull_points = 0
-        bear_points = 0
+        # ═══ Real Signal Detection (إشارات حقيقية) ═══
+        # حقيقي = اتجاه مستمر عبر فترات متعددة + EMAs تؤكد + هيكل واضح
+        real_bull = (
+            body / candle_range >= 0.35
+            and close_strength >= 0.50
+            and change_5 > 0 and change_10 > 0  # اتجاه مستمر
+            and not fake_bull
+        )
+        real_bear = (
+            body / candle_range >= 0.35
+            and close_strength <= 0.50
+            and change_5 < 0 and change_10 < 0  # هبوط مستمر
+            and not fake_bear
+        )
 
-        # Price vs EMAs
+        # ═══ Pump then dump / Dump then pump ═══
+        pump_then_dump = False
+        dump_then_pump = False
+        if len(close) > 30:
+            recent_change30 = float(close.iloc[-1] - close.iloc[-30]) / float(close.iloc[-30]) * 100
+            prev_high30 = float(high.iloc[-30:-5].max())
+            prev_low30 = float(low.iloc[-30:-5].min())
+            pump_then_dump = (
+                prev_high30 > price * 1.04
+                and recent_change30 < -2.5
+                and change_5 < 0
+            )
+            dump_then_pump = (
+                prev_low30 < price * 0.96
+                and recent_change30 > 2.5
+                and change_5 > 0
+            )
+
+        # ═══════════════════════════════════════════
+        # Scoring v2 - يعتمد على التراكمية مو اللحظة
+        # ═══════════════════════════════════════════
+        bull_points = 0.0
+        bear_points = 0.0
+
+        # --- 1. EMA Position (وزن عالي - أساس الاتجاه) ---
+        # لكن فقط لو في momentum يدعم (يمنع false signals في الـ sideways)
+        has_real_momentum = (abs(change_5) > 0.3 or abs(change_10) > 0.5)
+
         if price_above_ema21 and price_above_ema50:
-            bull_points += 3
-            if ema21_above_ema50: bull_points += 1
+            bull_points += 3 if has_real_momentum else 1.5
+            if ema21_above_ema50:
+                bull_points += 1.5  # Golden alignment
         elif price_above_ema21:
             bull_points += 1
 
         if not price_above_ema21 and not price_above_ema50:
-            bear_points += 2
-            if not ema21_above_ema50: bear_points += 1
+            bear_points += 3 if has_real_momentum else 1.5
+            if not ema21_above_ema50:
+                bear_points += 1.5 if has_real_momentum else 0.5  # Death alignment
         elif not price_above_ema21:
             bear_points += 1
 
-        # Momentum
-        if change_10 > 2.0:
+        # --- 2. Multi-period Momentum (يكتشف البطيء) ---
+        # الهبوط/الصعود الحقيقي = مستمر عبر 5 و 10 و 20 (مع حد أدنى يتجاهل التذبذب العشوائي)
+        momentum_alignment_bull = (change_5 > 0.3 and change_10 > 0.3 and change_20 > 0.5)
+        momentum_alignment_bear = (change_5 < -0.3 and change_10 < -0.3 and change_20 < -0.5)
+
+        if momentum_alignment_bull:
+            bull_points += 3  # اتجاه صعودي مؤكد عبر 3 فترات
+        elif momentum_alignment_bear:
+            bear_points += 3  # اتجاه هبوطي مؤكد عبر 3 فترات
+
+        # Momentum magnitude
+        avg_momentum = (change_5 + change_10 * 0.7 + change_20 * 0.5) / 3
+        if avg_momentum > 1.5:
             bull_points += 2
-        elif change_10 > 0.8:
+        elif avg_momentum > 0.5:
             bull_points += 1
-        elif change_10 < -2.0:
+        elif avg_momentum < -1.5:
             bear_points += 2
-        elif change_10 < -0.8:
+        elif avg_momentum < -0.5:
             bear_points += 1
 
-        # Volume + candle
-        volume_confirms = volume_ratio >= 1.15
-        if volume_confirms and real_candle:
+        # --- 3. Price Structure (Higher Lows / Lower Highs) ---
+        if structure == 'bullish':
             bull_points += 2
-        elif fake_signal:
-            bear_points += 2
-        elif volume_confirms and change_10 > 0:
-            bull_points += 1
-        elif volume_ratio < 0.7 and change_10 > 0.5:
-            bear_points += 2
-        elif change_10 > 3.0 and volume_ratio < 0.95:
+        elif structure == 'bearish':
             bear_points += 2
 
-        if fake_signal:
+        # --- 4. Volume Confirmation ---
+        volume_confirms = volume_ratio >= 1.1
+        if volume_confirms and real_bull:
+            bull_points += 2
+        elif volume_confirms and real_bear:
+            bear_points += 2
+        elif volume_ratio < 0.7 and change_10 > 1.0:
+            bear_points += 1.5  # صعود بدون Volume = وهمي
+        elif volume_ratio < 0.7 and change_10 < -1.0:
+            bear_points += 0.5  # هبوط بدون Volume = ضعيف بس يحتسب
+
+        # --- 5. Fake Signal Penalties ---
+        if fake_bull:
+            bull_points = max(0, bull_points - 2)
             bear_points += 1
+        if fake_bear:
+            bear_points = max(0, bear_points - 2)
+            bull_points += 1
 
-        # RSI influence
-        if rsi_value > 70:
-            bear_points += 0.5  # overbought caution
-        elif rsi_value < 30:
-            bull_points += 1  # oversold bounce potential
+        # --- 6. Pump & Dump ---
+        if pump_then_dump:
+            bear_points += 2.5
+            bull_points = max(0, bull_points - 2)
+        if dump_then_pump:
+            bull_points += 2.5
+            bear_points = max(0, bear_points - 2)
+
+        # --- 7. RSI (secondary confirmation) ---
+        if rsi_value > 75:
+            bear_points += 1  # overbought = caution
+        elif rsi_value > 70 and change_5 < 0:
+            bear_points += 1.5  # divergence
+        elif rsi_value < 25:
+            bull_points += 1
+        elif rsi_value < 30 and change_5 > 0:
+            bull_points += 1.5  # oversold bounce
 
         return {
-            'bull_points': bull_points,
-            'bear_points': bear_points,
+            'bull_points': round(bull_points, 1),
+            'bear_points': round(bear_points, 1),
             'price': price,
+            'change_5': round(change_5, 2),
             'change_10': round(change_10, 2),
+            'change_20': round(change_20, 2),
             'volume_ratio': round(volume_ratio, 2),
-            'real_candle': real_candle,
-            'fake_signal': fake_signal,
+            'real_candle': real_bull,
+            'fake_signal': fake_bull or fake_bear,
+            'fake_bull': fake_bull,
+            'fake_bear': fake_bear,
             'pump_then_dump': pump_then_dump,
+            'dump_then_pump': dump_then_pump,
             'close_strength': round(close_strength, 2),
             'rsi': round(rsi_value, 1),
+            'structure': structure,
+            'momentum_aligned': 'bull' if momentum_alignment_bull else ('bear' if momentum_alignment_bear else 'none'),
         }
+
+    @staticmethod
+    def _safe_pct_change(series: pd.Series, periods: int) -> float:
+        """حساب نسبة التغيير بأمان"""
+        if len(series) <= periods:
+            return 0.0
+        prev = float(series.iloc[-periods - 1])
+        curr = float(series.iloc[-1])
+        return ((curr - prev) / prev * 100) if prev > 0 else 0.0
+
+    @staticmethod
+    def _analyze_price_structure(high: pd.Series, low: pd.Series, close: pd.Series) -> str:
+        """
+        تحليل هيكل السعر: Higher Lows = bullish, Lower Highs = bearish
+        ينظر لآخر 15 شمعة مقسمة 3 أقسام
+        """
+        if len(close) < 15:
+            return 'neutral'
+
+        # تقسيم لـ 3 مناطق
+        zone1_high = float(high.iloc[-15:-10].max())
+        zone1_low = float(low.iloc[-15:-10].min())
+        zone2_high = float(high.iloc[-10:-5].max())
+        zone2_low = float(low.iloc[-10:-5].min())
+        zone3_high = float(high.iloc[-5:].max())
+        zone3_low = float(low.iloc[-5:].min())
+
+        # Higher Lows + Higher Highs = Bullish
+        higher_lows = (zone3_low > zone2_low > zone1_low)
+        higher_highs = (zone3_high > zone2_high > zone1_high)
+
+        # Lower Highs + Lower Lows = Bearish
+        lower_highs = (zone3_high < zone2_high < zone1_high)
+        lower_lows = (zone3_low < zone2_low < zone1_low)
+
+        if higher_lows and higher_highs:
+            return 'bullish'
+        elif higher_lows:
+            return 'bullish'
+        elif lower_highs and lower_lows:
+            return 'bearish'
+        elif lower_highs:
+            return 'bearish'
+        return 'neutral'
 
     def _get_volatility_factor(self) -> float:
         """Compute dynamic threshold factor based on ATR of BTC/USDT 4h."""
@@ -398,37 +533,104 @@ class MacroTrendAdvisor:
         return rates
 
     def _resolve_status(self, result: dict) -> str:
-        """Aggregate across all coins with sticky logic."""
+        """
+        Aggregate across all coins - v2.
+        يعتمد على:
+        1. عدد العملات الصاعدة/الهابطة
+        2. Momentum المتوسط (multi-period)
+        3. Structure alignment (كم عملة عندها هيكل واضح)
+        4. فلترة الإشارات الوهمية
+        """
         bull = result['bull_count']
         bear = result['bear_count']
+        total = len(self.LEADERS)
         symbols = result.get('symbols', {})
-        momentums = [d.get("change_10", 0.0) for d in symbols.values() if isinstance(d, dict)]
-        volumes = [d.get("volume_ratio", 0.0) for d in symbols.values() if isinstance(d, dict)]
-        avg_momentum = sum(momentums) / len(momentums) if momentums else 0.0
+
+        # جمع بيانات تفصيلية
+        momentums_5 = []
+        momentums_10 = []
+        momentums_20 = []
+        volumes = []
+        structures = {'bullish': 0, 'bearish': 0, 'neutral': 0}
+        momentum_aligned = {'bull': 0, 'bear': 0, 'none': 0}
+        fake_signals = 0
+
+        for d in symbols.values():
+            if not isinstance(d, dict):
+                continue
+            momentums_5.append(d.get("change_5", d.get("change_10", 0.0)))
+            momentums_10.append(d.get("change_10", 0.0))
+            momentums_20.append(d.get("change_20", 0.0))
+            volumes.append(d.get("volume_ratio", 1.0))
+            # Structure
+            s = d.get("structure", "neutral")
+            structures[s] = structures.get(s, 0) + 1
+            # Momentum alignment
+            ma = d.get("momentum_aligned", "none")
+            momentum_aligned[ma] = momentum_aligned.get(ma, 0) + 1
+            # Fake
+            if d.get("fake_signal", False):
+                fake_signals += 1
+
+        avg_m5 = sum(momentums_5) / len(momentums_5) if momentums_5 else 0.0
+        avg_m10 = sum(momentums_10) / len(momentums_10) if momentums_10 else 0.0
+        avg_m20 = sum(momentums_20) / len(momentums_20) if momentums_20 else 0.0
         avg_volume = sum(volumes) / len(volumes) if volumes else 1.0
 
-        bull_threshold = int(len(self.LEADERS) * 0.3)
+        # ═══ Decision Logic v2 ═══
+        # الفكرة: الاتجاه الحقيقي = momentum aligned + structure confirms
+        # الوهمي = fake signals كثير + momentum مو aligned
 
-        mild_threshold = int(len(self.LEADERS) * 0.2)
-        if avg_volume < 0.6 and avg_momentum < -15 and bear >= bull_threshold:
+        # Strong Bull: 40%+ bullish + momentum aligned + structure
+        strong_bull_threshold = int(total * 0.4)
+        # Mild Bull: 30%+ bullish + some confirmation
+        mild_bull_threshold = int(total * 0.3)
+        # Bear thresholds (أقل لأن الهبوط أسرع من الصعود)
+        strong_bear_threshold = int(total * 0.35)
+        mild_bear_threshold = int(total * 0.25)
+
+        # حساب "Real Score" - يتجاهل الوهمي
+        real_bull_count = bull - min(fake_signals, bull)
+        real_bear_count = bear - min(fake_signals, bear)
+
+        # Multi-period momentum confirmation
+        bull_momentum_confirmed = (avg_m5 > 0.3 and avg_m10 > 0.2)
+        bear_momentum_confirmed = (avg_m5 < -0.3 and avg_m10 < -0.2)
+        slow_bear = (avg_m10 < -0.5 and avg_m20 < -1.0)  # هبوط بطيء مستمر
+        slow_bull = (avg_m10 > 0.5 and avg_m20 > 1.0)  # صعود بطيء مستمر
+
+        # Structure confirmation
+        struct_bull = structures.get('bullish', 0) >= int(total * 0.3)
+        struct_bear = structures.get('bearish', 0) >= int(total * 0.3)
+
+        # ─── القرار النهائي ───
+        if (real_bear_count >= strong_bear_threshold
+                and bear_momentum_confirmed
+                and struct_bear):
             new_status = "🔴 BEAR_MARKET"
-        elif bull >= bull_threshold and avg_momentum > 0.2 and avg_volume >= 1.1:
-            new_status = "🟢 BULL_MARKET"
-        elif bull >= bull_threshold and avg_momentum > 0.5 and avg_volume >= 0.7:
-            new_status = "🟢 BULL_MARKET"
-        elif bull >= mild_threshold and avg_momentum > 0.1 and avg_volume >= 0.65:
-            new_status = "🟢 MILD_BULL"
-        elif bear >= bull_threshold and avg_momentum < -0.2 and bear > 0:
-            new_status = "🔴 BEAR_MARKET"
-        elif bear >= mild_threshold and avg_momentum < -0.1:
+        elif (real_bear_count >= mild_bear_threshold
+                and (bear_momentum_confirmed or slow_bear)):
             new_status = "🔴 MILD_BEAR"
+        elif (real_bull_count >= strong_bull_threshold
+                and bull_momentum_confirmed
+                and struct_bull):
+            new_status = "🟢 BULL_MARKET"
+        elif (real_bull_count >= mild_bull_threshold
+                and (bull_momentum_confirmed or slow_bull)):
+            new_status = "🟢 MILD_BULL"
+        # Slow gradual moves (الهبوط/الصعود البطيء المستمر)
+        elif slow_bear and real_bear_count >= 2:
+            new_status = "🔴 MILD_BEAR"
+        elif slow_bull and real_bull_count >= 2:
+            new_status = "🟢 MILD_BULL"
         else:
             new_status = "⚪ SIDEWAYS"
-        # Sticky logic
+
+        # ─── Sticky Logic (أبسط - تأكيد واحد فقط بدل 2) ───
         if new_status != self._last_status:
             if new_status == self._pending_status:
                 self._pending_count += 1
-                if self._pending_count >= 2:
+                if self._pending_count >= 1:  # تأكيد واحد يكفي (بدل 2)
                     self._pending_status = None
                     self._pending_count = 0
                     return new_status
