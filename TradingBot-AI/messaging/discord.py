@@ -414,35 +414,43 @@ def send_advisor_report(signal_type, symbol, core_votes, meta_confidence,
         is_buy = signal_type.upper() == 'BUY'
         color = 'green' if is_buy else 'red'
 
-        # Meta points
-        meta_max = 40 if is_buy else 20
+        # Meta points (meta_trading = 40 نقطة للشراء والبيع)
+        meta_max = 40
         meta_pts = (min(meta_confidence, 100) / 100) * meta_max
 
-        # Advisor weights
+        # Advisor weights (12 مستشار = 40 نقطة)
+        # متطابق مع meta_buy.py سطر 381-398 و meta_sell.py سطر 401-417
         if is_buy:
+            # الشراء: Price Action(19) + Trend(6) + Volume(2) + Smart Money(4) + Technical(4) + Divergence(5) = 40
             advisor_config = [
-                ('candle_expert',   'Candle Expert',    8),
-                ('chart_cnn',       'Chart CNN',        1),
-                ('realtime_pa',     'RealTime PA',      8),
-                ('trend_detector',  'Trend Detector',   2),
-                ('multitimeframe',  'Multi-Timeframe',  5),
-                ('fibonacci',       'Fibonacci',        4),
-                ('smart_money',     'Smart Money',      2),
-                ('volume_forecast', 'Volume Forecast',  1),
-                ('pattern',         'Pattern',          6),
-                ('liquidity_vote',  'Liquidity',        2),
-                ('volume_pred',     'Volume Pred',      1),
+                ('candle_expert',   'Candle Expert',    7),   # Price Action
+                ('realtime_pa',     'RealTime PA',      7),   # Price Action
+                ('pattern',         'Pattern',          5),   # Price Action
+                ('divergence',      'Divergence',       5),   # Reversal Signal
+                ('multitimeframe',  'Multi-Timeframe',  4),   # Trend
+                ('fibonacci',       'Fibonacci',        3),   # Technical
+                ('trend_detector',  'Trend Detector',   2),   # Trend
+                ('smart_money',     'Smart Money',      2),   # Smart Money
+                ('liquidity_vote',  'Liquidity',        2),   # Smart Money
+                ('chart_cnn',       'Chart CNN',        1),   # Technical
+                ('volume_forecast', 'Volume Forecast',  1),   # Volume
+                ('volume_pred',     'Volume Pred',      1),   # Volume
             ]
         else:
+            # البيع: Price Action(18) + Trend(8) + Volume(2) + Smart Money(3) + Technical(4) + Divergence(5) = 40
             advisor_config = [
-                ('candle_expert',   'Candle Expert',    12),
-                ('chart_cnn',       'Chart CNN',        12),
-                ('realtime_pa',     'RealTime PA',      12),
-                ('multitimeframe',  'Multi-Timeframe',  8),
-                ('trend_detector',  'Trend Detector',   8),
-                ('fibonacci',       'Fibonacci',        5),
-                ('smart_money',     'Smart Money',      5),
-                ('volume_forecast', 'Volume Forecast',  3),
+                ('candle_expert',   'Candle Expert',    7),   # Price Action
+                ('realtime_pa',     'RealTime PA',      7),   # Price Action
+                ('divergence',      'Divergence',       5),   # Reversal Signal
+                ('multitimeframe',  'Multi-Timeframe',  4),   # Trend
+                ('trend_detector',  'Trend Detector',   4),   # Trend
+                ('pattern',         'Pattern',          4),   # Price Action
+                ('fibonacci',       'Fibonacci',        3),   # Technical
+                ('smart_money',     'Smart Money',      2),   # Smart Money
+                ('chart_cnn',       'Chart CNN',        1),   # Technical
+                ('volume_forecast', 'Volume Forecast',  1),   # Volume
+                ('liquidity_vote',  'Liquidity',        1),   # Smart Money
+                ('volume_pred',     'Volume Pred',      1),   # Volume
             ]
 
         votes = core_votes or {}
