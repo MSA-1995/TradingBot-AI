@@ -224,14 +224,21 @@ def get_live_news_data(symbol: str | None = None, hours: int = 24) -> dict | Non
         if symbol:
             raw = _events_by_symbol.get(symbol)
             event = json.loads(zlib.decompress(raw).decode()) if raw else None
-            events = [event] if event and datetime.fromisoformat(event["timestamp"]) >= cutoff else []
+            if event and datetime.fromisoformat(event["timestamp"]) >= cutoff:
+                events = [event]
+            else:
+                _events_by_symbol.pop(symbol, None)
+                events = []
         else:
-            events = [
-                json.loads(zlib.decompress(e).decode())
-                for e in _events_by_symbol.values()
-                if e
-            ]
-            events = [e for e in events if datetime.fromisoformat(e["timestamp"]) >= cutoff]
+            events = []
+            for event_symbol, raw in list(_events_by_symbol.items()):
+                if not raw:
+                    continue
+                event = json.loads(zlib.decompress(raw).decode())
+                if datetime.fromisoformat(event["timestamp"]) >= cutoff:
+                    events.append(event)
+                else:
+                    _events_by_symbol.pop(event_symbol, None)
 
     if not events:
         return None
