@@ -219,6 +219,7 @@ def process_news_text(text: str, source: str = "Manual", url: str = "",
 
 def get_live_news_data(symbol: str | None = None, hours: int = 24) -> dict | None:
     cutoff = _now() - timedelta(hours=hours)
+    expired_count = 0
 
     with _lock:
         if symbol:
@@ -227,7 +228,8 @@ def get_live_news_data(symbol: str | None = None, hours: int = 24) -> dict | Non
             if event and datetime.fromisoformat(event["timestamp"]) >= cutoff:
                 events = [event]
             else:
-                _events_by_symbol.pop(symbol, None)
+                if _events_by_symbol.pop(symbol, None) is not None:
+                    expired_count += 1
                 events = []
         else:
             events = []
@@ -238,7 +240,11 @@ def get_live_news_data(symbol: str | None = None, hours: int = 24) -> dict | Non
                 if datetime.fromisoformat(event["timestamp"]) >= cutoff:
                     events.append(event)
                 else:
-                    _events_by_symbol.pop(event_symbol, None)
+                    if _events_by_symbol.pop(event_symbol, None) is not None:
+                        expired_count += 1
+
+    if expired_count:
+        print(f"Live news feed cleanup: {expired_count} expired item(s) removed")
 
     if not events:
         return None
